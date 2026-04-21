@@ -1327,6 +1327,49 @@ function MiniLineChart({ data }) {
   )
 }
 
+function MetricTile({ label, value, helper }) {
+  return (
+    <div className="home-metric-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {helper ? <small>{helper}</small> : null}
+    </div>
+  )
+}
+
+function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
+  const max = Math.max(...data.map((item) => item[maxKey] || 0), 1)
+  return (
+    <div className="mini-chart bars-chart" aria-hidden="true">
+      {data.map((item) => (
+        <div key={item.label} className="bar-group">
+          <span className="bar-label">{item.label}</span>
+          <div className="bar-track"><div className="bar-fill" style={{ height: `${Math.max(((item[dataKey] || 0) / max) * 100, 6)}%` }} /></div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MiniLineChart({ data }) {
+  const width = 240; const height = 80
+  const values = data.map((item) => item.value)
+  const max = Math.max(...values, 1); const min = Math.min(...values, 0)
+  const points = data.map((item, index) => {
+    const x = (index / Math.max(data.length - 1, 1)) * width
+    const y = height - (((item.value - min) / Math.max(max - min, 1)) * (height - 12)) - 6
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <div className="mini-line-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <polyline fill="none" stroke="currentColor" strokeWidth="3" points={points} />
+      </svg>
+      <div className="chart-xlabels">{data.map((item) => <span key={item.label}>{item.label}</span>)}</div>
+    </div>
+  )
+}
+
 function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, onEdit, onQuickCreate }) {
   const navigate = useNavigate()
   const { isMobile } = useResponsive()
@@ -1344,110 +1387,73 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const completionSeries = getWeekCompletionSeries(tasks)
   const budgetSeries = getBudgetSeries(expenses)
   const scoreTrend = getScoreTrend()
-
-  const focusCopy = todayTasks.filter((task) => !task.completed).slice(0, 3).map((task) => task.title)
+  const focusCopy = todayTasks.filter((task) => !task.completed).slice(0, 2).map((task) => task.title)
 
   return (
-    <div className="screen-grid two-col-grid premium-home-grid">
-      <section className="card hero-card premium-hero full-bleed living-hero">
-        <div>
-          <p className="eyebrow">Today’s Focus</p>
-          <h2>{focusCopy.join(' • ') || 'Live the day on purpose'}</h2>
-          <p className="muted hero-subcopy">The Living Planner keeps today, your week, your money, and your momentum in one place without the clutter.</p>
+    <div className="home-stack">
+      {/* Hero focus card */}
+      <div className="hero-focus-card">
+        <p className="eyebrow">Today's Focus</p>
+        <h2>{focusCopy.join(' • ') || 'Live the day on purpose'}</h2>
+        <p className="muted">Tasks, goals, habits, and budget — all in one place.</p>
+        <div className="hero-focus-actions">
+          <Link className="secondary-btn" to="/calendar">{isMobile ? 'Day View' : 'Open Day View'}</Link>
+          <Link className="secondary-btn" to="/tasks">{isMobile ? 'Tasks' : 'See Tasks'}</Link>
+          <button className="primary-btn" onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
         </div>
-        <div className="hero-actions">
-          <div className="button-row wrap-row hero-button-row">
-            <Link className="secondary-btn" to="/calendar">{isMobile ? 'Day View' : 'Open Day View'}</Link>
-            <Link className="secondary-btn" to="/tasks">{isMobile ? 'Tasks' : 'See Tasks'}</Link>
-            <button className="primary-btn premium-btn" onClick={() => onQuickCreate('event', { date: TODAY })}>Add Event</button>
-          </div>
-          <div className="hero-metrics-grid">
-            <MetricTile label="Open Tasks" value={insights.openTasks} helper={`${insights.overdueCount} overdue`} />
-            <MetricTile label="Completion" value={`${insights.completionRate}%`} helper="This week" />
-            <MetricTile label="Budget Left" value={`$${insights.budgetRemaining.toFixed(2)}`} helper="This week" />
-            <MetricTile label="Habit Streak" value={`${insights.currentHabitStreak} days`} helper={`${insights.habitCount} habits active`} />
-          </div>
-        </div>
-      </section>
+      </div>
 
-      <section className="card premium-card">
+      {/* Metrics strip */}
+      <div className="home-metrics-strip">
+        <MetricTile label="Open Tasks" value={insights.openTasks} helper={`${insights.overdueCount} overdue`} />
+        <MetricTile label="Completion" value={`${insights.completionRate}%`} helper="This week" />
+        <MetricTile label="Budget Left" value={`$${insights.budgetRemaining.toFixed(0)}`} helper="This week" />
+        <MetricTile label="Habit Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} active`} />
+      </div>
+
+      {/* Smart suggestions */}
+      <section className="card">
         <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Smart Suggestions</p>
-            <h3>What the planner would do next</h3>
-          </div>
-          <span className="status-pill">Live insights</span>
+          <div><p className="eyebrow">Smart Suggestions</p><h3>What to do next</h3></div>
+          <span className="status-pill">Live</span>
         </div>
         <div className="suggestion-stack">
-          {suggestions.length === 0 ? <p className="muted">No nudges right now. You’re in a good groove.</p> : suggestions.map((suggestion) => (
-            <button key={suggestion.title} className={`suggestion-card tone-${suggestion.tone}`} onClick={() => navigate(suggestion.route)}>
-              <strong>{suggestion.title}</strong>
-              <span>{suggestion.body}</span>
-              <small>{suggestion.actionLabel}</small>
+          {suggestions.length === 0
+            ? <p className="muted">No nudges right now. You're in a good groove.</p>
+            : suggestions.map((s) => (
+              <button key={s.title} className={`suggestion-card tone-${s.tone}`} onClick={() => navigate(s.route)}>
+                <strong>{s.title}</strong>
+                <span>{s.body}</span>
+                <small>{s.actionLabel} →</small>
+              </button>
+            ))}
+        </div>
+      </section>
+
+      {/* Today timeline */}
+      <section className="card">
+        <div className="section-title-row">
+          <div><p className="eyebrow">Today Timeline</p><h3>What's on the clock</h3></div>
+          <button className="ghost-btn" onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
+        </div>
+        {todaySchedule.length === 0
+          ? <p className="muted">No scheduled items today.</p>
+          : todaySchedule.slice(0, 5).map((item) => (
+            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}>
+              <strong>{item.startTime}</strong>
+              <span>{item.title}</span>
+              <small>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
           ))}
-        </div>
       </section>
 
-      <section className="card premium-card">
+      {/* Goals */}
+      <section className="card">
         <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Weekly Completion</p>
-            <h3>How execution is trending</h3>
-          </div>
+          <div><p className="eyebrow">Goals</p><h3>Top Goals</h3></div>
+          <button className="ghost-btn" onClick={() => onQuickCreate('goal')}>+ Add</button>
         </div>
-        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="completed" maxKey="total" />
-        <p className="muted">Completed actions by day this week.</p>
-      </section>
-
-      <section className="card premium-card">
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Budget Drift</p>
-            <h3>Spend across the week</h3>
-          </div>
-        </div>
-        <MiniBarChart data={budgetSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="amount" />
-        <p className="muted">Week spend: <strong>${weekSpend.toFixed(2)}</strong> against <strong>${budget.weeklyTarget.toFixed(2)}</strong>.</p>
-      </section>
-
-      <section className="card premium-card full-bleed">
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Momentum Trend</p>
-            <h3>Score pulse</h3>
-          </div>
-          <Link className="ghost-btn" to="/growth">Open Growth</Link>
-        </div>
-        <MiniLineChart data={scoreTrend} />
-      </section>
-
-      <section className="card premium-card">
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Today Timeline</p>
-            <h3>What’s on the clock</h3>
-          </div>
-          <button className="ghost-btn" onClick={() => onQuickCreate('task', { date: TODAY })}>Add task</button>
-        </div>
-        {todaySchedule.length === 0 ? <p>No scheduled items.</p> : todaySchedule.slice(0, 5).map((item) => (
-          <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}>
-            <strong>{item.startTime}</strong>
-            <span>{item.title}</span>
-            <small>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
-          </button>
-        ))}
-      </section>
-
-      <section className="card premium-card">
-        <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Goals</p>
-            <h3>Week’s Top Goals</h3>
-          </div>
-          <button className="ghost-btn" onClick={() => onQuickCreate('goal')}>Add</button>
-        </div>
-        {topGoals.map((goal) => (
+        {topGoals.length === 0 ? <p className="muted">No goals yet.</p> : topGoals.map((goal) => (
           <div key={goal.id} className="progress-block">
             <div className="metric-row compact-row">
               <span>{goal.title}</span>
@@ -1458,46 +1464,31 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         ))}
       </section>
 
-      <section className="card premium-card">
+      {/* Weekly completion chart */}
+      <section className="card">
         <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Projects</p>
-            <h3>Open Projects</h3>
-          </div>
-          <button className="ghost-btn" onClick={() => onQuickCreate('project')}>Add</button>
+          <div><p className="eyebrow">Weekly Completion</p><h3>Execution trend</h3></div>
         </div>
-        {openProjects.map((project) => (
-          <button key={project.id} className="list-action-row premium-list-row" onClick={() => onEdit('project', project)}>
-            <span>{project.title}</span>
-            <strong>{getProjectProgress(project.id, tasks)}%</strong>
-          </button>
-        ))}
-        {!openProjects.length ? <p className="muted">No active projects right now.</p> : null}
+        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="completed" maxKey="total" />
+        <p className="muted" style={{fontSize:'.8rem', marginTop: 4}}>Completed actions by day.</p>
       </section>
 
-      <section className="card premium-card">
+      {/* Budget */}
+      <section className="card">
         <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Watchlist</p>
-            <h3>Needs attention</h3>
-          </div>
-          <span className="status-pill alert-pill">{overdueTasks.length} items</span>
+          <div><p className="eyebrow">Budget Drift</p><h3>Spend this week</h3></div>
         </div>
-        {overdueTasks.length === 0 ? <p>No overdue tasks.</p> : overdueTasks.map((task) => (
-          <button key={task.id} className="list-action-row premium-list-row" onClick={() => onEdit('task', task)}>
-            <span>{task.title}</span>
-            <strong>{task.date}</strong>
-          </button>
-        ))}
+        <MiniBarChart data={budgetSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="amount" />
+        <p className="muted" style={{fontSize:'.8rem', marginTop: 4}}>
+          <strong>${weekSpend.toFixed(2)}</strong> of <strong>${budget.weeklyTarget.toFixed(2)}</strong> target
+        </p>
       </section>
 
-      <section className="card premium-card full-bleed">
+      {/* Life scores */}
+      <section className="card">
         <div className="section-title-row">
-          <div>
-            <p className="eyebrow">Life Score Snapshot</p>
-            <h3>Automated balance check</h3>
-          </div>
-          <Link className="ghost-btn" to="/growth">Open Growth</Link>
+          <div><p className="eyebrow">Life Score</p><h3>Balance check</h3></div>
+          <Link className="ghost-btn" to="/growth">Growth →</Link>
         </div>
         <div className="score-grid">
           {Object.entries(scores).map(([key, value]) => (
@@ -1509,26 +1500,22 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           ))}
         </div>
       </section>
-    </div>
-  )
-}
 
-
-function TaskItem({ task, onToggle, onEdit, onDelete, prefersTouch }) {
-  const dragPayload = JSON.stringify({ type: 'task', id: task.id })
-  return (
-    <div className="list-item with-actions premium-task-item" draggable onDragStart={(event) => event.dataTransfer.setData('application/json', dragPayload)}>
-      <div>
-        <h4>{task.title} {task.recurrence && task.recurrence !== 'none' ? <span className="tag">Repeats {task.recurrence}</span> : null}</h4>
-        <p>{task.category} • {task.date} {task.time ? `• ${task.time}` : ''} • {task.priority}</p>
-      </div>
-      <div className="item-actions">
-        <button className={task.completed ? 'secondary-btn' : 'primary-btn premium-btn'} onClick={() => onToggle(task.id)}>
-          {task.completed ? 'Done' : 'Complete'}
-        </button>
-        <button className="ghost-btn" onClick={() => onEdit('task', task)}>{prefersTouch && !task.time ? 'Plan' : 'Edit'}</button>
-        <button className="ghost-btn" onClick={() => onDelete('task', task.id)}>Delete</button>
-      </div>
+      {/* Watchlist */}
+      {overdueTasks.length > 0 && (
+        <section className="card">
+          <div className="section-title-row">
+            <div><p className="eyebrow">Watchlist</p><h3>Needs attention</h3></div>
+            <span className="status-pill alert-pill">{overdueTasks.length} overdue</span>
+          </div>
+          {overdueTasks.map((task) => (
+            <button key={task.id} className="list-action-row premium-list-row" onClick={() => onEdit('task', task)}>
+              <span>{task.title}</span>
+              <strong style={{fontSize:'.8rem', color:'var(--danger)'}}>{task.date}</strong>
+            </button>
+          ))}
+        </section>
+      )}
     </div>
   )
 }
@@ -1655,10 +1642,11 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`))
   }, [tasks, events])
 
+  const hours = Array.from({ length: 16 }, (_, i) => `${String(i + 5).padStart(2, '0')}:00`)
   const weekDays = getWeekDays(selectedDate)
   const monthDays = getMonthDays(selectedDate)
   const dayScheduled = scheduled.filter((item) => item.date === selectedDate)
-  const upcomingScheduled = scheduled.filter((item) => item.date >= TODAY).slice(0, 8)
+  const upcomingScheduled = scheduled.filter((item) => item.date >= TODAY).slice(0, 6)
   const selectedMonthLabel = formatDateLabel(selectedDate, { month: 'long', year: 'numeric' })
 
   const handleDropItem = async (payload, date, time) => {
@@ -1666,47 +1654,80 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     await onReschedule(payload.type, payload.id, { date, ...(time ? { time, startTime: time } : {}) })
   }
 
+  const navLabel = view === 'month'
+    ? selectedMonthLabel
+    : view === 'week'
+    ? `Week of ${formatDateLabel(weekDays[0], { month: 'short', day: 'numeric' })}`
+    : formatDateLabel(selectedDate, { weekday: 'short', month: 'short', day: 'numeric' })
+
+  const step = view === 'month' ? 30 : view === 'week' ? 7 : 1
+
   return (
-    <section className="screen-stack">
-      <section className="card premium-card calendar-header-card">
-        <div className="section-title-row wrap-row">
+    <div className="screen-stack">
+      {/* Header */}
+      <section className="card calendar-header-card">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:10, marginBottom:12}}>
           <div>
             <p className="eyebrow">Time Control</p>
-            <h3>Calendar</h3>
-            <p className="muted">{view === 'month' ? selectedMonthLabel : formatDateLabel(selectedDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+            <h3 style={{margin:0}}>Calendar</h3>
           </div>
-          <div className="button-row wrap-row">
-            <button className="ghost-btn" onClick={() => setSelectedDate(addDays(selectedDate, view === 'month' ? -30 : view === 'week' ? -7 : -1))}>Back</button>
-            <button className="ghost-btn" onClick={() => setSelectedDate(TODAY)}>Today</button>
-            <button className="ghost-btn" onClick={() => setSelectedDate(addDays(selectedDate, view === 'month' ? 30 : view === 'week' ? 7 : 1))}>Next</button>
-            <button className={view === 'day' ? 'pill active-pill' : 'pill'} onClick={() => setView('day')}>Day</button>
-            <button className={view === 'week' ? 'pill active-pill' : 'pill'} onClick={() => setView('week')}>Week</button>
-            <button className={view === 'month' ? 'pill active-pill' : 'pill'} onClick={() => setView('month')}>Month</button>
-            <button className="primary-btn premium-btn" onClick={() => onQuickCreate('event', { date: selectedDate })}>Add Event</button>
-          </div>
+          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 14px'}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
+        </div>
+        {/* Nav row */}
+        <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹</button>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(TODAY)}>Today</button>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, step))}>›</button>
+          <span style={{flex:1, fontWeight:600, fontSize:'.9rem', color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{navLabel}</span>
+        </div>
+        {/* View toggle */}
+        <div style={{display:'flex', gap:6, marginTop:10}}>
+          {['day','week','month'].map((v) => (
+            <button key={v} className={view === v ? 'pill active-pill' : 'pill'} onClick={() => setView(v)} style={{fontSize:'.8rem', padding:'6px 14px', textTransform:'capitalize'}}>{v}</button>
+          ))}
         </div>
       </section>
 
+      {/* Day view */}
       {view === 'day' && (
-        <section className="card premium-card">
-          <div className="section-title-row"><h3>Daily Time Slots</h3><span className="status-pill">{prefersTouch ? 'Tap a slot or edit a task to place it' : 'Drag tasks here to schedule them'}</span></div>
-          {isMobile ? (
+        <section className="card">
+          <div className="section-title-row">
+            <h3>Daily Schedule</h3>
+            <span className="status-pill">{prefersTouch ? 'Tap a slot' : 'Drag to reschedule'}</span>
+          </div>
+          {isMobile && upcomingScheduled.length > 0 && (
             <div className="mobile-agenda-strip">
-              {upcomingScheduled.slice(0,4).map((item) => (
+              {upcomingScheduled.map((item) => (
                 <button key={`${item.itemType}-${item.id}`} className="agenda-chip" onClick={() => onEdit(item.itemType, item)}>
-                  <strong>{item.startTime}</strong>
-                  <span>{item.title}</span>
+                  <strong style={{fontSize:'.78rem', color:'var(--teal)'}}>{item.startTime}</strong>
+                  <span style={{fontSize:'.82rem', color:'var(--text)', fontWeight:600}}>{item.title}</span>
                 </button>
               ))}
             </div>
-          ) : null}
-          <div className={settings.compactCalendar ? 'timeline compact-calendar premium-timeline' : 'timeline premium-timeline'}>
+          )}
+          <div className={settings.compactCalendar ? 'timeline compact-calendar' : 'timeline'}>
             {hours.map((hour) => {
               const items = dayScheduled.filter((item) => item.startTime?.slice(0, 2) === hour.slice(0, 2))
               return (
                 <div className="timeline-row" key={hour}>
                   <div className="timeline-hour">{hour}</div>
-                  <DropSlot date={selectedDate} time={hour} onQuickCreate={onQuickCreate} onDropItem={handleDropItem} items={items} onEdit={onEdit} onDelete={onDelete} prefersTouch={prefersTouch} />
+                  <div
+                    className={items.length === 0 ? (false ? 'timeline-slot drop-active' : 'timeline-slot') : 'timeline-slot'}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}
+                  >
+                    {items.length === 0
+                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}>{prefersTouch ? 'Tap to add' : 'Add here'}</button>
+                      : items.map((item) => (
+                        <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                          <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
+                            <strong style={{fontSize:'.9rem'}}>{item.title}</strong>
+                            <span style={{fontSize:'.78rem', color:'var(--muted)'}}>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
+                          </button>
+                          <button className="ghost-btn" style={{fontSize:'.78rem', padding:'5px 10px'}} onClick={() => onDelete(item.itemType, item.id)}>Delete</button>
+                        </div>
+                      ))}
+                  </div>
                 </div>
               )
             })}
@@ -1714,31 +1735,22 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </section>
       )}
 
+      {/* Week view */}
       {view === 'week' && (
-        <section className="card premium-card">
-          <div className="section-title-row"><h3>Weekly View</h3><span className="status-pill">Drop tasks on a day to move them</span></div>
-          <div className="week-grid premium-week-grid">
+        <section className="card">
+          <div className="section-title-row"><h3>Weekly View</h3></div>
+          <div className="week-grid">
             {weekDays.map((date) => {
               const items = scheduled.filter((item) => item.date === date)
               return (
-                <div
-                  key={date}
-                  className="week-card premium-week-card droppable-day"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    try {
-                      const payload = JSON.parse(event.dataTransfer.getData('application/json'))
-                      handleDropItem(payload, date)
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                >
-                  <button className="day-chip" onClick={() => { setSelectedDate(date); setView('day') }}>{formatDateLabel(date)}</button>
-                  {items.length === 0 ? <p className="muted">Open</p> : items.map((item) => (
-                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)} draggable onDragStart={(event) => event.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
-                      <span>{item.startTime}</span>
-                      <strong>{item.title}</strong>
+                <div key={date} className="week-card droppable-day"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), date) } catch {} }}>
+                  <button className="day-chip" onClick={() => { setSelectedDate(date); setView('day') }}>{formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}</button>
+                  {items.length === 0 ? <p className="muted" style={{fontSize:'.78rem'}}>Open</p> : items.map((item) => (
+                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)} draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                      <span style={{fontSize:'.72rem', color:'var(--teal)'}}>{item.startTime}</span>
+                      <strong style={{fontSize:'.82rem'}}>{item.title}</strong>
                     </button>
                   ))}
                 </div>
@@ -1748,16 +1760,17 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </section>
       )}
 
+      {/* Month view */}
       {view === 'month' && (
-        <section className="card premium-card">
-          <div className="section-title-row"><h3>Monthly Snapshot</h3><span className="status-pill">Tap a day to drill in</span></div>
-          <div className="month-grid premium-month-grid">
+        <section className="card">
+          <div className="section-title-row"><h3>{selectedMonthLabel}</h3></div>
+          <div className="month-grid">
             {monthDays.map((date) => {
               const count = scheduled.filter((item) => item.date === date).length
               return (
-                <button key={date} className={date === selectedDate ? 'month-cell active-cell premium-month-cell' : 'month-cell premium-month-cell'} onClick={() => { setSelectedDate(date); setView('day') }}>
-                  <strong>{formatDateLabel(date, { month: 'short', day: 'numeric' })}</strong>
-                  <span>{count} scheduled</span>
+                <button key={date} className={date === selectedDate ? 'month-cell active-cell' : 'month-cell'} onClick={() => { setSelectedDate(date); setView('day') }}>
+                  <strong style={{fontSize:'.82rem'}}>{formatDateLabel(date, { month: 'short', day: 'numeric' })}</strong>
+                  {count > 0 && <span style={{fontSize:'.72rem', color:'var(--teal)'}}>{count} item{count > 1 ? 's' : ''}</span>}
                   <div className="mini-progress"><div style={{ width: `${Math.min(count * 25, 100)}%` }} /></div>
                 </button>
               )
@@ -1765,10 +1778,9 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
           </div>
         </section>
       )}
-    </section>
+    </div>
   )
 }
-
 
 function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate }) {
   return (
