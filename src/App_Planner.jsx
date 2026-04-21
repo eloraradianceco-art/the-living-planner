@@ -103,8 +103,9 @@ function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
     if (log.completed) habitByCategory[habit.category].completed += 1
   }
 
-  const spent = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
-  const financeScore = Math.max(1, Math.min(10, Math.round(((budget.weeklyTarget - spent) / budget.weeklyTarget) * 10 + 7)))
+  // Finance score based on savings progress, not weekly spend (bills shouldn't hurt score)
+  const discretionary = expenses.filter(e => !['Bills','Utilities','Rent','Insurance'].includes(e.category)).reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const financeScore = Math.max(1, Math.min(10, Math.round(((budget.weeklyTarget - discretionary) / Math.max(budget.weeklyTarget, 1)) * 10 + 7)))
 
   const scoreFromCompletion = (group) => {
     if (!group || group.total === 0) return 5
@@ -1050,7 +1051,6 @@ const tabs = [
   { to: '/', label: 'Home', icon: '⌂' },
   { to: '/tasks', label: 'Tasks', icon: '✓' },
   { to: '/calendar', label: 'Calendar', icon: '◷' },
-  { to: '/projects', label: 'Projects', icon: '◈' },
   { to: '/growth', label: 'Growth', icon: '↑' },
   { to: '/more', label: 'More', icon: '⋯' },
 ]
@@ -1483,14 +1483,19 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
   const [category, setCategory] = useState('All')
   const [status, setStatus] = useState('All')
 
-  const filtered = useMemo(() => tasks.filter((task) => {
-    if (!settings.showCompletedTasks && task.completed) return false
-    if (category !== 'All' && task.category !== category) return false
-    if (status === 'Open' && task.completed) return false
-    if (status === 'Done' && !task.completed) return false
-    if (query && !task.title.toLowerCase().includes(query.toLowerCase())) return false
-    return true
-  }), [tasks, settings.showCompletedTasks, category, status, query])
+  const filtered = useMemo(() => {
+    try {
+      return (tasks || []).filter((task) => {
+        if (!task || !task.title) return false
+        if (!(settings || {}).showCompletedTasks && task.completed) return false
+        if (category !== 'All' && task.category !== category) return false
+        if (status === 'Open' && task.completed) return false
+        if (status === 'Done' && !task.completed) return false
+        if (query && !task.title.toLowerCase().includes(query.toLowerCase())) return false
+        return true
+      })
+    } catch(e) { return [] }
+  }, [tasks, settings, category, status, query])
 
   const groups = {
     Today: filtered.filter((task) => isToday(task.date)),
@@ -1622,25 +1627,31 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   return (
     <div className="screen-stack">
       {/* Header */}
-      <section className="card calendar-header-card">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:10, marginBottom:12}}>
+      <section className="card" style={{padding:'14px 16px'}}>
+        {/* Row 1: title + add button */}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
           <div>
-            <p className="eyebrow">Time Control</p>
-            <h3 style={{margin:0}}>Calendar</h3>
+            <p className="eyebrow" style={{marginBottom:2}}>Calendar</p>
+            <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)'}}>{navLabel}</div>
           </div>
-          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 14px'}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
+          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 14px', flexShrink:0}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
         </div>
-        {/* Nav row */}
-        <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap'}}>
-          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹</button>
-          <button className="cal-nav-btn" onClick={() => setSelectedDate(TODAY)}>Today</button>
-          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, step))}>›</button>
-          <span style={{flex:1, fontWeight:600, fontSize:'.9rem', color:'var(--text)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{navLabel}</span>
+        {/* Row 2: back / today / forward */}
+        <div style={{display:'flex', gap:6, marginBottom:10}}>
+          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹ Back</button>
+          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(TODAY)}>Today</button>
+          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(addDays(selectedDate, step))}>Next ›</button>
         </div>
-        {/* View toggle */}
-        <div style={{display:'flex', gap:6, marginTop:10}}>
+        {/* Row 3: view toggle */}
+        <div style={{display:'flex', gap:6}}>
           {['day','week','month'].map((v) => (
-            <button key={v} className={view === v ? 'pill active-pill' : 'pill'} onClick={() => setView(v)} style={{fontSize:'.8rem', padding:'6px 14px', textTransform:'capitalize'}}>{v}</button>
+            <button key={v} onClick={() => setView(v)}
+              style={{flex:1, padding:'7px 4px', borderRadius:'999px', border:'1.5px solid', fontSize:'.82rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit',
+                borderColor: view===v ? 'var(--teal)' : 'var(--border2)',
+                background: view===v ? 'var(--teal)' : 'var(--surface)',
+                color: view===v ? 'var(--navy)' : 'var(--text2)'}}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
           ))}
         </div>
       </section>
@@ -1778,6 +1789,937 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
 }
 
 
+// ── FINANCE PAGE ─────────────────────────────────────────────────────────
+function FinancePage({ expenses, budget, setBudget }) {
+  const LS_KEY = (k) => 'planner.' + k
+  const lsGet = (k, d) => { try { const v = localStorage.getItem(LS_KEY(k)); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem(LS_KEY(k), JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('overview')
+  const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
+  const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
+  const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', { income: 0, bills: [], subscriptions: [] }))
+  const [newBill, setNewBill] = useState({ label: '', amount: '' })
+  const [newSub, setNewSub] = useState({ label: '', amount: '', cycle: 'monthly' })
+
+  const saveSavings = (s) => { setSavings(s); lsSet('savings', s) }
+  const saveNoSpend = (n) => { setNoSpend(n); lsSet('noSpend', n) }
+  const saveMonthly = (m) => { setMonthlyBudget(m); lsSet('monthlyBudget', m) }
+
+  const totalBills = monthlyBudget.bills.reduce((s, b) => s + Number(b.amount || 0), 0)
+  const totalSubs = monthlyBudget.subscriptions.reduce((s, b) => s + Number(b.amount || 0), 0)
+  const monthlyExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
+  const savingsPct = Math.min((savings.current / savings.goal) * 100, 100)
+  const noSpendFilled = noSpend.checked.length
+  const daysArray = Array.from({ length: noSpend.days }, (_, i) => i + 1)
+
+  const TABS = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'savings', label: 'Savings' },
+    { id: 'nospend', label: 'No-Spend' },
+    { id: 'monthly', label: 'Monthly' },
+    { id: 'subs', label: 'Subscriptions' },
+  ]
+
+  return (
+    <div className="screen-stack">
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {TABS.map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'overview' && (
+        <>
+          <section className="card">
+            <p className="eyebrow">Monthly Summary</p>
+            <h3 style={{ margin: '4px 0 14px' }}>Financial Overview</h3>
+            {[
+              ['Monthly Income', `$${Number(monthlyBudget.income).toFixed(2)}`, 'var(--success)'],
+              ['Monthly Bills', `$${totalBills.toFixed(2)}`, 'var(--danger)'],
+              ['Subscriptions', `$${totalSubs.toFixed(2)}`, 'var(--warning)'],
+              ['Other Expenses', `$${monthlyExpenses.toFixed(2)}`, 'var(--teal)'],
+              ['Net', `$${(Number(monthlyBudget.income) - totalBills - totalSubs - monthlyExpenses).toFixed(2)}`, 'var(--navy)'],
+            ].map(([label, val, color]) => (
+              <div key={label} className="metric-row card-row">
+                <span style={{ color: 'var(--text2)', fontSize: '.9rem' }}>{label}</span>
+                <strong style={{ color }}>{val}</strong>
+              </div>
+            ))}
+          </section>
+          <section className="card">
+            <p className="eyebrow">Weekly Budget</p>
+            <h3 style={{ margin: '4px 0 10px' }}>Weekly Spending Target</h3>
+            <p className="muted" style={{ fontSize: '.82rem', marginBottom: 10 }}>This target tracks discretionary spending only — not bills or subscriptions. Your life score won't penalize bill payments.</p>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="number" value={budget.weeklyTarget}
+                onChange={e => setBudget({ weeklyTarget: Number(e.target.value) })}
+                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '1rem' }} />
+              <span style={{ color: 'var(--muted)', fontSize: '.85rem' }}>/ week</span>
+            </div>
+          </section>
+        </>
+      )}
+
+      {tab === 'savings' && (
+        <section className="card">
+          <p className="eyebrow">Savings Tracker</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Your Savings Goal</h3>
+          <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+            {[['Goal Label', 'text', 'label', savings.label], ['Goal Amount ($)', 'number', 'goal', savings.goal], ['Current Saved ($)', 'number', 'current', savings.current]].map(([lbl, type, key, val]) => (
+              <label key={key} style={{ display: 'grid', gap: 4, fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)' }}>
+                {lbl}
+                <input type={type} value={val}
+                  onChange={e => saveSavings({ ...savings, [key]: type === 'number' ? Number(e.target.value) : e.target.value })}
+                  style={{ padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.95rem' }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6 }}>
+              ${savings.current.toFixed(2)} <span style={{ fontSize: '.9rem', color: 'var(--muted)', fontWeight: 400 }}>of ${savings.goal.toFixed(2)}</span>
+            </div>
+            <div style={{ background: 'var(--border2)', borderRadius: 999, height: 12, overflow: 'hidden', marginBottom: 8 }}>
+              <div style={{ width: `${savingsPct}%`, height: '100%', background: 'linear-gradient(90deg, var(--teal), var(--teal2))', borderRadius: 999, transition: 'width .4s' }} />
+            </div>
+            <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{savingsPct.toFixed(0)}% toward {savings.label}</div>
+          </div>
+        </section>
+      )}
+
+      {tab === 'nospend' && (
+        <section className="card">
+          <p className="eyebrow">No-Spend Challenge</p>
+          <h3 style={{ margin: '4px 0 6px' }}>Day Tracker</h3>
+          <p className="muted" style={{ fontSize: '.82rem', marginBottom: 12 }}>Tap a bubble to mark a no-spend day. {noSpendFilled} of {noSpend.days} days complete.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: '.85rem', color: 'var(--text2)' }}>Challenge days:</span>
+            {[7, 14, 21, 30].map(n => (
+              <button key={n} onClick={() => saveNoSpend({ ...noSpend, days: n, checked: [] })}
+                style={{ padding: '5px 12px', borderRadius: 999, border: '1.5px solid', fontSize: '.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                  borderColor: noSpend.days === n ? 'var(--teal)' : 'var(--border2)',
+                  background: noSpend.days === n ? 'var(--teal)' : 'var(--surface)',
+                  color: noSpend.days === n ? 'var(--navy)' : 'var(--text2)', fontWeight: 600 }}>{n}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {daysArray.map(day => {
+              const checked = noSpend.checked.includes(day)
+              return (
+                <button key={day} onClick={() => {
+                  const next = checked ? noSpend.checked.filter(d => d !== day) : [...noSpend.checked, day]
+                  saveNoSpend({ ...noSpend, checked: next })
+                }} style={{
+                  width: 44, height: 44, borderRadius: '50%', border: '2px solid',
+                  borderColor: checked ? 'var(--teal)' : 'var(--border2)',
+                  background: checked ? 'var(--teal)' : 'var(--surface)',
+                  color: checked ? 'var(--navy)' : 'var(--muted)',
+                  fontWeight: 700, fontSize: '.85rem', cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'grid', placeItems: 'center'
+                }}>{checked ? '✓' : day}</button>
+              )
+            })}
+          </div>
+          {noSpendFilled === noSpend.days && (
+            <div style={{ marginTop: 16, padding: 14, background: 'rgba(0,194,179,.1)', borderRadius: 'var(--radius)', textAlign: 'center', color: 'var(--teal)', fontWeight: 700 }}>
+              🎉 Challenge Complete! You made it {noSpend.days} days!
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === 'monthly' && (
+        <>
+          <section className="card">
+            <p className="eyebrow">Monthly Planner</p>
+            <h3 style={{ margin: '4px 0 12px' }}>Income & Bills</h3>
+            <label style={{ display: 'grid', gap: 4, fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)', marginBottom: 12 }}>
+              Monthly Income
+              <input type="number" value={monthlyBudget.income}
+                onChange={e => saveMonthly({ ...monthlyBudget, income: Number(e.target.value) })}
+                style={{ padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.95rem' }} />
+            </label>
+            <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8, fontSize: '.9rem' }}>Monthly Bills</div>
+            {monthlyBudget.bills.map((b, i) => (
+              <div key={i} className="metric-row card-row">
+                <span style={{ fontSize: '.9rem' }}>{b.label}</span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <strong style={{ color: 'var(--danger)' }}>${Number(b.amount).toFixed(2)}</strong>
+                  <button onClick={() => saveMonthly({ ...monthlyBudget, bills: monthlyBudget.bills.filter((_, j) => j !== i) })}
+                    style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+                </div>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <input placeholder="Bill name" value={newBill.label} onChange={e => setNewBill(p => ({ ...p, label: e.target.value }))}
+                style={{ flex: 2, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <input type="number" placeholder="$" value={newBill.amount} onChange={e => setNewBill(p => ({ ...p, amount: e.target.value }))}
+                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
+                onClick={() => { if (!newBill.label) return; saveMonthly({ ...monthlyBudget, bills: [...monthlyBudget.bills, newBill] }); setNewBill({ label: '', amount: '' }) }}>Add</button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {tab === 'subs' && (
+        <section className="card">
+          <p className="eyebrow">Subscriptions</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Subscription Tracker</h3>
+          {monthlyBudget.subscriptions.map((s, i) => (
+            <div key={i} className="metric-row card-row">
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{s.label}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{s.cycle}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <strong style={{ color: 'var(--warning)' }}>${Number(s.amount).toFixed(2)}</strong>
+                <button onClick={() => saveMonthly({ ...monthlyBudget, subscriptions: monthlyBudget.subscriptions.filter((_, j) => j !== i) })}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+          ))}
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            <input placeholder="Service name (Netflix, Gym...)" value={newSub.label} onChange={e => setNewSub(p => ({ ...p, label: e.target.value }))}
+              style={{ padding: '8px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="number" placeholder="Amount" value={newSub.amount} onChange={e => setNewSub(p => ({ ...p, amount: e.target.value }))}
+                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <select value={newSub.cycle} onChange={e => setNewSub(p => ({ ...p, cycle: e.target.value }))}
+                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                <option value="monthly">Monthly</option>
+                <option value="annual">Annual</option>
+                <option value="weekly">Weekly</option>
+              </select>
+              <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
+                onClick={() => { if (!newSub.label) return; saveMonthly({ ...monthlyBudget, subscriptions: [...monthlyBudget.subscriptions, newSub] }); setNewSub({ label: '', amount: '', cycle: 'monthly' }) }}>Add</button>
+            </div>
+          </div>
+          <div style={{ marginTop: 14, padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '.85rem', color: 'var(--text2)' }}>Total monthly</span>
+            <strong style={{ color: 'var(--warning)' }}>${totalSubs.toFixed(2)}</strong>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── WELLNESS PAGE ─────────────────────────────────────────────────────────
+function WellnessPage() {
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.w.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.w.' + k, JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('reading')
+  const [books, setBooks] = useState(() => lsGet('books', []))
+  const [newBook, setNewBook] = useState({ title: '', author: '', status: 'Reading', pages: '', pagesRead: 0 })
+  const [routine, setRoutine] = useState(() => lsGet('routine', []))
+  const [newRoutineItem, setNewRoutineItem] = useState({ time: '', label: '', type: 'morning' })
+  const [routineLog, setRoutineLog] = useState(() => lsGet('routineLog', {}))
+
+  const saveBooks = (b) => { setBooks(b); lsSet('books', b) }
+  const saveRoutine = (r) => { setRoutine(r); lsSet('routine', r) }
+  const saveLog = (l) => { setRoutineLog(l); lsSet('routineLog', l) }
+
+  const todayKey = TODAY
+  const todayLog = routineLog[todayKey] || []
+  const toggleRoutineItem = (id) => {
+    const next = todayLog.includes(id) ? todayLog.filter(x => x !== id) : [...todayLog, id]
+    saveLog({ ...routineLog, [todayKey]: next })
+  }
+
+  const STATUS_COLORS = { Reading: 'var(--teal)', Completed: 'var(--success)', 'Want to Read': 'var(--warning)' }
+
+  return (
+    <div className="screen-stack">
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {[{ id: 'reading', label: '📚 Reading' }, { id: 'routine', label: '🌅 Daily Routine' }].map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'reading' && (
+        <section className="card">
+          <p className="eyebrow">Reading Tracker</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Your Books</h3>
+          {books.map((book, i) => (
+            <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--surface)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text)' }}>{book.title}</div>
+                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{book.author}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: '.72rem', padding: '3px 8px', borderRadius: 999, background: STATUS_COLORS[book.status] + '18', color: STATUS_COLORS[book.status], fontWeight: 700 }}>{book.status}</span>
+                  <button onClick={() => saveBooks(books.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                </div>
+              </div>
+              {book.pages > 0 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.75rem', color: 'var(--muted)', marginBottom: 4 }}>
+                    <span>Progress</span><span>{book.pagesRead}/{book.pages} pages</span>
+                  </div>
+                  <div style={{ background: 'var(--surface)', borderRadius: 999, height: 6, overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.min((book.pagesRead / book.pages) * 100, 100)}%`, height: '100%', background: 'var(--teal)', borderRadius: 999 }} />
+                  </div>
+                  <input type="range" min={0} max={book.pages} value={book.pagesRead}
+                    onChange={e => saveBooks(books.map((b, j) => j === i ? { ...b, pagesRead: Number(e.target.value) } : b))}
+                    style={{ width: '100%', accentColor: 'var(--teal)', marginTop: 6 }} />
+                </div>
+              )}
+            </div>
+          ))}
+          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+            <input placeholder="Book title" value={newBook.title} onChange={e => setNewBook(p => ({ ...p, title: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input placeholder="Author" value={newBook.author} onChange={e => setNewBook(p => ({ ...p, author: e.target.value }))}
+                style={{ flex: 2, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <input type="number" placeholder="Pages" value={newBook.pages} onChange={e => setNewBook(p => ({ ...p, pages: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select value={newBook.status} onChange={e => setNewBook(p => ({ ...p, status: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                <option>Reading</option><option>Completed</option><option>Want to Read</option>
+              </select>
+              <button className="primary-btn" style={{ padding: '9px 16px', fontSize: '.82rem' }}
+                onClick={() => { if (!newBook.title) return; saveBooks([...books, { ...newBook, pagesRead: 0 }]); setNewBook({ title: '', author: '', status: 'Reading', pages: '', pagesRead: 0 }) }}>Add Book</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === 'routine' && (
+        <section className="card">
+          <p className="eyebrow">Daily Routine</p>
+          <h3 style={{ margin: '4px 0 6px' }}>Today's Routine</h3>
+          <p className="muted" style={{ fontSize: '.82rem', marginBottom: 14 }}>{todayLog.length} of {routine.length} items completed today</p>
+          {['morning', 'afternoon', 'evening'].map(type => {
+            const items = routine.filter(r => r.type === type)
+            if (!items.length) return null
+            return (
+              <div key={type} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--teal)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>
+                  {type === 'morning' ? '🌅' : type === 'afternoon' ? '☀️' : '🌙'} {type}
+                </div>
+                {items.map((item, i) => {
+                  const done = todayLog.includes(item.id)
+                  return (
+                    <div key={i} onClick={() => toggleRoutineItem(item.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--surface)', cursor: 'pointer' }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: done ? 'var(--teal)' : 'var(--border2)', background: done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                        {done && <span style={{ color: 'var(--navy)', fontSize: '.8rem', fontWeight: 700 }}>✓</span>}
+                      </div>
+                      <span style={{ flex: 1, fontSize: '.9rem', color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }}>{item.label}</span>
+                      {item.time && <span style={{ fontSize: '.75rem', color: 'var(--teal)' }}>{item.time}</span>}
+                      <button onClick={e => { e.stopPropagation(); saveRoutine(routine.filter(r => r.id !== item.id)) }}
+                        style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.9rem' }}>✕</button>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            <input placeholder="Routine item (Prayer, Workout...)" value={newRoutineItem.label} onChange={e => setNewRoutineItem(p => ({ ...p, label: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="time" value={newRoutineItem.time} onChange={e => setNewRoutineItem(p => ({ ...p, time: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <select value={newRoutineItem.type} onChange={e => setNewRoutineItem(p => ({ ...p, type: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                <option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option>
+              </select>
+              <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
+                onClick={() => { if (!newRoutineItem.label) return; saveRoutine([...routine, { ...newRoutineItem, id: Date.now() }]); setNewRoutineItem({ time: '', label: '', type: 'morning' }) }}>Add</button>
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── PRODUCTIVITY PAGE ─────────────────────────────────────────────────────
+function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('tasks')
+  const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
+  const [cleaning, setCleaning] = useState(() => lsGet('cleaning', { month: new Date().getMonth(), year: new Date().getFullYear(), rooms: [] }))
+  const [newChecklist, setNewChecklist] = useState('')
+  const [newItem, setNewItem] = useState({})
+  const [newRoom, setNewRoom] = useState({ label: '', tasks: '' })
+  const [cleaningLog, setCleaningLog] = useState(() => lsGet('cleaningLog', {}))
+
+  const saveChecklists = (c) => { setChecklists(c); lsSet('checklists', c) }
+  const saveCleaning = (c) => { setCleaning(c); lsSet('cleaning', c) }
+  const saveCleaningLog = (l) => { setCleaningLog(l); lsSet('cleaningLog', l) }
+
+  const monthKey = `${cleaning.year}-${cleaning.month}`
+
+  return (
+    <div className="screen-stack">
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'cleaning', label: '🧹 Cleaning' }].map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'tasks' && (
+        <section className="card">
+          <div className="section-title-row">
+            <div><p className="eyebrow">Productivity</p><h3>Tasks</h3></div>
+            <button className="primary-btn" style={{ fontSize: '.82rem', padding: '8px 14px' }} onClick={() => onQuickCreate('task')}>+ Task</button>
+          </div>
+          {tasks.filter(t => !t.completed || settings.showCompletedTasks).slice(0, 20).map(task => (
+            <div key={task.id} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '.9rem', textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'var(--muted)' : 'var(--text)' }}>{task.title}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{task.category} • {task.date}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button className={task.completed ? 'secondary-btn' : 'primary-btn'} style={{ fontSize: '.78rem', padding: '5px 10px' }} onClick={() => onToggle(task.id)}>{task.completed ? '✓ Done' : 'Complete'}</button>
+                <button className="ghost-btn" style={{ fontSize: '.78rem', padding: '5px 10px' }} onClick={() => onEdit('task', task)}>Edit</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === 'checklists' && (
+        <>
+          {checklists.map((cl, ci) => (
+            <section key={cl.id} className="card">
+              <div className="section-title-row">
+                <h3 style={{ fontSize: '1rem' }}>{cl.title}</h3>
+                <button onClick={() => saveChecklists(checklists.filter((_, i) => i !== ci))}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem' }}>Remove</button>
+              </div>
+              {cl.items.map((item, ii) => (
+                <div key={ii} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--surface)' }}>
+                  <div onClick={() => {
+                    const updated = checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: c.items.map((it, iIdx) => iIdx !== ii ? it : { ...it, done: !it.done }) })
+                    saveChecklists(updated)
+                  }} style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: item.done ? 'var(--teal)' : 'var(--border2)', background: item.done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                    {item.done && <span style={{ color: 'var(--navy)', fontWeight: 700, fontSize: '.8rem' }}>✓</span>}
+                  </div>
+                  <span style={{ flex: 1, fontSize: '.9rem', textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--muted)' : 'var(--text)' }}>{item.label}</span>
+                  <button onClick={() => saveChecklists(checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: c.items.filter((_, iIdx) => iIdx !== ii) }))}
+                    style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                <input placeholder="Add item..." value={newItem[cl.id] || ''}
+                  onChange={e => setNewItem(p => ({ ...p, [cl.id]: e.target.value }))}
+                  style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+                <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
+                  onClick={() => { if (!newItem[cl.id]) return; saveChecklists(checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: [...c.items, { label: newItem[cl.id], done: false }] })); setNewItem(p => ({ ...p, [cl.id]: '' })) }}>Add</button>
+              </div>
+            </section>
+          ))}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input placeholder="New checklist name..." value={newChecklist} onChange={e => setNewChecklist(e.target.value)}
+              style={{ flex: 1, padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.88rem' }} />
+            <button className="primary-btn" style={{ padding: '10px 16px', fontSize: '.85rem' }}
+              onClick={() => { if (!newChecklist) return; saveChecklists([...checklists, { id: Date.now(), title: newChecklist, items: [] }]); setNewChecklist('') }}>Create</button>
+          </div>
+        </>
+      )}
+
+      {tab === 'cleaning' && (
+        <section className="card">
+          <p className="eyebrow">Monthly House Cleaning</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Cleaning Tracker</h3>
+          {cleaning.rooms.map((room, ri) => {
+            const roomTasks = room.tasks.split(',').map(t => t.trim()).filter(Boolean)
+            return (
+              <div key={ri} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--surface)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>{room.label}</div>
+                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{roomTasks.filter(t => (cleaningLog[monthKey] || []).includes(`${ri}-${t}`)).length}/{roomTasks.length}</div>
+                </div>
+                {roomTasks.map(task => {
+                  const key = `${ri}-${task}`
+                  const done = (cleaningLog[monthKey] || []).includes(key)
+                  return (
+                    <div key={task} onClick={() => {
+                      const current = cleaningLog[monthKey] || []
+                      saveCleaningLog({ ...cleaningLog, [monthKey]: done ? current.filter(k => k !== key) : [...current, key] })
+                    }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer', borderBottom: '1px solid var(--surface)' }}>
+                      <div style={{ width: 20, height: 20, borderRadius: 4, border: '2px solid', borderColor: done ? 'var(--teal)' : 'var(--border2)', background: done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                        {done && <span style={{ color: 'var(--navy)', fontSize: '.72rem', fontWeight: 700 }}>✓</span>}
+                      </div>
+                      <span style={{ fontSize: '.88rem', color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }}>{task}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input placeholder="Room (Kitchen, Bathroom...)" value={newRoom.label} onChange={e => setNewRoom(p => ({ ...p, label: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Tasks (comma-separated: Mop, Wipe counters, Clean sink)" value={newRoom.tasks} onChange={e => setNewRoom(p => ({ ...p, tasks: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" style={{ padding: '10px', fontSize: '.85rem' }}
+              onClick={() => { if (!newRoom.label) return; saveCleaning({ ...cleaning, rooms: [...cleaning.rooms, newRoom] }); setNewRoom({ label: '', tasks: '' }) }}>Add Room</button>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── LIFESTYLE PAGE ─────────────────────────────────────────────────────────
+function LifestylePage() {
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('braindump')
+  const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
+  const [birthdays, setBirthdays] = useState(() => lsGet('birthdays', []))
+  const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
+  const [contacts, setContacts] = useState(() => lsGet('contacts', []))
+  const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
+  const [trips, setTrips] = useState(() => lsGet('trips', []))
+  const [brainDump, setBrainDump] = useState(() => lsGet('brainDump', ''))
+  const [form, setForm] = useState({})
+  const save = (key, setter, val) => { setter(val); lsSet(key, val) }
+
+  const TABS = [
+    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' },
+    { id: 'birthdays', label: '🎂 Birthdays' }, { id: 'keydates', label: '📅 Key Dates' },
+    { id: 'contacts', label: '👥 Contacts' }, { id: 'passwords', label: '🔑 Passwords' },
+    { id: 'trips', label: '✈️ Trips' },
+  ]
+
+  const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
+    ? <p className="muted" style={{ fontSize: '.85rem' }}>Nothing added yet.</p>
+    : items.map((item, i) => (
+      <div key={i} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>{renderItem(item)}</div>
+        <button onClick={() => onDelete(i)} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', flexShrink: 0 }}>✕</button>
+      </div>
+    ))
+
+  return (
+    <div className="screen-stack">
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {TABS.map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.8rem' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'braindump' && (
+        <section className="card">
+          <p className="eyebrow">Brain Dump</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Clear Your Head</h3>
+          <textarea value={brainDump} onChange={e => save('brainDump', setBrainDump, e.target.value)}
+            placeholder="Dump everything here — ideas, worries, random thoughts, lists, anything on your mind..."
+            style={{ width: '100%', minHeight: 280, padding: 14, border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.9rem', lineHeight: 1.7, resize: 'vertical', color: 'var(--text)', background: 'var(--surface)' }} />
+          <p style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 6 }}>Saved automatically as you type.</p>
+        </section>
+      )}
+
+      {tab === 'groceries' && (
+        <section className="card">
+          <p className="eyebrow">Grocery List</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Shopping List</h3>
+          {groceries.map((item, i) => (
+            <div key={i} onClick={() => save('groceries', setGroceries, groceries.map((g, j) => j === i ? { ...g, done: !g.done } : g))}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--surface)', cursor: 'pointer' }}>
+              <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: item.done ? 'var(--teal)' : 'var(--border2)', background: item.done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                {item.done && <span style={{ color: 'var(--navy)', fontWeight: 700, fontSize: '.8rem' }}>✓</span>}
+              </div>
+              <span style={{ flex: 1, textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--muted)' : 'var(--text)', fontSize: '.9rem' }}>{item.label}</span>
+              {item.qty && <span style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.qty}</span>}
+              <button onClick={e => { e.stopPropagation(); save('groceries', setGroceries, groceries.filter((_, j) => j !== i)) }}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input placeholder="Item" value={form.grocLabel || ''} onChange={e => setForm(p => ({ ...p, grocLabel: e.target.value }))}
+              style={{ flex: 2, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Qty" value={form.grocQty || ''} onChange={e => setForm(p => ({ ...p, grocQty: e.target.value }))}
+              style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
+              onClick={() => { if (!form.grocLabel) return; save('groceries', setGroceries, [...groceries, { label: form.grocLabel, qty: form.grocQty, done: false }]); setForm(p => ({ ...p, grocLabel: '', grocQty: '' })) }}>Add</button>
+          </div>
+          {groceries.some(g => g.done) && (
+            <button className="ghost-btn" style={{ marginTop: 10, fontSize: '.82rem' }}
+              onClick={() => save('groceries', setGroceries, groceries.filter(g => !g.done))}>Clear Checked</button>
+          )}
+        </section>
+      )}
+
+      {tab === 'birthdays' && (
+        <section className="card">
+          <p className="eyebrow">Birthday Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Birthdays</h3>
+          <SimpleList items={birthdays} onDelete={i => save('birthdays', setBirthdays, birthdays.filter((_, j) => j !== i))}
+            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.name}</div><div style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.date}{item.notes ? ' · ' + item.notes : ''}</div></>)} />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <input placeholder="Name" value={form.bdName || ''} onChange={e => setForm(p => ({ ...p, bdName: e.target.value }))}
+              style={{ flex: 2, minWidth: 0, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input type="date" value={form.bdDate || ''} onChange={e => setForm(p => ({ ...p, bdDate: e.target.value }))}
+              style={{ flex: 1, minWidth: 0, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
+              onClick={() => { if (!form.bdName) return; save('birthdays', setBirthdays, [...birthdays, { name: form.bdName, date: form.bdDate, notes: form.bdNotes }]); setForm(p => ({ ...p, bdName: '', bdDate: '', bdNotes: '' })) }}>Add</button>
+          </div>
+        </section>
+      )}
+
+      {tab === 'keydates' && (
+        <section className="card">
+          <p className="eyebrow">Key Dates</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Important Dates</h3>
+          <SimpleList items={keyDates} onDelete={i => save('keyDates', setKeyDates, keyDates.filter((_, j) => j !== i))}
+            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.label}</div><div style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.date} · {item.category}</div></>)} />
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            <input placeholder="Label (Anniversary, Renewal...)" value={form.kdLabel || ''} onChange={e => setForm(p => ({ ...p, kdLabel: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="date" value={form.kdDate || ''} onChange={e => setForm(p => ({ ...p, kdDate: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <input placeholder="Category" value={form.kdCat || ''} onChange={e => setForm(p => ({ ...p, kdCat: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
+                onClick={() => { if (!form.kdLabel) return; save('keyDates', setKeyDates, [...keyDates, { label: form.kdLabel, date: form.kdDate, category: form.kdCat }]); setForm(p => ({ ...p, kdLabel: '', kdDate: '', kdCat: '' })) }}>Add</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {tab === 'contacts' && (
+        <section className="card">
+          <p className="eyebrow">Contacts</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Key People</h3>
+          <SimpleList items={contacts} onDelete={i => save('contacts', setContacts, contacts.filter((_, j) => j !== i))}
+            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.name}</div><div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{item.phone}{item.email ? ' · ' + item.email : ''}{item.notes ? ' · ' + item.notes : ''}</div></>)} />
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {[['Name', 'cName', 'text'], ['Phone', 'cPhone', 'tel'], ['Email', 'cEmail', 'email'], ['Notes', 'cNotes', 'text']].map(([lbl, key, type]) => (
+              <input key={key} type={type} placeholder={lbl} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            ))}
+            <button className="primary-btn" onClick={() => { if (!form.cName) return; save('contacts', setContacts, [...contacts, { name: form.cName, phone: form.cPhone, email: form.cEmail, notes: form.cNotes }]); setForm(p => ({ ...p, cName: '', cPhone: '', cEmail: '', cNotes: '' })) }}>Add Contact</button>
+          </div>
+        </section>
+      )}
+
+      {tab === 'passwords' && (
+        <section className="card">
+          <div style={{ background: 'rgba(240,180,41,.1)', border: '1px solid rgba(240,180,41,.3)', borderRadius: 'var(--radius-sm)', padding: 10, marginBottom: 14, fontSize: '.82rem', color: 'var(--warning)' }}>
+            ⚠️ Stored locally on this device only. Do not store critical passwords here without a backup.
+          </div>
+          <SimpleList items={passwords} onDelete={i => save('passwords', setPasswords, passwords.filter((_, j) => j !== i))}
+            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.service}</div><div style={{ fontSize: '.78rem', color: 'var(--muted)', fontFamily: 'monospace' }}>{item.username} · {'•'.repeat(8)}</div></>)} />
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {[['Service/Website', 'pwSrv', 'text'], ['Username/Email', 'pwUser', 'text'], ['Password', 'pwPass', 'password']].map(([lbl, key, type]) => (
+              <input key={key} type={type} placeholder={lbl} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            ))}
+            <button className="primary-btn" onClick={() => { if (!form.pwSrv) return; save('passwords', setPasswords, [...passwords, { service: form.pwSrv, username: form.pwUser, password: form.pwPass }]); setForm(p => ({ ...p, pwSrv: '', pwUser: '', pwPass: '' })) }}>Save</button>
+          </div>
+        </section>
+      )}
+
+      {tab === 'trips' && (
+        <section className="card">
+          <p className="eyebrow">Trip Planner</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Your Trips</h3>
+          {trips.map((trip, ti) => (
+            <div key={ti} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--surface)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '.95rem' }}>{trip.destination}</div>
+                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{trip.dates}</div>
+                </div>
+                <button onClick={() => save('trips', setTrips, trips.filter((_, i) => i !== ti))}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.08em' }}>Packing List</div>
+              {(trip.packing || '').split(',').map(item => item.trim()).filter(Boolean).map((item, pi) => {
+                const packKey = `${ti}-${pi}`
+                const packed = (trip.packed || []).includes(packKey)
+                return (
+                  <div key={pi} onClick={() => save('trips', setTrips, trips.map((t, i) => i !== ti ? t : { ...t, packed: packed ? (t.packed || []).filter(k => k !== packKey) : [...(t.packed || []), packKey] }))}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', cursor: 'pointer', borderBottom: '1px solid var(--surface)' }}>
+                    <div style={{ width: 18, height: 18, borderRadius: 4, border: '2px solid', borderColor: packed ? 'var(--teal)' : 'var(--border2)', background: packed ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      {packed && <span style={{ color: 'var(--navy)', fontSize: '.65rem', fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize: '.85rem', textDecoration: packed ? 'line-through' : 'none', color: packed ? 'var(--muted)' : 'var(--text)' }}>{item}</span>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input placeholder="Destination" value={form.tripDest || ''} onChange={e => setForm(p => ({ ...p, tripDest: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Dates (Apr 25 - Apr 30)" value={form.tripDates || ''} onChange={e => setForm(p => ({ ...p, tripDates: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Packing list (comma-separated: Passport, Charger, Shoes)" value={form.tripPack || ''} onChange={e => setForm(p => ({ ...p, tripPack: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" onClick={() => { if (!form.tripDest) return; save('trips', setTrips, [...trips, { destination: form.tripDest, dates: form.tripDates, packing: form.tripPack, packed: [] }]); setForm(p => ({ ...p, tripDest: '', tripDates: '', tripPack: '' })) }}>Add Trip</button>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── HEALTH PAGE ───────────────────────────────────────────────────────────
+function HealthPage() {
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.h.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.h.' + k, JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('meds')
+  const [meds, setMeds] = useState(() => lsGet('meds', []))
+  const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
+  const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
+  const [migraines, setMigraines] = useState(() => lsGet('migraines', []))
+  const [sleep, setSleep] = useState(() => lsGet('sleep', []))
+  const [form, setForm] = useState({})
+
+  const saveMeds = (m) => { setMeds(m); lsSet('meds', m) }
+  const saveMedLog = (l) => { setMedLog(l); lsSet('medLog', l) }
+  const saveAnxiety = (a) => { setAnxiety(a); lsSet('anxiety', a) }
+  const saveMigraines = (m) => { setMigraines(m); lsSet('migraines', m) }
+  const saveSleep = (s) => { setSleep(s); lsSet('sleep', s) }
+
+  const todayMedKey = TODAY
+  const todayMeds = medLog[todayMedKey] || []
+
+  const TABS = [
+    { id: 'meds', label: '💊 Medications' }, { id: 'sleep', label: '😴 Sleep' },
+    { id: 'anxiety', label: '🧘 Anxiety' }, { id: 'migraines', label: '🤕 Migraines' },
+  ]
+
+  const ANXIETY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  const anxietyColor = (n) => n <= 3 ? 'var(--success)' : n <= 6 ? 'var(--warning)' : 'var(--danger)'
+
+  return (
+    <div className="screen-stack">
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {TABS.map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'meds' && (
+        <>
+          <section className="card">
+            <p className="eyebrow">Today's Medications</p>
+            <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {TODAY}</h3>
+            {meds.map((med, i) => {
+              const taken = todayMeds.includes(med.name)
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--surface)' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '.9rem', color: taken ? 'var(--muted)' : 'var(--text)', textDecoration: taken ? 'line-through' : 'none' }}>{med.name}</div>
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{med.dose} · {med.time} · {med.type}</div>
+                  </div>
+                  <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== med.name) : [...todayMeds, med.name] })}
+                    style={{ padding: '6px 14px', borderRadius: 999, border: '1.5px solid', cursor: 'pointer', fontSize: '.82rem', fontWeight: 700, fontFamily: 'inherit',
+                      borderColor: taken ? 'var(--success)' : 'var(--teal)',
+                      background: taken ? 'rgba(34,197,94,.1)' : 'var(--teal)',
+                      color: taken ? 'var(--success)' : 'var(--navy)' }}>
+                    {taken ? '✓ Taken' : 'Take'}
+                  </button>
+                </div>
+              )
+            })}
+            {meds.length === 0 && <p className="muted" style={{ fontSize: '.85rem' }}>No medications added yet.</p>}
+          </section>
+          <section className="card">
+            <p className="eyebrow">Medication Summary</p>
+            <h3 style={{ margin: '4px 0 12px' }}>Add Medication / Supplement</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {[['Name', 'medName', 'text', 'e.g. Vitamin D, Metformin'], ['Dose', 'medDose', 'text', 'e.g. 500mg'], ['Time', 'medTime', 'text', 'e.g. Morning, With food']].map(([lbl, key, type, ph]) => (
+                <input key={key} type={type} placeholder={`${lbl} — ${ph}`} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                  style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              ))}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select value={form.medType || 'Medication'} onChange={e => setForm(p => ({ ...p, medType: e.target.value }))}
+                  style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                  <option>Medication</option><option>Supplement</option><option>Vitamin</option><option>Probiotic</option>
+                </select>
+                <button className="primary-btn" style={{ padding: '9px 16px', fontSize: '.85rem' }}
+                  onClick={() => { if (!form.medName) return; saveMeds([...meds, { name: form.medName, dose: form.medDose, time: form.medTime, type: form.medType || 'Medication' }]); setForm(p => ({ ...p, medName: '', medDose: '', medTime: '' })) }}>Add</button>
+              </div>
+            </div>
+            {meds.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                {meds.map((med, i) => (
+                  <div key={i} className="metric-row card-row">
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: '.88rem' }}>{med.name}</span>
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)', marginLeft: 8 }}>{med.dose} · {med.time}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: '.72rem', padding: '2px 8px', borderRadius: 999, background: 'var(--teal-dim)', color: 'var(--teal)' }}>{med.type}</span>
+                      <button onClick={() => saveMeds(meds.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === 'sleep' && (
+        <section className="card">
+          <p className="eyebrow">Sleep Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Sleep Log</h3>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Bedtime <input type="time" value={form.sleepBed || ''} onChange={e => setForm(p => ({ ...p, sleepBed: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
+              </label>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Wake time <input type="time" value={form.sleepWake || ''} onChange={e => setForm(p => ({ ...p, sleepWake: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Quality (1-10)
+                <input type="range" min={1} max={10} value={form.sleepQ || 5} onChange={e => setForm(p => ({ ...p, sleepQ: Number(e.target.value) }))}
+                  style={{ accentColor: 'var(--teal)' }} />
+              </label>
+              <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--teal)', minWidth: 24 }}>{form.sleepQ || 5}</span>
+            </div>
+            <input placeholder="Notes (dreams, woke up, restless...)" value={form.sleepNote || ''} onChange={e => setForm(p => ({ ...p, sleepNote: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" onClick={() => {
+              const entry = { date: TODAY, bed: form.sleepBed, wake: form.sleepWake, quality: form.sleepQ || 5, notes: form.sleepNote }
+              saveSleep([entry, ...sleep].slice(0, 30))
+              setForm(p => ({ ...p, sleepBed: '', sleepWake: '', sleepQ: 5, sleepNote: '' }))
+            }}>Log Sleep</button>
+          </div>
+          {sleep.slice(0, 7).map((entry, i) => (
+            <div key={i} className="metric-row card-row">
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{entry.bed} → {entry.wake}{entry.notes ? ' · ' + entry.notes : ''}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: entry.quality >= 7 ? 'rgba(34,197,94,.15)' : entry.quality >= 5 ? 'rgba(240,180,41,.15)' : 'rgba(232,85,85,.15)', display: 'grid', placeItems: 'center' }}>
+                  <span style={{ fontSize: '.82rem', fontWeight: 700, color: entry.quality >= 7 ? 'var(--success)' : entry.quality >= 5 ? 'var(--warning)' : 'var(--danger)' }}>{entry.quality}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === 'anxiety' && (
+        <section className="card">
+          <p className="eyebrow">Anxiety Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Daily Check-In</h3>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)', marginBottom: 10 }}>How's your anxiety right now? (1 = calm, 10 = severe)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ANXIETY_LEVELS.map(n => (
+                <button key={n} onClick={() => setForm(p => ({ ...p, anxLevel: n }))}
+                  style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid', cursor: 'pointer', fontWeight: 700, fontSize: '.88rem', fontFamily: 'inherit',
+                    borderColor: form.anxLevel === n ? anxietyColor(n) : 'var(--border2)',
+                    background: form.anxLevel === n ? anxietyColor(n) + '18' : 'var(--surface)',
+                    color: form.anxLevel === n ? anxietyColor(n) : 'var(--text2)' }}>{n}</button>
+              ))}
+            </div>
+          </div>
+          <input placeholder="Triggers or notes..." value={form.anxNote || ''} onChange={e => setForm(p => ({ ...p, anxNote: e.target.value }))}
+            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem', marginBottom: 10 }} />
+          <button className="primary-btn" style={{ width: '100%' }} onClick={() => {
+            if (!form.anxLevel) return
+            saveAnxiety([{ date: TODAY, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), level: form.anxLevel, notes: form.anxNote }, ...anxiety].slice(0, 60))
+            setForm(p => ({ ...p, anxLevel: null, anxNote: '' }))
+          }}>Log Entry</button>
+          <div style={{ marginTop: 14 }}>
+            {anxiety.slice(0, 7).map((entry, i) => (
+              <div key={i} className="metric-row card-row">
+                <div>
+                  <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{entry.date} · {entry.time}</div>
+                  {entry.notes && <div style={{ fontSize: '.8rem', color: 'var(--text2)' }}>{entry.notes}</div>}
+                </div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'grid', placeItems: 'center', background: anxietyColor(entry.level) + '18', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, color: anxietyColor(entry.level) }}>{entry.level}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {tab === 'migraines' && (
+        <section className="card">
+          <p className="eyebrow">Migraine & Headache Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Log an Episode</h3>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Type
+                <select value={form.migType || 'Headache'} onChange={e => setForm(p => ({ ...p, migType: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                  <option>Headache</option><option>Migraine</option><option>Cluster</option><option>Tension</option>
+                </select>
+              </label>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Pain (1-10)
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="range" min={1} max={10} value={form.migPain || 5} onChange={e => setForm(p => ({ ...p, migPain: Number(e.target.value) }))}
+                    style={{ flex: 1, accentColor: 'var(--danger)' }} />
+                  <span style={{ fontWeight: 700, color: 'var(--danger)', minWidth: 16 }}>{form.migPain || 5}</span>
+                </div>
+              </label>
+            </div>
+            <input placeholder="Duration (e.g. 2 hours, all day)" value={form.migDur || ''} onChange={e => setForm(p => ({ ...p, migDur: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Triggers (stress, sleep, food, weather...)" value={form.migTrig || ''} onChange={e => setForm(p => ({ ...p, migTrig: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Medication taken" value={form.migMed || ''} onChange={e => setForm(p => ({ ...p, migMed: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" onClick={() => {
+              saveMigraines([{ date: TODAY, type: form.migType || 'Headache', pain: form.migPain || 5, duration: form.migDur, triggers: form.migTrig, medication: form.migMed }, ...migraines].slice(0, 60))
+              setForm(p => ({ ...p, migType: 'Headache', migPain: 5, migDur: '', migTrig: '', migMed: '' }))
+            }}>Log Episode</button>
+          </div>
+          <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: 8 }}>Last 30 days: {migraines.filter(m => m.date >= addDays(TODAY, -30)).length} episodes</div>
+          {migraines.slice(0, 7).map((entry, i) => (
+            <div key={i} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date} · {entry.type}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>
+                  {entry.duration && `${entry.duration} · `}{entry.triggers && `Triggers: ${entry.triggers}`}
+                  {entry.medication && ` · ${entry.medication}`}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(232,85,85,.12)', display: 'grid', placeItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '.82rem' }}>{entry.pain}</span>
+                </div>
+                <button onClick={() => saveMigraines(migraines.filter((_, j) => j !== i))}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  )
+}
+
 function GrowthPage({ scores, habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
   const weekStart = startOfWeek(TODAY)
   const weekEnd = endOfWeek(TODAY)
@@ -1898,6 +2840,26 @@ function MorePage({ goals, tasks, projects, expenses, notes, budget, profile, se
 
   return (
     <div className="screen-stack">
+      <section className="card">
+        <p className="eyebrow">Quick Access</p>
+        <h3 style={{margin:'4px 0 12px'}}>All Sections</h3>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
+          {[
+            {to:'/finance', icon:'💰', label:'Finance', desc:'Budget, savings, bills'},
+            {to:'/wellness', icon:'🌿', label:'Wellness', desc:'Reading, routine'},
+            {to:'/productivity', icon:'⚡', label:'Productivity', desc:'Tasks, checklists'},
+            {to:'/lifestyle', icon:'🌍', label:'Lifestyle', desc:'Contacts, trips, groceries'},
+            {to:'/health', icon:'💊', label:'Health', desc:'Meds, sleep, trackers'},
+            {to:'/growth', icon:'📈', label:'Growth', desc:'Habits, scorecard'},
+          ].map(s => (
+            <Link key={s.to} to={s.to} style={{display:'block', padding:'12px 14px', borderRadius:'var(--radius)', border:'1px solid var(--border2)', background:'var(--surface)', textDecoration:'none'}}>
+              <div style={{fontSize:'1.2rem', marginBottom:4}}>{s.icon}</div>
+              <div style={{fontWeight:700, fontSize:'.88rem', color:'var(--text)'}}>{s.label}</div>
+              <div style={{fontSize:'.74rem', color:'var(--muted)'}}>{s.desc}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
       {!settings.onboardingComplete ? <OnboardingChecklist settings={settings} profile={profile} tasks={tasks} goals={goals} projects={projects} updateSettings={updateSettings} /> : null}
 
       <section className="card">
@@ -2043,6 +3005,11 @@ function PlannerApp() {
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} />} />
+          <Route path="/wellness" element={<WellnessPage />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/lifestyle" element={<LifestylePage />} />
+          <Route path="/health" element={<HealthPage />} />
           <Route path="/more" element={<MorePage goals={goals} tasks={tasks} projects={projects} expenses={expenses} notes={notes} budget={budget} profile={profile} settings={settings} updateProfile={async (nextProfile) => { await updateProfile(nextProfile); pushToast('Profile saved', '', 'success') }} updateSettings={async (nextSettings) => { await updateSettings(nextSettings); pushToast('Settings saved', '', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Item deleted', '', 'success') }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
