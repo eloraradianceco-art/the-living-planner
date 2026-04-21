@@ -1480,27 +1480,36 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
 function TaskItem({ task, onToggle, onEdit, onDelete }) {
   return (
-    <div className="list-item with-actions premium-task-item">
-      <div style={{flex:1, minWidth:0}}>
-        <h4 style={{margin:'0 0 3px', fontSize:'.92rem', textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'var(--muted)' : 'var(--text)'}}>
-          {task.title}
-          {task.recurrence && task.recurrence !== 'none'
-            ? <span className="tag">Repeats {task.recurrence}</span>
-            : null}
-        </h4>
-        <p style={{fontSize:'.78rem', color:'var(--muted)'}}>
-          {task.category} • {task.date}{task.time ? ` • ${task.time}` : ''} • {task.priority}
-        </p>
+    <div style={{padding:'12px 0', borderBottom:'1px solid var(--surface)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom:8}}>
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{fontWeight:600, fontSize:'.92rem', color: task.completed ? 'var(--muted)' : 'var(--text)', textDecoration: task.completed ? 'line-through' : 'none', marginBottom:3, lineHeight:1.3}}>
+            {task.title}
+            {task.recurrence && task.recurrence !== 'none'
+              ? <span style={{marginLeft:6, fontSize:'.7rem', padding:'2px 7px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700, whiteSpace:'nowrap'}}>↻ {task.recurrence}</span>
+              : null}
+          </div>
+          <div style={{fontSize:'.75rem', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
+            {task.category} · {task.date}{task.time ? ` · ${task.time}` : ''} · {task.priority}
+          </div>
+        </div>
       </div>
-      <div className="item-actions">
-        <button
-          className={task.completed ? 'secondary-btn' : 'primary-btn'}
-          style={{fontSize:'.8rem', padding:'7px 12px'}}
-          onClick={() => onToggle(task.id)}>
+      <div style={{display:'flex', gap:6}}>
+        <button onClick={() => onToggle(task.id)}
+          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid', cursor:'pointer', fontSize:'.8rem', fontWeight:700, fontFamily:'inherit',
+            borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
+            background: task.completed ? 'rgba(34,197,94,.08)' : 'var(--teal)',
+            color: task.completed ? 'var(--success)' : 'var(--navy)'}}>
           {task.completed ? '✓ Done' : 'Complete'}
         </button>
-        <button className="ghost-btn" style={{fontSize:'.8rem', padding:'7px 12px'}} onClick={() => onEdit('task', task)}>Edit</button>
-        <button className="ghost-btn" style={{fontSize:'.8rem', padding:'7px 12px'}} onClick={() => onDelete('task', task.id)}>Delete</button>
+        <button onClick={() => onEdit('task', task)}
+          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid var(--border2)', background:'var(--surface)', color:'var(--text2)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit'}}>
+          Edit
+        </button>
+        <button onClick={() => onDelete('task', task.id)}
+          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid var(--border2)', background:'var(--surface)', color:'var(--muted)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit'}}>
+          Delete
+        </button>
       </div>
     </div>
   )
