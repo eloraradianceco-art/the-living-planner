@@ -1477,6 +1477,36 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   )
 }
 
+
+function TaskItem({ task, onToggle, onEdit, onDelete }) {
+  return (
+    <div className="list-item with-actions premium-task-item">
+      <div style={{flex:1, minWidth:0}}>
+        <h4 style={{margin:'0 0 3px', fontSize:'.92rem', textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'var(--muted)' : 'var(--text)'}}>
+          {task.title}
+          {task.recurrence && task.recurrence !== 'none'
+            ? <span className="tag">Repeats {task.recurrence}</span>
+            : null}
+        </h4>
+        <p style={{fontSize:'.78rem', color:'var(--muted)'}}>
+          {task.category} • {task.date}{task.time ? ` • ${task.time}` : ''} • {task.priority}
+        </p>
+      </div>
+      <div className="item-actions">
+        <button
+          className={task.completed ? 'secondary-btn' : 'primary-btn'}
+          style={{fontSize:'.8rem', padding:'7px 12px'}}
+          onClick={() => onToggle(task.id)}>
+          {task.completed ? '✓ Done' : 'Complete'}
+        </button>
+        <button className="ghost-btn" style={{fontSize:'.8rem', padding:'7px 12px'}} onClick={() => onEdit('task', task)}>Edit</button>
+        <button className="ghost-btn" style={{fontSize:'.8rem', padding:'7px 12px'}} onClick={() => onDelete('task', task.id)}>Delete</button>
+      </div>
+    </div>
+  )
+}
+
+
 function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate }) {
   const [query, setQuery] = useState('')
   const { prefersTouch, isMobile } = useResponsive()
