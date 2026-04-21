@@ -36,7 +36,8 @@
 
 /* ── Reset ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; background: var(--off-white); color: var(--text); -webkit-font-smoothing: antialiased; }
+html { overflow-x: hidden; }
+body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; background: var(--off-white); color: var(--text); -webkit-font-smoothing: antialiased; overflow-x: hidden; max-width: 100vw; }
 a { color: inherit; text-decoration: none; }
 button, input, select, textarea { font: inherit; }
 button:disabled { opacity: .45; cursor: not-allowed; }
@@ -44,7 +45,7 @@ h1,h2,h3,h4 { font-family: 'DM Serif Display', Georgia, serif; margin: 0 0 4px; 
 p { margin: 0; }
 
 /* ── App Shell ─────────────────────────────────────────────────── */
-.app-shell { max-width: 1140px; margin: 0 auto; min-height: 100vh; padding: 0 0 96px; }
+.app-shell { max-width: 1140px; margin: 0 auto; min-height: 100vh; padding: 0 0 96px; overflow-x: hidden; width: 100%; }
 
 /* ── Topbar ────────────────────────────────────────────────────── */
 .topbar {
@@ -84,10 +85,10 @@ p { margin: 0; }
 .muted { color: var(--muted); font-size: .9rem; }
 
 /* ── Content ───────────────────────────────────────────────────── */
-.content { padding: 20px; }
+.content { padding: 16px; max-width: 100%; overflow-x: hidden; }
 
 /* ── Screen layouts ────────────────────────────────────────────── */
-.screen-grid, .screen-stack { display: grid; gap: 16px; }
+.screen-grid, .screen-stack { display: grid; gap: 16px; width: 100%; min-width: 0; }
 .two-col-grid { grid-template-columns: repeat(2, 1fr); }
 .full-bleed { grid-column: 1 / -1; }
 .premium-home-grid { align-items: start; }
@@ -99,6 +100,8 @@ p { margin: 0; }
   border-radius: var(--radius-lg);
   padding: 20px;
   box-shadow: var(--shadow);
+  min-width: 0;
+  width: 100%;
 }
 .premium-card { border-color: var(--border2); }
 .hero-card h2 { margin-top: 4px; }
@@ -462,7 +465,7 @@ p { margin: 0; }
 }
 
 /* ── HomePage mobile fixes ─────────────────────────────────────── */
-.home-stack { display: grid; gap: 14px; }
+.home-stack { display: grid; gap: 14px; width: 100%; min-width: 0; overflow-x: hidden; }
 .home-metrics-strip {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
