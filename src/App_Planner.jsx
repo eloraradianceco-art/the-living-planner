@@ -1282,50 +1282,6 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
 }
 
 
-function MetricTile({ label, value, helper }) {
-  return (
-    <div className="metric-tile">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {helper ? <small>{helper}</small> : null}
-    </div>
-  )
-}
-
-function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
-  const max = Math.max(...data.map((item) => item[maxKey] || 0), 1)
-  return (
-    <div className="mini-chart bars-chart" aria-hidden="true">
-      {data.map((item) => (
-        <div key={item.label} className="bar-group">
-          <span className="bar-label">{item.label}</span>
-          <div className="bar-track"><div className="bar-fill" style={{ height: `${Math.max(((item[dataKey] || 0) / max) * 100, 6)}%` }} /></div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function MiniLineChart({ data }) {
-  const width = 240
-  const height = 80
-  const values = data.map((item) => item.value)
-  const max = Math.max(...values, 1)
-  const min = Math.min(...values, 0)
-  const points = data.map((item, index) => {
-    const x = (index / Math.max(data.length - 1, 1)) * width
-    const y = height - (((item.value - min) / Math.max(max - min, 1)) * (height - 12)) - 6
-    return `${x},${y}`
-  }).join(' ')
-  return (
-    <div className="mini-line-chart">
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <polyline fill="none" stroke="currentColor" strokeWidth="3" points={points} />
-      </svg>
-      <div className="chart-xlabels">{data.map((item) => <span key={item.label}>{item.label}</span>)}</div>
-    </div>
-  )
-}
 
 function MetricTile({ label, value, helper }) {
   return (
@@ -1369,6 +1325,7 @@ function MiniLineChart({ data }) {
     </div>
   )
 }
+
 
 function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, onEdit, onQuickCreate }) {
   const navigate = useNavigate()
