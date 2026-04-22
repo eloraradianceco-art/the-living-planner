@@ -1650,16 +1650,16 @@ Rules:
           borderRadius:'var(--radius-sm)', fontSize:'.9rem', resize:'none',
           fontFamily:'inherit', color:'var(--text)', background:'var(--surface)', lineHeight:1.6
         }}
-        onKeyDown={e => { if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) callAI() }}
       />
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, marginBottom: parsed.length > 0 ? 16 : 0}}>
-        <span style={{fontSize:'.72rem', color:'var(--muted)'}}>⌘ + Enter to submit</span>
+        <span style={{fontSize:'.72rem', color:'var(--muted)'}}>Type naturally, then tap Parse Tasks</span>
         <button onClick={callAI} disabled={loading || !input.trim()}
           style={{
-            padding:'8px 18px', borderRadius:999, border:'none', fontWeight:700, fontFamily:'inherit',
-            fontSize:'.85rem', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+            padding:'10px 22px', borderRadius:999, border:'none', fontWeight:700, fontFamily:'inherit',
+            fontSize:'.9rem', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
             background: loading || !input.trim() ? 'var(--border2)' : 'var(--teal)',
-            color: loading || !input.trim() ? 'var(--muted)' : 'var(--navy)'
+            color: loading || !input.trim() ? 'var(--muted)' : 'var(--navy)',
+            minWidth: 140
           }}>
           {loading ? '✦ Thinking…' : '✦ Parse Tasks'}
         </button>
@@ -1739,7 +1739,7 @@ Rules:
 
           <div style={{display:'flex', gap:8, marginTop:4}}>
             <button onClick={confirmSave}
-              style={{flex:1, padding:'11px', borderRadius:999, border:'none', background:'var(--teal)', color:'var(--navy)', fontWeight:700, fontSize:'.9rem', cursor:'pointer', fontFamily:'inherit'}}>
+              style={{flex:1, padding:'14px', borderRadius:999, border:'none', background:'var(--teal)', color:'var(--navy)', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
               ✓ Add {parsed.filter(t=>t.selected).length} Task{parsed.filter(t=>t.selected).length !== 1 ? 's' : ''}
             </button>
             <button onClick={() => { setParsed([]); setInput('') }}
