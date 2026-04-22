@@ -1028,6 +1028,9 @@ const tabs = [
   { to: '/more', label: 'More', icon: '⋯' },
 ]
 
+// Additional routes not in bottom nav
+const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects']
+
 function Layout({ children, onQuickAdd, banner, profile }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
@@ -1156,7 +1159,7 @@ const baseForms = {
   event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
-  goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '' },
+  goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr' },
   project: { title: '', goalId: '', dueDate: addDays(TODAY, 45), status: 'Active', description: '' },
   habit: { title: '', category: 'Health' },
 }
@@ -1241,6 +1244,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
           </>)}
 
           {selectedType === 'goal' && (<>
+            <label className="full-span">Timeframe<select value={form.timeframe||'1yr'} onChange={(e) => setForm({...form,timeframe:e.target.value})} style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}}><option value='1wk'>1 Week</option><option value='1mo'>1 Month</option><option value='6mo'>6 Months</option><option value='1yr'>1 Year</option><option value='3yr'>3 Years</option><option value='5yr'>5 Years</option></select></label>
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Target Date<input type="date" value={form.targetDate} onChange={(e) => setForm({ ...form, targetDate: e.target.value })} /></label>
             <label className="full-span">Why<textarea rows="4" value={form.why || ''} onChange={(e) => setForm({ ...form, why: e.target.value })} /></label>
@@ -1344,14 +1348,16 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const topGoals = goals.slice(0, 3)
 
   const SECTIONS = [
-    { to:'/tasks',        icon:'✓',  label:'Tasks',        color:'var(--teal)',    count: openTasks.length || null },
-    { to:'/calendar',     icon:'◷',  label:'Calendar',     color:'var(--navy)',    count: todaySchedule.length || null },
-    { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',        count: null },
-    { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',    count: habits.length || null },
-    { to:'/health',       icon:'💊', label:'Health',       color:'#E85555',        count: null },
-    { to:'/wellness',     icon:'🌿', label:'Wellness',     color:'#22C55E',        count: null },
-    { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',        count: null },
-    { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--navy)',     count: null },
+    { to:'/tasks',        icon:'✓',  label:'Tasks',        color:'var(--teal)',   count: openTasks.length || null },
+    { to:'/calendar',     icon:'◷',  label:'Calendar',     color:'var(--slate)',  count: todaySchedule.length || null },
+    { to:'/habits',       icon:'🔁', label:'Habits',       color:'var(--brass)',  count: habits.length || null },
+    { to:'/goals',        icon:'🎯', label:'Goals',        color:'var(--brass)',  count: goals.length || null },
+    { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',       count: null },
+    { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',   count: null },
+    { to:'/health',       icon:'💊', label:'Health',       color:'#E85555',       count: null },
+    { to:'/wellness',     icon:'🌿', label:'Wellness',     color:'#22C55E',       count: null },
+    { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',       count: null },
+    { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--slate)',   count: null },
   ]
 
   return (
@@ -1388,7 +1394,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <div className="section-title-row" style={{marginBottom:12}}>
           <div><p className="eyebrow">Your Planner</p><h3>Quick Access</h3></div>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8}}>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8}}>
           {SECTIONS.map(s => (
             <Link key={s.to} to={s.to} style={{
               display:'flex', flexDirection:'column', alignItems:'center', gap:4,
@@ -2377,6 +2383,9 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('tasks')
+  const [noteQuery, setNoteQuery] = useState('')
+  const [notes, setNotes] = useState(() => { try { const v = localStorage.getItem('planner.notes'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const saveNotes = (n) => { setNotes(n); try { localStorage.setItem('planner.notes', JSON.stringify(n)) } catch {} }
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
   const [cleaning, setCleaning] = useState(() => lsGet('cleaning', {
       month: new Date().getMonth(), year: new Date().getFullYear(),
@@ -2408,7 +2417,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
       </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'cleaning', label: '🧹 Cleaning' }].map(t => (
+        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'notes', label: '📝 Notes' }, { id: 'cleaning', label: '🧹 Cleaning' }].map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
             onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
         ))}
@@ -2513,6 +2522,43 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
             <button className="primary-btn" style={{ padding: '10px', fontSize: '.85rem' }}
               onClick={() => { if (!newRoom.label) return; saveCleaning({ ...cleaning, rooms: [...cleaning.rooms, newRoom] }); setNewRoom({ label: '', tasks: '' }) }}>Add Room</button>
           </div>
+        </section>
+      )}
+
+      {tab === 'notes' && (
+        <section className="card">
+          <div className="section-title-row">
+            <div><p className="eyebrow">Notes</p><h3>Quick Capture</h3></div>
+            <button className="primary-btn" style={{fontSize:'.8rem',padding:'6px 12px'}} onClick={() => {
+              const title = prompt('Note title:')
+              if(!title) return
+              const content = prompt('Note content:')
+              const newNote = {id:Date.now(),title,content:content||'',date:TODAY}
+              const updated = [newNote, ...notes]
+              setNotes(updated)
+              try{localStorage.setItem('planner.notes',JSON.stringify(updated))}catch{}
+            }}>+ Note</button>
+          </div>
+          <input placeholder="Search notes..." value={noteQuery} onChange={e=>setNoteQuery(e.target.value)}
+            style={{width:'100%',padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:12,background:'var(--stone)',color:'var(--text)'}} />
+          {notes.filter(n => !noteQuery || n.title.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
+            ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet. Capture your first thought.</p>
+            : notes.filter(n => !noteQuery || n.title.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).map(note => (
+            <div key={note.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                <strong style={{fontSize:'.9rem',color:'var(--ink)'}}>{note.title}</strong>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  <span style={{fontSize:'.72rem',color:'var(--muted)'}}>{note.date}</span>
+                  <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.9rem'}} onClick={()=>{
+                    const updated = notes.filter(n=>n.id!==note.id)
+                    setNotes(updated)
+                    try{localStorage.setItem('planner.notes',JSON.stringify(updated))}catch{}
+                  }}>✕</button>
+                </div>
+              </div>
+              <p style={{fontSize:'.82rem',color:'var(--text2)',lineHeight:1.5}}>{note.content}</p>
+            </div>
+          ))}
         </section>
       )}
     </div>
@@ -3018,6 +3064,252 @@ function HealthPage() {
   )
 }
 
+function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuickCreate }) {
+  const weekStart = startOfWeek(TODAY)
+  const weekEnd = endOfWeek(TODAY)
+  const weekLogs = habitLogs.filter(l => l.date >= weekStart && l.date <= weekEnd)
+
+  const SUGGESTED = [
+    ['Wake up earlier','Health'],['Meditate daily','Wellness'],['Drink more water','Health'],
+    ['Stay active','Health'],['Practice gratitude','Wellness'],['Eat mindfully','Health'],
+    ['Cook your own meals','Health'],['Do hardest tasks first','Productivity'],
+    ['Hold yourself accountable','Productivity'],['Track your goals','Productivity'],
+    ['Invest in yourself','Productivity'],['Deepen your relationships','Lifestyle'],
+    ['Spend more time in nature','Lifestyle'],['Stay inspired','Wellness'],
+    ['Have mental reset days','Wellness'],['Know yourself better','Wellness'],
+    ['Be OK with saying no','Wellness'],['Diversify your income streams','Finances'],
+    ['Shop smarter','Finances'],['Test your limits','Health'],
+  ]
+
+  const CAT_COLOR = {Health:'#E85555',Wellness:'#22C55E',Productivity:'var(--teal)',Lifestyle:'var(--brass)',Finances:'#6366F1',Faith:'#A855F7'}
+
+  return (
+    <div className="screen-stack">
+      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
+        <span style={{fontSize:'1.1rem'}}>🔁</span>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Habits</p>
+      </div>
+
+      {/* Active habits */}
+      <section className="card">
+        <div className="section-title-row">
+          <div><p className="eyebrow">Your Habits</p><h3>Daily Consistency</h3></div>
+          <button className="primary-btn" style={{fontSize:'.8rem',padding:'6px 14px'}} onClick={() => onQuickCreate('habit')}>+ Habit</button>
+        </div>
+
+        {habits.length === 0 && (
+          <p className="muted" style={{fontSize:'.85rem',marginBottom:8}}>No habits yet. Add one or tap a suggestion below.</p>
+        )}
+
+        {habits.map(habit => {
+          const logs = habitLogs.filter(l => l.habitId === habit.id)
+          const todayLog = logs.find(l => isToday(l.date))
+          const weekComplete = weekLogs.filter(l => l.habitId === habit.id && l.completed).length
+          const streak = (() => {
+            let s = 0
+            let d = new Date()
+            while(true) {
+              const ds = d.toISOString().slice(0,10)
+              if(logs.find(l=>l.date===ds&&l.completed)) { s++; d.setDate(d.getDate()-1) }
+              else break
+            }
+            return s
+          })()
+          return (
+            <div key={habit.id} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)',display:'flex',alignItems:'center',gap:10}}>
+              <button onClick={() => onToggleHabit(habit.id, TODAY)} style={{
+                width:28,height:28,borderRadius:'50%',border:'2px solid',flexShrink:0,cursor:'pointer',
+                borderColor: todayLog?.completed ? 'var(--success)' : CAT_COLOR[habit.category]||'var(--brass)',
+                background: todayLog?.completed ? 'var(--success)' : 'transparent',
+                display:'grid',placeItems:'center'
+              }}>
+                {todayLog?.completed && <span style={{color:'white',fontSize:'.75rem',fontWeight:800}}>✓</span>}
+              </button>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{habit.title}</div>
+                <div style={{display:'flex',gap:10,marginTop:2,fontSize:'.72rem',color:'var(--muted)'}}>
+                  <span style={{color:CAT_COLOR[habit.category]||'var(--brass)',fontWeight:600}}>{habit.category}</span>
+                  <span>{weekComplete}/7 this week</span>
+                  {streak > 1 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
+                </div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0}}>
+                <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px'}} onClick={() => onEdit('habit',habit)}>Edit</button>
+                <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}} onClick={() => onDelete('habit',habit.id)}>✕</button>
+              </div>
+            </div>
+          )
+        })}
+      </section>
+
+      {/* Weekly overview */}
+      {habits.length > 0 && (
+        <section className="card">
+          <p className="eyebrow">This Week</p>
+          <h3 style={{margin:'4px 0 12px'}}>Completion Overview</h3>
+          {habits.map(habit => {
+            const days = getWeekDays(TODAY)
+            return (
+              <div key={habit.id} style={{marginBottom:12}}>
+                <div style={{fontSize:'.82rem',fontWeight:600,color:'var(--ink)',marginBottom:5}}>{habit.title}</div>
+                <div style={{display:'flex',gap:4}}>
+                  {days.map(date => {
+                    const logged = habitLogs.find(l => l.habitId === habit.id && l.date === date && l.completed)
+                    const isT = date === TODAY
+                    return (
+                      <div key={date} onClick={() => onToggleHabit(habit.id, date)} style={{
+                        flex:1,height:28,borderRadius:5,cursor:'pointer',
+                        background: logged ? 'var(--success)' : isT ? 'var(--brass-dim)' : 'var(--stone2)',
+                        border: isT ? '1.5px solid var(--brass)' : '1px solid var(--border)',
+                        display:'grid',placeItems:'center',fontSize:'.6rem',color: logged ? 'white' : 'var(--muted)',fontWeight:700
+                      }}>
+                        {logged ? '✓' : new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'narrow'})}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      {/* Suggestions */}
+      <section className="card">
+        <p className="eyebrow">Suggestions</p>
+        <h3 style={{margin:'4px 0 10px'}}>30 Powerful Habits</h3>
+        <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Tap any habit to add it instantly.</p>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {SUGGESTED.filter(([t]) => !habits.find(h=>h.title===t)).map(([title,cat]) => (
+            <button key={title} onClick={() => onQuickCreate('habit',{title,category:cat})} style={{
+              padding:'6px 12px',borderRadius:999,border:'1.5px solid var(--border2)',
+              background:'var(--stone)',color:'var(--ink2)',fontSize:'.78rem',
+              fontWeight:500,cursor:'pointer',fontFamily:'var(--sans)'
+            }}>+ {title}</button>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) {
+  const [activeFrame, setActiveFrame] = useState('all')
+
+  const TIMEFRAMES = [
+    {id:'all',label:'All'},
+    {id:'1wk',label:'1 Week'},
+    {id:'1mo',label:'1 Month'},
+    {id:'6mo',label:'6 Months'},
+    {id:'1yr',label:'1 Year'},
+    {id:'3yr',label:'3 Years'},
+    {id:'5yr',label:'5 Years'},
+  ]
+
+  const SMART_GUIDE = [
+    {letter:'S',word:'Specific',desc:'Exactly what do you want to accomplish? Be precise — not "get fit" but "run a 5K in under 30 minutes."'},
+    {letter:'M',word:'Measurable',desc:'How will you know you achieved it? Define the number, date, or result that proves success.'},
+    {letter:'A',word:'Achievable',desc:'Is this goal realistic given your current resources, time, and capacity? Challenge yourself but stay honest.'},
+    {letter:'R',word:'Relevant',desc:'Does this align with your values and your bigger vision? A goal worth achieving should matter deeply.'},
+    {letter:'T',word:'Time-Bound',desc:'What is the deadline? Without a date it is a dream, not a goal. Set a specific target date.'},
+  ]
+
+  const filtered = activeFrame === 'all' ? goals : goals.filter(g => g.timeframe === activeFrame)
+
+  return (
+    <div className="screen-stack">
+      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
+        <span style={{fontSize:'1.1rem'}}>🎯</span>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Goals</p>
+      </div>
+
+      {/* SMART goals guide */}
+      <section className="card" style={{background:'var(--ink)',border:'none'}}>
+        <p className="eyebrow" style={{color:'var(--brass)'}}>How to Set Goals That Work</p>
+        <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px',fontSize:'1.1rem'}}>The SMART Framework</h3>
+        <div style={{display:'grid',gap:10}}>
+          {SMART_GUIDE.map(s => (
+            <div key={s.letter} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+              <div style={{
+                width:32,height:32,borderRadius:8,flexShrink:0,
+                background:'var(--brass)',color:'var(--ink)',
+                display:'grid',placeItems:'center',
+                fontFamily:'var(--serif)',fontSize:'1.1rem',fontWeight:600
+              }}>{s.letter}</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:'.85rem',color:'var(--warm-white)',marginBottom:2}}>{s.word}</div>
+                <div style={{fontSize:'.78rem',color:'rgba(255,255,255,.55)',lineHeight:1.5}}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Timeframe filter */}
+      <section className="card" style={{padding:'12px 14px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+          <div><p className="eyebrow">Your Goals</p></div>
+          <button className="primary-btn" style={{fontSize:'.8rem',padding:'6px 14px'}} onClick={() => onQuickCreate('goal')}>+ Goal</button>
+        </div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {TIMEFRAMES.map(tf => (
+            <button key={tf.id} onClick={() => setActiveFrame(tf.id)} style={{
+              padding:'5px 10px',borderRadius:999,border:'1.5px solid',fontSize:'.75rem',
+              cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
+              borderColor: activeFrame===tf.id ? 'var(--brass)' : 'var(--border2)',
+              background: activeFrame===tf.id ? 'var(--brass-dim)' : 'transparent',
+              color: activeFrame===tf.id ? 'var(--brass)' : 'var(--muted)'
+            }}>{tf.label}</button>
+          ))}
+        </div>
+      </section>
+
+      {filtered.length === 0 && (
+        <section className="card" style={{textAlign:'center',padding:'28px 20px'}}>
+          <div style={{fontSize:'2rem',marginBottom:10}}>🎯</div>
+          <div style={{fontWeight:700,color:'var(--ink)',marginBottom:6}}>No goals yet</div>
+          <p className="muted" style={{fontSize:'.85rem',marginBottom:14}}>Use the SMART framework above to set your first goal.</p>
+          <button className="primary-btn" onClick={() => onQuickCreate('goal')}>Set Your First Goal</button>
+        </section>
+      )}
+
+      {filtered.map(goal => {
+        const progress = getGoalProgress(goal.id, tasks, projects)
+        const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
+        const tf = TIMEFRAMES.find(t => t.id === goal.timeframe)
+        return (
+          <section key={goal.id} className="card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                  <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>{goal.title}</div>
+                  {tf && tf.id !== 'all' && (
+                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass)',fontWeight:700}}>{tf.label}</span>
+                  )}
+                </div>
+                {goal.description && <div style={{fontSize:'.82rem',color:'var(--muted)',lineHeight:1.5,marginBottom:6}}>{goal.description}</div>}
+                <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{goal.category} · Due {goal.targetDate}</div>
+              </div>
+              <div style={{display:'flex',gap:6,flexShrink:0,marginLeft:8}}>
+                <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px'}} onClick={() => onEdit('goal',goal)}>Edit</button>
+                <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}} onClick={() => onDelete('goal',goal.id)}>✕</button>
+              </div>
+            </div>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
+              <span style={{color:'var(--muted)'}}>{linkedTasks.length} linked task{linkedTasks.length!==1?'s':''}</span>
+              <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
+            </div>
+            <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
+              <div style={{height:'100%',width:`${progress}%`,background:progress>=100?'var(--success)':'var(--brass)',borderRadius:999,transition:'width .4s'}} />
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
+
 function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
   const weekStart = startOfWeek(TODAY)
   const weekEnd = endOfWeek(TODAY)
@@ -3230,11 +3522,8 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
   )
 }
 
-function MorePage({ goals, tasks, projects, notes, budget, profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
+function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
   const { signOut } = useAuth()
-  const [noteQuery, setNoteQuery] = useState('')
-
-  const filteredNotes = useMemo(() => notes.filter((note) => !noteQuery || note.title.toLowerCase().includes(noteQuery.toLowerCase()) || note.content.toLowerCase().includes(noteQuery.toLowerCase())), [notes, noteQuery])
 
   return (
     <div className="screen-stack">
@@ -3288,28 +3577,7 @@ function MorePage({ goals, tasks, projects, notes, budget, profile, settings, up
         ))}
       </section>
 
-      {/* ── Notes ──────────────────────────────────────────────────── */}
-      <section className="card">
-        <div className="section-title-row" style={{marginBottom:10}}>
-          <div><p className="eyebrow">Notes</p><h3>Quick Notes</h3></div>
-          <button className="primary-btn" style={{fontSize:'.8rem', padding:'6px 12px'}} onClick={() => onQuickCreate('note')}>+ Note</button>
-        </div>
-        <input placeholder="Search notes..." value={noteQuery} onChange={(e) => setNoteQuery(e.target.value)}
-          style={{width:'100%', padding:'9px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.85rem', marginBottom:10, color:'var(--text)', background:'var(--surface)'}} />
-        {filteredNotes.length === 0 ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet.</p>
-          : filteredNotes.map((note) => (
-          <div key={note.id} style={{padding:'10px 0', borderBottom:'1px solid var(--surface)'}}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4}}>
-              <strong style={{fontSize:'.9rem', color:'var(--text)'}}>{note.title}</strong>
-              <div style={{display:'flex', gap:6, flexShrink:0}}>
-                <button className="ghost-btn" style={{fontSize:'.75rem', padding:'3px 8px'}} onClick={() => onEdit('note', note)}>Edit</button>
-                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem'}} onClick={() => onDelete('note', note.id)}>✕</button>
-              </div>
-            </div>
-            <p style={{fontSize:'.82rem', color:'var(--muted)', lineHeight:1.5}}>{note.content}</p>
-          </div>
-        ))}
-      </section>
+
 
       {/* ── Sync / Data ────────────────────────────────────────────── */}
       <section className="card">
@@ -3394,13 +3662,15 @@ function PlannerApp() {
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+          <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+            <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+            <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} />} />
           <Route path="/wellness" element={<WellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
           <Route path="/health" element={<HealthPage />} />
-          <Route path="/more" element={<MorePage goals={goals} tasks={tasks} projects={projects} notes={notes} budget={budget} profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+          <Route path="/more" element={<MorePage profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
           isOpen={modalState.open}
