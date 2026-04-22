@@ -300,92 +300,13 @@ const categories = [
 ]
 
 const defaultData = {
-  tasks: [
-    {
-      id: 1,
-      title: 'Morning workout',
-      completed: true,
-      category: 'Health',
-      date: TODAY,
-      time: '06:30',
-      linkedGoalId: 1,
-      linkedProjectId: null,
-      priority: 'High',
-      recurrence: 'weekly',
-    },
-    {
-      id: 2,
-      title: 'Review budget and spending',
-      completed: false,
-      category: 'Finances',
-      date: TODAY,
-      time: '19:00',
-      linkedGoalId: 3,
-      linkedProjectId: null,
-      priority: 'Medium',
-      recurrence: 'weekly',
-    },
-    {
-      id: 3,
-      title: 'Draft section for TB manual',
-      completed: false,
-      category: 'Productivity',
-      date: addDays(TODAY, 1),
-      time: '09:30',
-      linkedGoalId: 2,
-      linkedProjectId: 1,
-      priority: 'High',
-      recurrence: 'none',
-    },
-    {
-      id: 4,
-      title: 'Prayer and journaling',
-      completed: true,
-      category: 'Wellness',
-      date: TODAY,
-      time: '05:45',
-      linkedGoalId: 4,
-      linkedProjectId: null,
-      priority: 'Low',
-      recurrence: 'daily',
-    },
-    {
-      id: 5,
-      title: 'Call insurance office',
-      completed: false,
-      category: 'Lifestyle',
-      date: addDays(TODAY, -1),
-      time: '',
-      linkedGoalId: null,
-      linkedProjectId: null,
-      priority: 'Medium',
-      recurrence: 'none',
-    },
-  ],
-  goals: [
-    { id: 1, title: 'Train 4x per week', category: 'Health', targetDate: addDays(TODAY, 45), why: 'Keep health moving forward' },
-    { id: 2, title: 'Complete TB manual', category: 'Business', targetDate: addDays(TODAY, 120), why: 'Finish the business foundation asset' },
-    { id: 3, title: 'Stay under weekly spending target', category: 'Finances', targetDate: addDays(TODAY, 6), why: 'Improve financial awareness' },
-    { id: 4, title: 'Finish Bible in a year plan', category: 'Faith', targetDate: `${new Date().getFullYear()}-12-31`, why: 'Stay consistent spiritually' },
-  ],
-  projects: [
-    { id: 1, title: 'TB Manual', goalId: 2, dueDate: addDays(TODAY, 120), status: 'Active', description: 'Build out the manual chapters and organization.' },
-    { id: 2, title: 'Planner Web App', goalId: null, dueDate: addDays(TODAY, 60), status: 'Active', description: 'Turn the planner into a clean app beta.' },
-  ],
-  expenses: [
-    { id: 1, amount: 72, category: 'Food', date: addDays(TODAY, -1), note: 'Groceries' },
-    { id: 2, amount: 135, category: 'Bills', date: TODAY, note: 'Water + utilities' },
-    { id: 3, amount: 40, category: 'Business', date: TODAY, note: 'App domain tools' },
-  ],
-  notes: [
-    { id: 1, title: 'Planner ideas', content: 'Keep navigation simple and reduce clutter.', linkedType: 'project', linkedId: 2 },
-    { id: 2, title: 'Finance focus', content: 'Weekly spending needs a visual summary and upcoming bills list.', linkedType: 'goal', linkedId: 3 },
-  ],
-  events: [
-    { id: 1, title: 'Client appointment', date: TODAY, startTime: '11:00', endTime: '12:00', category: 'Business' },
-    { id: 2, title: 'Church small group', date: TODAY, startTime: '18:30', endTime: '20:00', category: 'Faith' },
-  ],
-  habits: [
+  tasks: [],
+  goals: [],
+  projects: [],
+  expenses: [],
+  notes: [],
+  events: [],
+    habits: [
     { id: 1, title: 'Wake up earlier', category: 'Health' },
     { id: 2, title: 'Meditate daily', category: 'Wellness' },
     { id: 3, title: 'Drink more water', category: 'Health' },
@@ -1616,7 +1537,224 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
 }
 
 
-function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate }) {
+function SmartTaskInput({ onSaveTasks, goals, projects }) {
+  const [open, setOpen] = useState(false)
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [parsed, setParsed] = useState([])
+  const [error, setError] = useState('')
+
+  const PRIORITY_COLOR = { High: 'var(--danger)', Medium: 'var(--warning)', Low: 'var(--muted)' }
+  const CAT_COLOR = { Health:'#E85555', Lifestyle:'#F0B429', Productivity:'var(--teal)', Wellness:'#22C55E', Finances:'#6366F1', Faith:'#A855F7', Business:'#0EA5E9' }
+
+  const callAI = async () => {
+    if (!input.trim()) return
+    setLoading(true)
+    setError('')
+    setParsed([])
+    const today = new Date().toISOString().slice(0,10)
+    const systemPrompt = `You are a task parser for a life planner app. The user will describe tasks in plain language. Extract each individual task and return a JSON array. Today is ${today}.
+
+Categories available: Health, Lifestyle, Productivity, Wellness, Finances, Faith, Business
+Priorities: High, Medium, Low
+
+For each task return:
+{
+  "title": "clear action-oriented task title",
+  "date": "YYYY-MM-DD or null if no date implied",
+  "category": "best matching category",
+  "priority": "High/Medium/Low based on urgency",
+  "time": "HH:MM or null"
+}
+
+Rules:
+- Split compound sentences into separate tasks
+- Infer dates from relative terms (today, tomorrow, this week, Friday, etc.)
+- If no date mentioned use null
+- Return ONLY a valid JSON array, no other text`
+
+    try {
+      const res = await fetch('/api/claude', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: input.trim() }]
+        })
+      })
+      const data = await res.json()
+      const text = data.content?.[0]?.text || '[]'
+      const clean = text.replace(/```json|```/g, '').trim()
+      const tasks = JSON.parse(clean)
+      setParsed(tasks.map((t, i) => ({ ...t, id: Date.now() + i, selected: true })))
+    } catch(e) {
+      setError('Could not parse tasks. Try again or be more specific.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleSelect = (id) => setParsed(p => p.map(t => t.id === id ? {...t, selected: !t.selected} : t))
+  const updateField = (id, field, val) => setParsed(p => p.map(t => t.id === id ? {...t, [field]: val} : t))
+  const removeTask = (id) => setParsed(p => p.filter(t => t.id !== id))
+
+  const confirmSave = async () => {
+    const toSave = parsed.filter(t => t.selected)
+    for (const task of toSave) {
+      await onSaveTasks({
+        title: task.title,
+        date: task.date || new Date().toISOString().slice(0,10),
+        time: task.time || '',
+        category: task.category || 'Productivity',
+        priority: task.priority || 'Medium',
+        recurrence: 'none',
+        completed: false,
+        linkedGoalId: '',
+        linkedProjectId: '',
+      })
+    }
+    setParsed([])
+    setInput('')
+    setOpen(false)
+  }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{
+      width:'100%', padding:'12px 16px', borderRadius:'var(--radius)', border:'1.5px dashed var(--teal)',
+      background:'var(--teal-dim)', color:'var(--teal)', fontSize:'.88rem', fontWeight:700,
+      cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8
+    }}>
+      ✦ AI Task Creator — describe anything in plain language
+    </button>
+  )
+
+  return (
+    <section className="card" style={{padding:'14px', border:'1.5px solid var(--teal)'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12}}>
+        <div>
+          <p className="eyebrow" style={{color:'var(--teal)'}}>AI Task Creator</p>
+          <h3 style={{fontSize:'1rem', marginTop:2}}>Describe your tasks naturally</h3>
+        </div>
+        <button onClick={() => { setOpen(false); setParsed([]); setInput('') }}
+          style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'1.1rem'}}>✕</button>
+      </div>
+
+      <textarea
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        placeholder={"e.g. Call insurance before Friday, prep client notes for Monday morning, pick up groceries this weekend, and schedule a dentist appointment sometime next week"}
+        style={{
+          width:'100%', minHeight:90, padding:'10px 12px', border:'1.5px solid var(--border2)',
+          borderRadius:'var(--radius-sm)', fontSize:'.9rem', resize:'none',
+          fontFamily:'inherit', color:'var(--text)', background:'var(--surface)', lineHeight:1.6
+        }}
+        onKeyDown={e => { if(e.key === 'Enter' && (e.metaKey || e.ctrlKey)) callAI() }}
+      />
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, marginBottom: parsed.length > 0 ? 16 : 0}}>
+        <span style={{fontSize:'.72rem', color:'var(--muted)'}}>⌘ + Enter to submit</span>
+        <button onClick={callAI} disabled={loading || !input.trim()}
+          style={{
+            padding:'8px 18px', borderRadius:999, border:'none', fontWeight:700, fontFamily:'inherit',
+            fontSize:'.85rem', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+            background: loading || !input.trim() ? 'var(--border2)' : 'var(--teal)',
+            color: loading || !input.trim() ? 'var(--muted)' : 'var(--navy)'
+          }}>
+          {loading ? '✦ Thinking…' : '✦ Parse Tasks'}
+        </button>
+      </div>
+
+      {error && <div style={{color:'var(--danger)', fontSize:'.82rem', marginTop:8}}>{error}</div>}
+
+      {parsed.length > 0 && (
+        <div>
+          <div style={{fontSize:'.8rem', fontWeight:700, color:'var(--text2)', marginBottom:10, letterSpacing:'.05em', textTransform:'uppercase'}}>
+            {parsed.length} task{parsed.length !== 1 ? 's' : ''} found — review & confirm
+          </div>
+
+          {parsed.map(task => (
+            <div key={task.id} style={{
+              padding:'10px 12px', borderRadius:'var(--radius-sm)', marginBottom:8,
+              border:'1.5px solid', borderColor: task.selected ? 'var(--teal)' : 'var(--border2)',
+              background: task.selected ? 'var(--teal-dim)' : 'var(--surface)',
+              opacity: task.selected ? 1 : 0.5, transition:'all .15s'
+            }}>
+              <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
+                {/* Select toggle */}
+                <button onClick={() => toggleSelect(task.id)} style={{
+                  width:20, height:20, borderRadius:4, border:'2px solid', flexShrink:0, marginTop:2, cursor:'pointer',
+                  borderColor: task.selected ? 'var(--teal)' : 'var(--border2)',
+                  background: task.selected ? 'var(--teal)' : 'transparent',
+                  display:'grid', placeItems:'center'
+                }}>
+                  {task.selected && <span style={{color:'var(--navy)', fontSize:'.65rem', fontWeight:900}}>✓</span>}
+                </button>
+
+                <div style={{flex:1, minWidth:0}}>
+                  {/* Title */}
+                  <input value={task.title} onChange={e => updateField(task.id, 'title', e.target.value)}
+                    style={{width:'100%', fontWeight:600, fontSize:'.9rem', color:'var(--text)', background:'transparent', border:'none', borderBottom:'1px solid var(--border2)', padding:'2px 0', marginBottom:8, fontFamily:'inherit'}} />
+
+                  {/* Fields row */}
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6}}>
+                    <div>
+                      <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:2, fontWeight:700}}>DATE</div>
+                      <input type="date" value={task.date || ''} onChange={e => updateField(task.id, 'date', e.target.value)}
+                        style={{width:'100%', padding:'4px 6px', fontSize:'.78rem', border:'1px solid var(--border2)', borderRadius:4, background:'var(--surface)', color:'var(--text)', fontFamily:'inherit'}} />
+                    </div>
+                    <div>
+                      <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:2, fontWeight:700}}>CATEGORY</div>
+                      <select value={task.category} onChange={e => updateField(task.id, 'category', e.target.value)}
+                        style={{width:'100%', padding:'4px 6px', fontSize:'.78rem', border:'1px solid var(--border2)', borderRadius:4, background:'var(--surface)', color:'var(--text)', fontFamily:'inherit'}}>
+                        {categories.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:2, fontWeight:700}}>PRIORITY</div>
+                      <select value={task.priority} onChange={e => updateField(task.id, 'priority', e.target.value)}
+                        style={{width:'100%', padding:'4px 6px', fontSize:'.78rem', border:'1px solid var(--border2)', borderRadius:4, background:'var(--surface)', color:'var(--text)', fontFamily:'inherit'}}>
+                        <option>High</option><option>Medium</option><option>Low</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Badges */}
+                  <div style={{display:'flex', gap:6, marginTop:6, flexWrap:'wrap'}}>
+                    <span style={{fontSize:'.68rem', padding:'2px 8px', borderRadius:999, fontWeight:700, background:(CAT_COLOR[task.category]||'var(--muted)')+'22', color:CAT_COLOR[task.category]||'var(--muted)'}}>
+                      {task.category}
+                    </span>
+                    <span style={{fontSize:'.68rem', padding:'2px 8px', borderRadius:999, fontWeight:700, background:(PRIORITY_COLOR[task.priority]||'var(--muted)')+'22', color:PRIORITY_COLOR[task.priority]||'var(--muted)'}}>
+                      {task.priority}
+                    </span>
+                    {task.date && <span style={{fontSize:'.68rem', padding:'2px 8px', borderRadius:999, background:'var(--surface)', color:'var(--muted)', fontWeight:600}}>{task.date}</span>}
+                  </div>
+                </div>
+
+                <button onClick={() => removeTask(task.id)}
+                  style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer', flexShrink:0, fontSize:'.9rem', padding:'2px'}}>✕</button>
+              </div>
+            </div>
+          ))}
+
+          <div style={{display:'flex', gap:8, marginTop:4}}>
+            <button onClick={confirmSave}
+              style={{flex:1, padding:'11px', borderRadius:999, border:'none', background:'var(--teal)', color:'var(--navy)', fontWeight:700, fontSize:'.9rem', cursor:'pointer', fontFamily:'inherit'}}>
+              ✓ Add {parsed.filter(t=>t.selected).length} Task{parsed.filter(t=>t.selected).length !== 1 ? 's' : ''}
+            </button>
+            <button onClick={() => { setParsed([]); setInput('') }}
+              style={{padding:'11px 16px', borderRadius:999, border:'1.5px solid var(--border2)', background:'transparent', color:'var(--muted)', fontWeight:600, fontSize:'.88rem', cursor:'pointer', fontFamily:'inherit'}}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+
+function TasksPage({ tasks, settings, goals, projects, onToggle, onEdit, onDelete, onQuickCreate, onSaveTask }) {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('All')
   const [status, setStatus] = useState('All')
@@ -1680,6 +1818,8 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
           </select>
         </div>
       </section>
+
+      <SmartTaskInput onSaveTasks={onSaveTask} goals={goals} projects={projects} />
 
       {Object.entries(groups).map(([label, items]) => {
         if (items.length === 0) return null
@@ -1921,36 +2061,144 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
 
 
 function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate }) {
+  const [filter, setFilter] = useState('All')
+  const [expandedId, setExpandedId] = useState(null)
+
+  const STATUS_ORDER = ['Active', 'In Progress', 'On Hold', 'Completed']
+  const STATUS_COLOR = {
+    Active: 'var(--teal)',
+    'In Progress': 'var(--warning)',
+    'On Hold': 'var(--muted)',
+    Completed: 'var(--success)',
+  }
+
+  const filtered = filter === 'All' ? projects : projects.filter(p => p.status === filter)
+
   return (
     <div className="screen-stack">
-      <section className="card">
-        <div className="section-title-row">
+
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <section className="card" style={{padding:'12px 14px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
           <div>
-            <p className="eyebrow">Build Zone</p>
-            <h3>Projects</h3>
+            <p className="eyebrow">Projects</p>
+            <div style={{fontSize:'.78rem', color:'var(--muted)', marginTop:2}}>
+              {projects.filter(p=>p.status!=='Completed').length} active · {projects.filter(p=>p.status==='Completed').length} done
+            </div>
           </div>
-          <button className="primary-btn" onClick={() => onQuickCreate('project')}>Add Project</button>
+          <button className="primary-btn" style={{fontSize:'.8rem', padding:'6px 14px'}} onClick={() => onQuickCreate('project')}>+ Project</button>
+        </div>
+        <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+          {['All', ...STATUS_ORDER].map(s => (
+            <button key={s} onClick={() => setFilter(s)} style={{
+              padding:'5px 12px', borderRadius:999, border:'1.5px solid', fontSize:'.78rem',
+              cursor:'pointer', fontFamily:'inherit', fontWeight:600,
+              borderColor: filter===s ? 'var(--teal)' : 'var(--border2)',
+              background: filter===s ? 'var(--teal-dim)' : 'transparent',
+              color: filter===s ? 'var(--teal)' : 'var(--muted)'
+            }}>{s}</button>
+          ))}
         </div>
       </section>
 
-      {projects.map((project) => {
-        const linkedGoal = goals.find((goal) => goal.id === project.goalId)
+      {/* ── Empty state ─────────────────────────────────────────── */}
+      {filtered.length === 0 && (
+        <section className="card" style={{textAlign:'center', padding:'32px 20px'}}>
+          <div style={{fontSize:'2rem', marginBottom:12}}>📁</div>
+          <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)', marginBottom:6}}>No projects yet</div>
+          <p className="muted" style={{fontSize:'.85rem', marginBottom:16}}>Projects connect your tasks and goals into focused workstreams.</p>
+          <button className="primary-btn" onClick={() => onQuickCreate('project')}>Create your first project</button>
+        </section>
+      )}
+
+      {/* ── Project cards ────────────────────────────────────────── */}
+      {filtered.map((project) => {
+        const linkedGoal = goals.find(g => g.id === project.goalId)
+        const projectTasks = tasks.filter(t => t.linkedProjectId === project.id)
+        const completedTasks = projectTasks.filter(t => t.completed).length
+        const progress = getProjectProgress(project.id, tasks)
+        const isExpanded = expandedId === project.id
+        const overdueTasks = projectTasks.filter(t => !t.completed && isOverdue(t.date))
+
         return (
-          <section className="card" key={project.id}>
-            <div className="metric-row">
-              <h3>{project.title}</h3>
-              <span className="status-pill">{project.status}</span>
+          <section key={project.id} className="card" style={{padding:'14px'}}>
+            {/* Project header */}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8}}>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
+                  <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)'}}>{project.title}</div>
+                  <span style={{
+                    fontSize:'.68rem', padding:'2px 8px', borderRadius:999, fontWeight:700,
+                    background: (STATUS_COLOR[project.status]||'var(--muted)')+'20',
+                    color: STATUS_COLOR[project.status]||'var(--muted)'
+                  }}>{project.status}</span>
+                </div>
+                {project.description && (
+                  <div style={{fontSize:'.82rem', color:'var(--muted)', lineHeight:1.5, marginBottom:6}}>{project.description}</div>
+                )}
+              </div>
+              <div style={{display:'flex', gap:6, flexShrink:0, marginLeft:8}}>
+                <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('project', project)}>Edit</button>
+                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('project', project.id)}>✕</button>
+              </div>
             </div>
-            <p>{project.description}</p>
-            <div className="metric-row">
-              <span>Due {project.dueDate}</span>
-              <strong>{getProjectProgress(project.id, tasks)}%</strong>
+
+            {/* Progress bar */}
+            <div style={{marginBottom:8}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
+                <span style={{fontSize:'.75rem', color:'var(--muted)'}}>
+                  {completedTasks}/{projectTasks.length} tasks · Due {project.dueDate}
+                </span>
+                <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--teal)'}}>{progress}%</span>
+              </div>
+              <div style={{height:6, borderRadius:999, background:'var(--surface)', overflow:'hidden'}}>
+                <div style={{
+                  height:'100%', borderRadius:999,
+                  width:`${progress}%`,
+                  background: progress >= 100 ? 'var(--success)' : progress >= 60 ? 'var(--teal)' : progress >= 30 ? 'var(--warning)' : 'var(--danger)',
+                  transition:'width .4s'
+                }} />
+              </div>
             </div>
-            <p className="muted">Goal: {linkedGoal?.title || 'Not linked yet'}</p>
-            <div className="item-actions aligned-right">
-              <button className="ghost-btn" onClick={() => onEdit('project', project)}>Edit</button>
-              <button className="ghost-btn" onClick={() => onDelete('project', project.id)}>Delete</button>
+
+            {/* Meta row */}
+            <div style={{display:'flex', gap:12, fontSize:'.75rem', color:'var(--muted)', marginBottom:8, flexWrap:'wrap'}}>
+              {linkedGoal && <span>🎯 {linkedGoal.title}</span>}
+              {overdueTasks.length > 0 && <span style={{color:'var(--danger)', fontWeight:600}}>⚠ {overdueTasks.length} overdue</span>}
             </div>
+
+            {/* Task list toggle */}
+            {projectTasks.length > 0 && (
+              <button onClick={() => setExpandedId(isExpanded ? null : project.id)}
+                style={{background:'none', border:'none', color:'var(--teal)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0, marginBottom: isExpanded ? 10 : 0}}>
+                {isExpanded ? '▲ Hide tasks' : `▼ Show ${projectTasks.length} task${projectTasks.length!==1?'s':''}`}
+              </button>
+            )}
+
+            {/* Expanded task list */}
+            {isExpanded && (
+              <div style={{borderTop:'1px solid var(--surface)', paddingTop:10}}>
+                {projectTasks.map(task => (
+                  <div key={task.id} style={{display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--surface)'}}>
+                    <div style={{
+                      width:18, height:18, borderRadius:'50%', border:'2px solid', flexShrink:0,
+                      borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
+                      background: task.completed ? 'var(--success)' : 'transparent',
+                      display:'grid', placeItems:'center'
+                    }}>
+                      {task.completed && <span style={{color:'white', fontSize:'.6rem', fontWeight:700}}>✓</span>}
+                    </div>
+                    <div style={{flex:1, minWidth:0}}>
+                      <div style={{fontSize:'.88rem', color: task.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: task.completed ? 'line-through' : 'none'}}>{task.title}</div>
+                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{task.date}</div>}
+                    </div>
+                  </div>
+                ))}
+                <button className="ghost-btn" style={{fontSize:'.78rem', padding:'6px 12px', marginTop:8}} onClick={() => onQuickCreate('task', {linkedProjectId: project.id})}>
+                  + Add task to this project
+                </button>
+              </div>
+            )}
           </section>
         )
       })}
@@ -1959,7 +2207,6 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
 }
 
 
-// ── FINANCE PAGE ─────────────────────────────────────────────────────────
 function FinancePage({ expenses, budget, setBudget }) {
   const LS_KEY = (k) => 'planner.' + k
   const lsGet = (k, d) => { try { const v = localStorage.getItem(LS_KEY(k)); return v ? JSON.parse(v) : d } catch { return d } }
@@ -3190,6 +3437,38 @@ function MorePage({ goals, tasks, projects, notes, budget, profile, settings, up
         ))}
       </section>
 
+      {/* ── Sync / Data ────────────────────────────────────────────── */}
+      <section className="card">
+        <div style={{marginBottom:12}}>
+          <p className="eyebrow">Data & Sync</p>
+          <h3 style={{margin:'4px 0 8px'}}>Cross-Device Sync</h3>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:'var(--radius-sm)', background:'var(--surface)', marginBottom:12}}>
+          <div style={{width:10, height:10, borderRadius:'50%', background: hasSupabaseEnv ? 'var(--success)' : 'var(--warning)', flexShrink:0}} />
+          <div>
+            <div style={{fontWeight:600, fontSize:'.88rem', color:'var(--text)'}}>{hasSupabaseEnv ? 'Supabase connected' : 'Demo mode — this device only'}</div>
+            <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{hasSupabaseEnv ? 'Your data syncs across all devices.' : 'Data saves locally. Add Supabase to sync.'}</div>
+          </div>
+        </div>
+        {!hasSupabaseEnv && (
+          <div style={{fontSize:'.8rem', color:'var(--text2)', lineHeight:1.7}}>
+            <div style={{fontWeight:700, marginBottom:6, color:'var(--text)'}}>To enable sync:</div>
+            <div style={{display:'grid', gap:6}}>
+              {[
+                '1. Create a free project at supabase.com',
+                '2. Copy your Project URL and anon key',
+                '3. In Vercel → Settings → Environment Variables:',
+                '   VITE_SUPABASE_URL = your project URL',
+                '   VITE_SUPABASE_ANON_KEY = your anon key',
+                '4. Redeploy — sync activates automatically'
+              ].map((step, i) => (
+                <div key={i} style={{padding:'6px 10px', background:'var(--surface)', borderRadius:'var(--radius-sm)', fontFamily:'monospace', fontSize:'.78rem', color:'var(--text2)'}}>{step}</div>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* ── Sign out ───────────────────────────────────────────────── */}
       <section className="card">
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -3238,7 +3517,7 @@ function PlannerApp() {
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} />} />
-          <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
+          <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} goals={goals} projects={projects} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} onSaveTask={async (task) => { await saveItem('task', task, 'create'); pushToast('Task added', task.title, 'success') }} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
