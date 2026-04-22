@@ -873,6 +873,15 @@ function AuthGate({ children, fallback }) {
 function AuthPage() {
   const { signIn, signUp, mode, setMode } = useAuth()
   const [step, setStep] = useState('welcome') // welcome | features | signin
+
+  useEffect(() => {
+    document.body.style.background = '#1C1C1E'
+    document.documentElement.style.background = '#1C1C1E'
+    return () => {
+      document.body.style.background = ''
+      document.documentElement.style.background = ''
+    }
+  }, [])
   const [isSignup, setIsSignup] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -2404,18 +2413,49 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const [notes, setNotes] = useState(() => { try { const v = localStorage.getItem('planner.notes'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const saveNotes = (n) => { setNotes(n); try { localStorage.setItem('planner.notes', JSON.stringify(n)) } catch {} }
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
-  const [cleaning, setCleaning] = useState(() => lsGet('cleaning', {
-      month: new Date().getMonth(), year: new Date().getFullYear(),
-      rooms: [
-        { label: 'Daily Tasks', tasks: 'Make beds,Laundry,Take out trash,Load/unload dishwasher,Clean countertops,Pick up shared spaces,Wipe down sinks & toilets,Spot vacuuming' },
-        { label: 'Bedrooms', tasks: 'Sweep/Vacuum/Mop,Wash bedding,Declutter nightstands & dressers,Clean mirrors,Dust & polish,Empty trash,Straighten closets & drawers' },
-        { label: 'Kitchen', tasks: 'Sweep/Mop,Clean stovetop,Wipe down all appliances,Clean microwave,Clean out fridge & freezer,Purge & tidy pantry,Wipe down cabinets,Wash dish towels,Dust & polish' },
-        { label: 'Bathrooms', tasks: 'Sweep/Mop,Clean mirrors,Clean sink & faucets,Clean toilets,Empty trash,Clean shower doors,Wipe down cabinets,Wash bath mats & shower curtains' },
-        { label: 'Living & Dining Rooms', tasks: 'Vacuum/Mop,Clean windows & blinds,Dust/polish,Clean chairs,Straighten shelves & cabinets' },
-        { label: 'Office / Playroom', tasks: 'Vacuum/Mop,Dust,Polish furniture,Clean electronics,Empty trash' },
-        { label: 'Hall / Stairs / Laundry Room', tasks: 'Vacuum & sweep floors,Clean handrails,Wipe down washer & dryer,Clean dryer lint trap,Wipe down cabinets,Straighten & organize' },
-      ]
-    }))
+  const [cleaningLog, saveCleaningLogDirect] = useState(() => lsGet('cleaning_log_v2', {}))
+  const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); lsSet('cleaning_log_v2', updated) }
+  const [cleaningFreq, setCleaningFreq] = useState('daily')
+
+  const CLEANING_SCHEDULE = {
+    daily: [
+      'Make beds', 'Do laundry', 'Take out trash', 'Load/unload dishwasher',
+      'Clean countertops', 'Pick up & tidy shared spaces', 'Wipe down sinks & toilets', 'Spot vacuuming'
+    ],
+    weekly: [
+      'Sweep/Vacuum/Mop all floors', 'Wash bedding', 'Clean mirrors', 'Dust & polish furniture',
+      'Sweep/Mop kitchen', 'Clean stovetop', 'Wipe down kitchen appliances', 'Clean microwave',
+      'Wipe down kitchen cabinets', 'Wash dish towels', 'Clean bathroom sinks & faucets',
+      'Scrub toilets', 'Clean shower doors', 'Vacuum rugs & upholstery',
+      'Clean windows & blinds', 'Empty all trash cans', 'Straighten closets & drawers',
+      'Vacuum & sweep stairs', 'Clean handrails', 'Wipe down washer & dryer exterior'
+    ],
+    monthly: [
+      'Clean out fridge & freezer', 'Purge & tidy pantry', 'Wash bath mats & shower curtains',
+      'Wipe down all cabinet fronts', 'Clean doors & walls', 'Dust ceiling fans & light fixtures',
+      'Clean baseboards', 'Organize junk drawer', 'Deep clean shower head',
+      'Restock toiletries', 'Purge & organize bathroom cabinets', 'Clean dryer lint trap thoroughly',
+      'Flip sofa cushions & pillows', 'Wash blankets', 'Clean under couch',
+      'Purge & organize toys or office supplies', 'Replenish cleaning supplies'
+    ],
+    quarterly: [
+      'Clean/wash windows inside & out', 'Purge closets & clutter', 'Flip mattresses',
+      'Deep clean oven', 'Deep clean fridge/freezer interior', 'Organize inside cabinets',
+      'Replace sink sponges', 'Deep clean trash cans', 'Wash comforters & duvets',
+      'Vacuum heating & cooling vents', 'Scrub tile grout', 'Air out rooms & drapes',
+      'Sort and clean closets — donate items', 'Clean & check pantry for expired items',
+      'Wipe switches, door handles & frames'
+    ],
+    yearly: [
+      'Clean carpets professionally', 'Dust refrigerator vent', 'Give AC a tune-up',
+      'Wash walls', 'Rinse window screens', 'Wash windowsills', 'Take off and scrub blinds',
+      'Deep clean dishwasher & freezer', 'Polish wood cabinets', 'Clean fireplace',
+      'Clean dryer vent hose', 'Clean washer gasket', 'Purge & organize laundry supplies',
+      'Wash light fixtures', 'Clean dryer vent'
+    ]
+  }
+  const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly' }
+  const FREQ_KEY_PREFIX = { daily:'d', weekly:'w', monthly:'m', quarterly:'q', yearly:'y' }
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
   const [newRoom, setNewRoom] = useState({ label: '', tasks: '' })
@@ -2502,44 +2542,93 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
       )}
 
       {tab === 'cleaning' && (
-        <section className="card">
-          <p className="eyebrow">Monthly House Cleaning</p>
-          <h3 style={{ margin: '4px 0 14px' }}>Cleaning Tracker</h3>
-          {cleaning.rooms.map((room, ri) => {
-            const roomTasks = room.tasks.split(',').map(t => t.trim()).filter(Boolean)
-            return (
-              <div key={ri} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--surface)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 700, color: 'var(--text)' }}>{room.label}</div>
-                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{roomTasks.filter(t => (cleaningLog[monthKey] || []).includes(`${ri}-${t}`)).length}/{roomTasks.length}</div>
-                </div>
-                {roomTasks.map(task => {
-                  const key = `${ri}-${task}`
-                  const done = (cleaningLog[monthKey] || []).includes(key)
-                  return (
-                    <div key={task} onClick={() => {
-                      const current = cleaningLog[monthKey] || []
-                      saveCleaningLog({ ...cleaningLog, [monthKey]: done ? current.filter(k => k !== key) : [...current, key] })
-                    }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer', borderBottom: '1px solid var(--surface)' }}>
-                      <div style={{ width: 20, height: 20, borderRadius: 4, border: '2px solid', borderColor: done ? 'var(--teal)' : 'var(--border2)', background: done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                        {done && <span style={{ color: 'var(--navy)', fontSize: '.72rem', fontWeight: 700 }}>✓</span>}
-                      </div>
-                      <span style={{ fontSize: '.88rem', color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }}>{task}</span>
-                    </div>
-                  )
-                })}
+        <div>
+          <section className="card" style={{padding:'12px 14px'}}>
+            <p className="eyebrow">Home Cleaning Tracker</p>
+            <h3 style={{margin:'4px 0 10px'}}>Keeping a Clean Home</h3>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {Object.keys(CLEANING_SCHEDULE).map(freq => {
+                const tasks = CLEANING_SCHEDULE[freq]
+                const prefix = FREQ_KEY_PREFIX[freq]
+                const done = tasks.filter(t => cleaningLog[prefix+'_'+t])
+                return (
+                  <button key={freq} onClick={() => setCleaningFreq(freq)} style={{
+                    padding:'6px 12px',borderRadius:999,border:'1.5px solid',fontSize:'.78rem',
+                    cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
+                    borderColor: cleaningFreq===freq ? 'var(--brass)' : 'var(--border2)',
+                    background: cleaningFreq===freq ? 'var(--brass-dim)' : 'transparent',
+                    color: cleaningFreq===freq ? 'var(--brass)' : 'var(--muted)',
+                    position:'relative'
+                  }}>
+                    {FREQ_LABELS[freq]}
+                    {done.length > 0 && (
+                      <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass)':'var(--success)',fontWeight:700}}>
+                        {done.length}/{tasks.length}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <div>
+                <p className="eyebrow">{FREQ_LABELS[cleaningFreq]}</p>
+                <h3 style={{margin:'2px 0 0'}}>
+                  {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length} of {CLEANING_SCHEDULE[cleaningFreq].length} done
+                </h3>
               </div>
-            )
-          })}
-          <div style={{ display: 'grid', gap: 8 }}>
-            <input placeholder="Room (Kitchen, Bathroom...)" value={newRoom.label} onChange={e => setNewRoom(p => ({ ...p, label: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Tasks (comma-separated: Mop, Wipe counters, Clean sink)" value={newRoom.tasks} onChange={e => setNewRoom(p => ({ ...p, tasks: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" style={{ padding: '10px', fontSize: '.85rem' }}
-              onClick={() => { if (!newRoom.label) return; saveCleaning({ ...cleaning, rooms: [...cleaning.rooms, newRoom] }); setNewRoom({ label: '', tasks: '' }) }}>Add Room</button>
-          </div>
-        </section>
+              <button onClick={() => {
+                const prefix = FREQ_KEY_PREFIX[cleaningFreq]
+                const tasks = CLEANING_SCHEDULE[cleaningFreq]
+                const allDone = tasks.every(t => cleaningLog[prefix+'_'+t])
+                const updated = {...cleaningLog}
+                tasks.forEach(t => { allDone ? delete updated[prefix+'_'+t] : (updated[prefix+'_'+t] = true) })
+                saveCleaningLog2(updated)
+              }} className="ghost-btn" style={{fontSize:'.75rem',padding:'5px 10px'}}>
+                {CLEANING_SCHEDULE[cleaningFreq].every(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]) ? 'Uncheck All' : 'Check All'}
+              </button>
+            </div>
+
+            {CLEANING_SCHEDULE[cleaningFreq].map(task => {
+              const key = FREQ_KEY_PREFIX[cleaningFreq] + '_' + task
+              const done = !!cleaningLog[key]
+              return (
+                <div key={task} onClick={() => {
+                  const updated = {...cleaningLog}
+                  done ? delete updated[key] : (updated[key] = true)
+                  saveCleaningLog2(updated)
+                }} style={{
+                  display:'flex',alignItems:'center',gap:10,padding:'10px 0',
+                  borderBottom:'1px solid var(--stone2)',cursor:'pointer'
+                }}>
+                  <div style={{
+                    width:22,height:22,borderRadius:6,border:'2px solid',flexShrink:0,
+                    borderColor: done ? 'var(--success)' : 'var(--border2)',
+                    background: done ? 'var(--success)' : 'var(--warm-white)',
+                    display:'grid',placeItems:'center',transition:'all .15s'
+                  }}>
+                    {done && <span style={{color:'white',fontSize:'.72rem',fontWeight:800}}>✓</span>}
+                  </div>
+                  <span style={{
+                    fontSize:'.88rem',flex:1,
+                    color: done ? 'var(--muted)' : 'var(--ink)',
+                    textDecoration: done ? 'line-through' : 'none',
+                    transition:'all .15s'
+                  }}>{task}</span>
+                </div>
+              )
+            })}
+
+            {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length === CLEANING_SCHEDULE[cleaningFreq].length && (
+              <div style={{marginTop:12,padding:'10px 14px',background:'rgba(52,168,83,.08)',borderRadius:'var(--radius-sm)',textAlign:'center',fontSize:'.85rem',color:'var(--success)',fontWeight:600}}>
+                ✓ All {FREQ_LABELS[cleaningFreq].toLowerCase()} tasks complete!
+              </div>
+            )}
+          </section>
+        </div>
       )}
 
       {tab === 'notes' && (
@@ -2624,36 +2713,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         </section>
       )}
 
-      {tab === 'tips' && (
-        <section className="card">
-          <p className="eyebrow">High Performance</p>
-          <h3 style={{margin:'4px 0 14px'}}>8 Habits of Highly Productive People</h3>
-          {[
-            ["Ruthlessly cut away the unimportant","If it doesn't move the needle, cut it."],
-            ['Allocate breaks strategically','Rest when you are tired — scheduled breaks prevent burnout.'],
-            ['Remove productivity pitstops','Identify the things that limit your productivity and eliminate them.'],
-            ['Tap into your inspiration','Channel your inner drive. Work that excites you gets done faster and better.'],
-            ["Create barriers to entry","Don't make yourself too accessible. Guard your deep work time."],
-            ['Optimize time pockets','Make the best of every minute — commutes, waiting rooms, transitions.'],
-            ['Set timelines','So things get done. Deadlines create momentum.'],
-            ["Automate everything possible","Outsource, delegate, and automate so you can focus on your highest leverage work."],
-          ].map(([habit, desc], i) => (
-            <div key={i} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
-              <div style={{
-                width:24,height:24,borderRadius:6,flexShrink:0,
-                background:'var(--ink)',color:'var(--brass)',
-                display:'grid',placeItems:'center',
-                fontSize:'.72rem',fontWeight:700
-              }}>{i+1}</div>
-              <div>
-                <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--ink)',marginBottom:2}}>{habit}</div>
-                <div style={{fontSize:'.78rem',color:'var(--muted)',lineHeight:1.5}}>{desc}</div>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-    </div>
+</div>
   )
 }
 
