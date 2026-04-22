@@ -1,31 +1,4 @@
-import React, { 
-              {tab === 'coping' && (
-                <div>
-                  {Object.entries(COPING_SKILLS).map(([category, skills]) => (
-                    <div key={category} style={{marginBottom:20}}>
-                      <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:10}}>{category}</div>
-                      <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-                        {skills.map(skill => (
-                          <button key={skill} style={{
-                            padding:'6px 12px', borderRadius:999,
-                            border:'1.5px solid var(--border2)',
-                            background:'var(--stone)', color:'var(--ink2)',
-                            fontSize:'.78rem', fontWeight:500, cursor:'pointer',
-                            fontFamily:'var(--sans)', transition:'all .15s'
-                          }}
-                          onMouseEnter={e=>{e.target.style.background='var(--brass-dim)';e.target.style.borderColor='var(--brass)';e.target.style.color='var(--brass)'}}
-                          onMouseLeave={e=>{e.target.style.background='var(--stone)';e.target.style.borderColor='var(--border2)';e.target.style.color='var(--ink2)'}}
-                          >{skill}</button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  <div style={{marginTop:12, padding:'12px 14px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', color:'var(--text2)', lineHeight:1.6}}>
-                    💡 Tap any skill as a reminder. These are tools — use what works for you in the moment.
-                  </div>
-                </div>
-              )}
-createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 
@@ -3013,6 +2986,32 @@ function HealthPage() {
               </div>
             </div>
           ))}
+        </section>
+      )}
+
+      {tab === 'coping' && (
+        <section className="card">
+          <p className="eyebrow">Coping Skills</p>
+          <h3 style={{margin:'4px 0 12px'}}>Your Toolkit</h3>
+          {Object.entries(COPING_SKILLS).map(([category, skills]) => (
+            <div key={category} style={{marginBottom:18}}>
+              <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:8}}>{category}</div>
+              <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                {skills.map(skill => (
+                  <span key={skill} style={{
+                    padding:'6px 12px', borderRadius:999,
+                    border:'1.5px solid var(--border2)',
+                    background:'var(--stone)', color:'var(--ink2)',
+                    fontSize:'.78rem', fontWeight:500,
+                    display:'inline-block'
+                  }}>{skill}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:8, padding:'10px 12px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.78rem', color:'var(--text2)', lineHeight:1.6}}>
+            💡 These are tools — use what works for you in the moment.
+          </div>
         </section>
       )}
     </div>
