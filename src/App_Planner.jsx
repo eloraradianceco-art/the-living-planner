@@ -2459,7 +2459,6 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
   const [newRoom, setNewRoom] = useState({ label: '', tasks: '' })
-  const [cleaningLog, setCleaningLog] = useState(() => lsGet('cleaningLog', {}))
 
   const saveChecklists = (c) => { setChecklists(c); lsSet('checklists', c) }
   const saveCleaning = (c) => { setCleaning(c); lsSet('cleaning', c) }
