@@ -3064,6 +3064,8 @@ function MorePage({ goals, tasks, projects, notes, budget, profile, settings, up
 }
 
 
+const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
+
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const [modalState, setModalState] = useState(modalEmpty)
