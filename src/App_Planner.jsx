@@ -1099,6 +1099,14 @@ function AuthPage() {
 }
 
 
+const tabs = [
+  { to: '/', label: 'Home', icon: '⌂' },
+  { to: '/tasks', label: 'Tasks', icon: '✓' },
+  { to: '/calendar', label: 'Calendar', icon: '◷' },
+  { to: '/growth', label: 'Growth', icon: '↑' },
+  { to: '/more', label: 'More', icon: '⋯' },
+]
+
 function Layout({ children, onQuickAdd, banner, profile }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
