@@ -2232,6 +2232,23 @@ function FinancePage({ expenses, budget, setBudget }) {
           </div>
         </section>
       )}
+
+      <section className="card">
+        <p className="eyebrow">Save More</p>
+        <h3 style={{margin:'4px 0 10px'}}>35 No-Spend Weekend Ideas</h3>
+        <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Free things to do that keep money in your pocket.</p>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {['De-clutter and sell your stuff','Attend free music or movies in the park','Have a picnic','Hike','Go to a park','Bike ride','Play board games','Host a potluck','Learn a new skill','Read a book','Make a new recipe','Play with your kids','Create art for your home','Sort and organize photos','Build a fire','DIY something','Visit a free museum','Volunteer','Camp in your backyard','Go fishing','Go to the beach','Explore your library','Take pictures','Make a budget','Re-design a room','Make lists','Write your goals','Garden','Slow down and relax','Host a clothing swap','Write','Draw or paint','Play a video game','Organize your cabinets','Sit outside with coffee or tea'].map(item => (
+            <span key={item} style={{
+              padding:'5px 10px',borderRadius:999,
+              border:'1px solid var(--border2)',
+              background:'var(--stone)',
+              fontSize:'.75rem',color:'var(--ink2)',
+              display:'inline-block'
+            }}>{item}</span>
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
@@ -2557,6 +2574,81 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
                 </div>
               </div>
               <p style={{fontSize:'.82rem',color:'var(--text2)',lineHeight:1.5}}>{note.content}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === 'tips' && (
+        <section className="card">
+          <p className="eyebrow">Time Management</p>
+          <h3 style={{margin:'4px 0 14px'}}>20 Tips for Better Focus</h3>
+          {[
+            ['Stop multi-tasking','Focus on one thing at a time — task-switching costs more time than it saves.'],
+            ['Set deadlines','Even self-imposed deadlines create urgency that drives completion.'],
+            ['Prioritise tasks','Do the most important task first, before anything else.'],
+            ['Remove distractions','Phone away, tabs closed. Your environment shapes your focus.'],
+            ['Keep your mind fresh','Protect sleep, eat well, move daily. Energy is the foundation.'],
+            ['Work when most productive','Know your peak hours and protect them for deep work.'],
+            ['Set reminders','Don't rely on memory — systems beat willpower.'],
+            ['Turn off email alerts','Check email on a schedule, not whenever it arrives.'],
+            ['Batch your tasks','Group similar tasks together to reduce mental switching costs.'],
+            ['Brain dump your thoughts','Clear your head into a list first, then prioritise.'],
+            ['Decline additional commitments','Every yes is a no to something else. Guard your calendar.'],
+            ['Tidy your workspace','A clear desk reduces cognitive load before you start.'],
+            ['Get more organised','Systems and structures make decisions automatic.'],
+            ['Get in a routine','Consistent rhythms reduce daily decision fatigue.'],
+            ['Manage your stress','Chronic stress kills focus and decision quality.'],
+            ['Delegate tasks','If someone else can do it 80% as well — let them.'],
+            ['Break big projects into steps','A project is just a series of small next actions.'],
+            ['Only take on what you can finish','Overcommitment leads to underdelivery.'],
+            ['Get inspired','Feed your mind with content that energises action.'],
+            ['Only focus on what matters','Ask: if I could only do one thing today, what would it be?'],
+          ].map(([tip, desc], i) => (
+            <div key={i} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
+              <div style={{
+                width:24,height:24,borderRadius:6,flexShrink:0,
+                background:'var(--brass-dim)',color:'var(--brass)',
+                display:'grid',placeItems:'center',
+                fontSize:'.72rem',fontWeight:700
+              }}>{i+1}</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--ink)',marginBottom:2}}>{tip}</div>
+                <div style={{fontSize:'.78rem',color:'var(--muted)',lineHeight:1.5}}>{desc}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:10,padding:'12px 14px',background:'rgba(184,150,90,.08)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',color:'var(--brass2)',lineHeight:1.6,fontStyle:'italic'}}>
+            "The key is not to prioritize what's on your schedule, but to schedule your priorities." — Stephen Covey
+          </div>
+        </section>
+      )}
+
+      {tab === 'tips' && (
+        <section className="card">
+          <p className="eyebrow">High Performance</p>
+          <h3 style={{margin:'4px 0 14px'}}>8 Habits of Highly Productive People</h3>
+          {[
+            ['Ruthlessly cut away the unimportant','Focus on the important. If it doesn't move the needle, cut it.'],
+            ['Allocate breaks strategically','Rest when you are tired — scheduled breaks prevent burnout.'],
+            ['Remove productivity pitstops','Identify the things that limit your productivity and eliminate them.'],
+            ['Tap into your inspiration','Channel your inner drive. Work that excites you gets done faster and better.'],
+            ['Create barriers to entry','Don't make yourself too accessible. Guard your deep work time.'],
+            ['Optimize time pockets','Make the best of every minute — commutes, waiting rooms, transitions.'],
+            ['Set timelines','So things get done. Deadlines create momentum.'],
+            ['Automate everything possible','Outsource, delegate, and automate so you can focus on your highest leverage work.'],
+          ].map(([habit, desc], i) => (
+            <div key={i} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
+              <div style={{
+                width:24,height:24,borderRadius:6,flexShrink:0,
+                background:'var(--ink)',color:'var(--brass)',
+                display:'grid',placeItems:'center',
+                fontSize:'.72rem',fontWeight:700
+              }}>{i+1}</div>
+              <div>
+                <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--ink)',marginBottom:2}}>{habit}</div>
+                <div style={{fontSize:'.78rem',color:'var(--muted)',lineHeight:1.5}}>{desc}</div>
+              </div>
             </div>
           ))}
         </section>
