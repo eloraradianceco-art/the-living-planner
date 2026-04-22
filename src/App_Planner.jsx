@@ -1327,14 +1327,13 @@ function MiniLineChart({ data }) {
 }
 
 
-function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, onEdit, onQuickCreate }) {
+function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate }) {
   const navigate = useNavigate()
-  const { isMobile } = useResponsive()
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
-  const topGoals = goals.slice(0, 3)
+  const openTasks = tasks.filter(t => !t.completed)
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.date))
-  const openProjects = projects.filter((project) => project.status !== 'Completed')
-  const weekSpend = expenses.reduce((sum, item) => sum + Number(item.amount), 0)
+  const weekSpend = expenses.filter(e => !['Bills','Utilities','Rent','Insurance'].includes(e.category))
+    .reduce((sum, item) => sum + Number(item.amount), 0)
   const todaySchedule = [
     ...todayTasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' })),
     ...events.filter((event) => event.date === TODAY).map((event) => ({ ...event, itemType: 'event' })),
@@ -1342,175 +1341,224 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const insights = getHomeInsights({ tasks, expenses, budget, projects, goals, events, habits, habitLogs })
   const suggestions = getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitLogs })
   const completionSeries = getWeekCompletionSeries(tasks)
-  const budgetSeries = getBudgetSeries(expenses)
-  const scoreTrend = getScoreTrend()
-  const focusCopy = todayTasks.filter((task) => !task.completed).slice(0, 2).map((task) => task.title)
+
+  const firstName = profile?.displayName?.split(' ')[0] || 'there'
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const focusCopy = openTasks.filter(t => isToday(t.date) && !t.completed).slice(0, 2).map(t => t.title)
+  const topGoals = goals.slice(0, 3)
+
+  const SECTIONS = [
+    { to:'/tasks',        icon:'✓',  label:'Tasks',        color:'var(--teal)',    count: openTasks.length || null },
+    { to:'/calendar',     icon:'◷',  label:'Calendar',     color:'var(--navy)',    count: todaySchedule.length || null },
+    { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',        count: null },
+    { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',    count: habits.length || null },
+    { to:'/health',       icon:'💊', label:'Health',       color:'#E85555',        count: null },
+    { to:'/wellness',     icon:'🌿', label:'Wellness',     color:'#22C55E',        count: null },
+    { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',        count: null },
+    { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--navy)',     count: null },
+  ]
 
   return (
     <div className="home-stack">
-      {/* Hero focus card */}
+
+      {/* ── Personal greeting hero ─────────────────────────────────── */}
       <div className="hero-focus-card">
-        <p className="eyebrow">Today's Focus</p>
-        <h2>{focusCopy.join(' • ') || 'Live the day on purpose'}</h2>
-        <p className="muted">Tasks, goals, habits, and budget — all in one place.</p>
-        <div className="hero-focus-actions">
-          <Link className="secondary-btn" to="/calendar">{isMobile ? 'Day View' : 'Open Day View'}</Link>
-          <Link className="secondary-btn" to="/tasks">{isMobile ? 'Tasks' : 'See Tasks'}</Link>
-          <button className="primary-btn" onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
+        <p className="eyebrow">{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})}</p>
+        <h2 style={{fontSize:'1.5rem', marginBottom:6}}>{greeting}, {firstName}</h2>
+        <p className="muted" style={{fontSize:'.9rem', lineHeight:1.5}}>
+          {focusCopy.length > 0
+            ? `Today: ${focusCopy.join(' · ')}`
+            : overdueTasks.length > 0
+            ? `You have ${overdueTasks.length} overdue item${overdueTasks.length > 1 ? 's' : ''} waiting.`
+            : 'Your day is clear. Add something to move toward.'}
+        </p>
+        <div className="hero-focus-actions" style={{marginTop:14}}>
+          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 16px'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
+          <button className="secondary-btn" style={{fontSize:'.82rem', padding:'8px 16px'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
+          <Link className="secondary-btn" to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px'}}>Day View</Link>
         </div>
       </div>
 
-      {/* Metrics strip */}
+      {/* ── 4 key metrics ─────────────────────────────────────────── */}
       <div className="home-metrics-strip">
-        <MetricTile label="Open Tasks" value={insights.openTasks} helper={`${insights.overdueCount} overdue`} />
-        <MetricTile label="Completion" value={`${insights.completionRate}%`} helper="This week" />
-        <MetricTile label="Budget Left" value={`$${insights.budgetRemaining.toFixed(0)}`} helper="This week" />
+        <MetricTile label="Open Tasks" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : 'on track'} />
+        <MetricTile label="This Week" value={`${insights.completionRate}%`} helper="completion rate" />
+        <MetricTile label="Budget Left" value={`$${Math.max(0, budget.weeklyTarget - weekSpend).toFixed(0)}`} helper="this week" />
         <MetricTile label="Habit Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} active`} />
       </div>
 
-      {/* Smart suggestions */}
+      {/* ── Quick access to all sections ──────────────────────────── */}
+      <section className="card">
+        <div className="section-title-row" style={{marginBottom:12}}>
+          <div><p className="eyebrow">Your Planner</p><h3>Quick Access</h3></div>
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:8}}>
+          {SECTIONS.map(s => (
+            <Link key={s.to} to={s.to} style={{
+              display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+              padding:'12px 6px', borderRadius:'var(--radius)', background:'var(--surface)',
+              border:'1px solid var(--border2)', textDecoration:'none', position:'relative'
+            }}>
+              {s.count > 0 && (
+                <div style={{position:'absolute', top:6, right:6, background:s.color, color:'white', fontSize:'.6rem', fontWeight:700, borderRadius:999, minWidth:16, height:16, display:'grid', placeItems:'center', padding:'0 3px'}}>
+                  {s.count}
+                </div>
+              )}
+              <span style={{fontSize:'1.3rem'}}>{s.icon}</span>
+              <span style={{fontSize:'.72rem', fontWeight:600, color:'var(--text2)', textAlign:'center'}}>{s.label}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Today's schedule ──────────────────────────────────────── */}
       <section className="card">
         <div className="section-title-row">
-          <div><p className="eyebrow">Smart Suggestions</p><h3>What to do next</h3></div>
-          <span className="status-pill">Live</span>
+          <div><p className="eyebrow">Today Timeline</p><h3>What's on the clock</h3></div>
+          <button className="ghost-btn" style={{fontSize:'.8rem'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
         </div>
-        <div className="suggestion-stack">
-          {suggestions.length === 0
-            ? <p className="muted">No nudges right now. You're in a good groove.</p>
-            : suggestions.map((s) => (
+        {todaySchedule.length === 0
+          ? <p className="muted" style={{fontSize:'.85rem'}}>Nothing scheduled yet today. <button onClick={() => onQuickCreate('task', { date: TODAY })} style={{background:'none', border:'none', color:'var(--teal)', cursor:'pointer', fontFamily:'inherit', fontWeight:600, padding:0}}>Add a task →</button></p>
+          : todaySchedule.slice(0, 6).map((item) => (
+            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}
+              style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
+              <strong style={{color:'var(--teal)', fontSize:'.82rem', minWidth:36}}>{item.startTime}</strong>
+              <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
+              <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
+            </button>
+          ))}
+      </section>
+
+      {/* ── Smart suggestions ─────────────────────────────────────── */}
+      {suggestions.length > 0 && (
+        <section className="card">
+          <div className="section-title-row" style={{marginBottom:10}}>
+            <div><p className="eyebrow">Smart Suggestions</p><h3>What to do next</h3></div>
+          </div>
+          <div className="suggestion-stack">
+            {suggestions.slice(0,3).map((s) => (
               <button key={s.title} className={`suggestion-card tone-${s.tone}`} onClick={() => navigate(s.route)}>
                 <strong>{s.title}</strong>
                 <span>{s.body}</span>
                 <small>{s.actionLabel} →</small>
               </button>
             ))}
-        </div>
-      </section>
-
-      {/* Today timeline */}
-      <section className="card">
-        <div className="section-title-row">
-          <div><p className="eyebrow">Today Timeline</p><h3>What's on the clock</h3></div>
-          <button className="ghost-btn" onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
-        </div>
-        {todaySchedule.length === 0
-          ? <p className="muted">No scheduled items today.</p>
-          : todaySchedule.slice(0, 5).map((item) => (
-            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}>
-              <strong>{item.startTime}</strong>
-              <span>{item.title}</span>
-              <small>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
-            </button>
-          ))}
-      </section>
-
-      {/* Goals */}
-      <section className="card">
-        <div className="section-title-row">
-          <div><p className="eyebrow">Goals</p><h3>Top Goals</h3></div>
-          <button className="ghost-btn" onClick={() => onQuickCreate('goal')}>+ Add</button>
-        </div>
-        {topGoals.length === 0 ? <p className="muted">No goals yet.</p> : topGoals.map((goal) => (
-          <div key={goal.id} className="progress-block">
-            <div className="metric-row compact-row">
-              <span>{goal.title}</span>
-              <strong>{getGoalProgress(goal.id, tasks, projects)}%</strong>
-            </div>
-            <div className="mini-progress"><div style={{ width: `${getGoalProgress(goal.id, tasks, projects)}%` }} /></div>
           </div>
-        ))}
-      </section>
+        </section>
+      )}
 
-      {/* Weekly completion chart */}
-      <section className="card">
-        <div className="section-title-row">
-          <div><p className="eyebrow">Weekly Completion</p><h3>Execution trend</h3></div>
-        </div>
-        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="completed" maxKey="total" />
-        <p className="muted" style={{fontSize:'.8rem', marginTop: 4}}>Completed actions by day.</p>
-      </section>
-
-      {/* Budget */}
-      <section className="card">
-        <div className="section-title-row">
-          <div><p className="eyebrow">Budget Drift</p><h3>Spend this week</h3></div>
-        </div>
-        <MiniBarChart data={budgetSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="amount" />
-        <p className="muted" style={{fontSize:'.8rem', marginTop: 4}}>
-          <strong>${weekSpend.toFixed(2)}</strong> of <strong>${budget.weeklyTarget.toFixed(2)}</strong> target
-        </p>
-      </section>
-
-      {/* Life scores */}
-      <section className="card">
-        <div className="section-title-row">
-          <div><p className="eyebrow">Life Score</p><h3>Balance check</h3></div>
-          <Link className="ghost-btn" to="/growth">Growth →</Link>
-        </div>
-        <div className="score-grid">
-          {Object.entries(scores).map(([key, value]) => (
-            <div key={key} className="score-card">
-              <span>{key}</span>
-              <strong>{value}/10</strong>
-              <div className="score-bar"><div style={{ width: `${value * 10}%` }} /></div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Watchlist */}
+      {/* ── Overdue watchlist ─────────────────────────────────────── */}
       {overdueTasks.length > 0 && (
-        <section className="card">
+        <section className="card" style={{borderLeft:'3px solid var(--danger)'}}>
           <div className="section-title-row">
-            <div><p className="eyebrow">Watchlist</p><h3>Needs attention</h3></div>
-            <span className="status-pill alert-pill">{overdueTasks.length} overdue</span>
+            <div><p className="eyebrow" style={{color:'var(--danger)'}}>Needs Attention</p><h3>Overdue</h3></div>
+            <span className="status-pill alert-pill">{overdueTasks.length}</span>
           </div>
-          {overdueTasks.map((task) => (
-            <button key={task.id} className="list-action-row premium-list-row" onClick={() => onEdit('task', task)}>
-              <span>{task.title}</span>
-              <strong style={{fontSize:'.8rem', color:'var(--danger)'}}>{task.date}</strong>
+          {overdueTasks.slice(0,4).map((task) => (
+            <button key={task.id} onClick={() => onEdit('task', task)}
+              style={{width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--surface)', background:'none', border:'none', borderBottom:'1px solid var(--surface)', cursor:'pointer', textAlign:'left'}}>
+              <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{task.title}</span>
+              <span style={{fontSize:'.75rem', color:'var(--danger)', fontWeight:600, flexShrink:0}}>{task.date}</span>
             </button>
           ))}
         </section>
       )}
+
+      {/* ── Top goals ─────────────────────────────────────────────── */}
+      {topGoals.length > 0 && (
+        <section className="card">
+          <div className="section-title-row">
+            <div><p className="eyebrow">Goals</p><h3>In Progress</h3></div>
+            <Link className="ghost-btn" to="/more" style={{fontSize:'.8rem'}}>All →</Link>
+          </div>
+          {topGoals.map((goal) => (
+            <div key={goal.id} className="progress-block">
+              <div className="metric-row compact-row" style={{padding:'5px 0'}}>
+                <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{goal.title}</span>
+                <strong style={{color:'var(--teal)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
+              </div>
+              <div className="mini-progress"><div style={{ width: `${getGoalProgress(goal.id, tasks, projects)}%` }} /></div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ── Life score strip ──────────────────────────────────────── */}
+      <section className="card">
+        <div className="section-title-row" style={{marginBottom:10}}>
+          <div><p className="eyebrow">Life Balance</p><h3>Score snapshot</h3></div>
+          <Link className="ghost-btn" to="/growth" style={{fontSize:'.8rem'}}>Details →</Link>
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6}}>
+          {Object.entries(scores).map(([key, value]) => (
+            <div key={key} style={{textAlign:'center', padding:'8px 4px', background:'var(--surface)', borderRadius:'var(--radius-sm)'}}>
+              <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:3, textTransform:'uppercase', letterSpacing:'.05em'}}>{key.slice(0,4)}</div>
+              <div style={{fontSize:'1.1rem', fontWeight:700, color: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)'}}>{value}</div>
+              <div style={{height:3, borderRadius:999, background:'var(--border2)', marginTop:4, overflow:'hidden'}}>
+                <div style={{height:'100%', width:`${value*10}%`, background: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)', borderRadius:999}} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Weekly execution chart ────────────────────────────────── */}
+      <section className="card">
+        <div className="section-title-row" style={{marginBottom:8}}>
+          <div><p className="eyebrow">This Week</p><h3>Execution</h3></div>
+        </div>
+        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="completed" maxKey="total" />
+      </section>
+
     </div>
   )
 }
 
 
+
 function TaskItem({ task, onToggle, onEdit, onDelete }) {
+  const isOverdue = task.date && task.date < TODAY && !task.completed
+  const priorityColor = task.priority === 'High' ? 'var(--danger)' : task.priority === 'Medium' ? 'var(--warning)' : 'var(--muted)'
+
   return (
-    <div style={{padding:'12px 0', borderBottom:'1px solid var(--surface)'}}>
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom:8}}>
-        <div style={{flex:1, minWidth:0}}>
-          <div style={{fontWeight:600, fontSize:'.92rem', color: task.completed ? 'var(--muted)' : 'var(--text)', textDecoration: task.completed ? 'line-through' : 'none', marginBottom:3, lineHeight:1.3}}>
-            {task.title}
-            {task.recurrence && task.recurrence !== 'none'
-              ? <span style={{marginLeft:6, fontSize:'.7rem', padding:'2px 7px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700, whiteSpace:'nowrap'}}>↻ {task.recurrence}</span>
-              : null}
-          </div>
-          <div style={{fontSize:'.75rem', color:'var(--muted)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>
-            {task.category} · {task.date}{task.time ? ` · ${task.time}` : ''} · {task.priority}
-          </div>
+    <div style={{padding:'10px 0', borderBottom:'1px solid var(--surface)', display:'flex', alignItems:'center', gap:10}}>
+      {/* Complete toggle — left side circle */}
+      <button onClick={() => onToggle(task.id)} style={{
+        width:24, height:24, borderRadius:'50%', border:'2px solid', flexShrink:0, cursor:'pointer',
+        borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
+        background: task.completed ? 'var(--success)' : 'transparent',
+        display:'grid', placeItems:'center'
+      }}>
+        {task.completed && <span style={{color:'white', fontSize:'.7rem', fontWeight:700}}>✓</span>}
+      </button>
+
+      {/* Content — middle */}
+      <div style={{flex:1, minWidth:0}} onClick={() => onEdit('task', task)} >
+        <div style={{
+          fontWeight:600, fontSize:'.9rem', lineHeight:1.3,
+          color: task.completed ? 'var(--muted)' : isOverdue ? 'var(--danger)' : 'var(--text)',
+          textDecoration: task.completed ? 'line-through' : 'none',
+          marginBottom:2
+        }}>
+          {task.title}
+          {task.recurrence && task.recurrence !== 'none' &&
+            <span style={{marginLeft:6, fontSize:'.65rem', padding:'1px 5px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700}}>↻</span>
+          }
+        </div>
+        <div style={{fontSize:'.72rem', color: isOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
+          <span style={{width:6, height:6, borderRadius:'50%', background:priorityColor, display:'inline-block', flexShrink:0}} />
+          <span>{task.category}</span>
+          {task.date && <span>{isOverdue ? '⚠ ' : ''}{task.date}</span>}
+          {task.time && <span>{task.time}</span>}
         </div>
       </div>
-      <div style={{display:'flex', gap:6}}>
-        <button onClick={() => onToggle(task.id)}
-          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid', cursor:'pointer', fontSize:'.8rem', fontWeight:700, fontFamily:'inherit',
-            borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
-            background: task.completed ? 'rgba(34,197,94,.08)' : 'var(--teal)',
-            color: task.completed ? 'var(--success)' : 'var(--navy)'}}>
-          {task.completed ? '✓ Done' : 'Complete'}
-        </button>
-        <button onClick={() => onEdit('task', task)}
-          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid var(--border2)', background:'var(--surface)', color:'var(--text2)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit'}}>
-          Edit
-        </button>
-        <button onClick={() => onDelete('task', task.id)}
-          style={{flex:1, padding:'7px 0', borderRadius:999, border:'1.5px solid var(--border2)', background:'var(--surface)', color:'var(--muted)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit'}}>
-          Delete
-        </button>
-      </div>
+
+      {/* Delete — right side */}
+      <button onClick={() => onDelete('task', task.id)} style={{
+        background:'none', border:'none', color:'var(--muted)', cursor:'pointer',
+        fontSize:'1rem', padding:'4px', flexShrink:0, lineHeight:1
+      }}>✕</button>
     </div>
   )
 }
@@ -3039,7 +3087,7 @@ function PlannerApp() {
     <>
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
         <Routes>
-          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} onEdit={openEdit} onQuickCreate={openCreate} />} />
+          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
