@@ -1036,11 +1036,11 @@ function Layout({ children, onQuickAdd, banner, profile }) {
   return (
     <div className="app-shell premium-shell living-planner-shell">
       <header className="topbar premium-topbar living-planner-topbar">
-        <div className="topbar-copy">
+        <Link to="/" className="topbar-copy" style={{textDecoration:'none'}}>
           <p className="eyebrow">The Living Planner</p>
           <h1>The Living Planner</h1>
           <p className="muted topbar-date">{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-        </div>
+        </Link>
 
         <div className="topbar-actions">
           <div className="profile-pill">
@@ -1070,7 +1070,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
                 <Link
                   key={tab.to}
                   to={tab.to}
-                  className={location.pathname === tab.to ? 'side-nav-link active' : 'side-nav-link'}
+                  className={location.pathname === tab.to ? 'side-nav-link active' : 'side-nav-link'} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:'var(--radius-sm)',color:location.pathname===tab.to?'var(--brass)':'var(--text2)',fontWeight:location.pathname===tab.to?700:400,textDecoration:'none',background:location.pathname===tab.to?'var(--brass-dim)':'transparent'}}
                 >
                   <span className="nav-icon">{tab.icon}</span>
                   {tab.label}
@@ -1093,7 +1093,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
             <Link
               key={tab.to}
               to={tab.to}
-              className={location.pathname === tab.to ? 'nav-link active' : 'nav-link'}
+              className={location.pathname === tab.to ? 'nav-item active' : 'nav-item'}
             >
               <span className="nav-icon">{tab.icon}</span>
               <span className="nav-label">{tab.label}</span>
@@ -1103,7 +1103,15 @@ function Layout({ children, onQuickAdd, banner, profile }) {
       ) : null}
 
       {!isDesktop ? (
-        <button className="mobile-fab primary-btn premium-btn" onClick={onQuickAdd}>＋</button>
+        <button onClick={onQuickAdd} style={{
+          position:'fixed', bottom:76, right:20, zIndex:90,
+          width:52, height:52, borderRadius:'50%',
+          background:'var(--brass)', color:'var(--warm-white)',
+          border:'none', fontSize:'1.6rem', fontWeight:300,
+          cursor:'pointer', display:'grid', placeItems:'center',
+          boxShadow:'0 4px 20px var(--brass-glow)',
+          lineHeight:1
+        }}>+</button>
       ) : null}
     </div>
   )
@@ -1180,10 +1188,17 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="ghost-btn" onClick={onClose}>Close</button>
+      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18}}>
+          <h2 className="modal-title" style={{margin:0}}>{title}</h2>
+          <button onClick={onClose} style={{
+            background:'var(--stone2)', border:'1.5px solid var(--border2)',
+            borderRadius:'50%', width:32, height:32,
+            display:'grid', placeItems:'center',
+            cursor:'pointer', color:'var(--ink)', fontSize:'1rem', fontWeight:700,
+            flexShrink:0
+          }}>✕</button>
         </div>
         <div className="pill-row modal-tabs">
           {Object.keys(labels).map((option) => (
