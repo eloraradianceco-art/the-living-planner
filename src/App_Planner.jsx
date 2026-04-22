@@ -1047,9 +1047,9 @@ function Layout({ children, onQuickAdd, banner, profile }) {
         <div className="topbar-actions">
           <div className="profile-pill">
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
-            <div>
-              <strong>{displayName}</strong>
-              <span>{profile?.plannerMode || 'Balanced'} mode</span>
+            <div style={{display:'flex',flexDirection:'column',gap:1}}>
+              <strong style={{lineHeight:1.1}}>{displayName}</strong>
+              <span style={{fontSize:'.62rem',opacity:.7}}>{profile?.plannerMode || 'Balanced'} mode</span>
             </div>
           </div>
         </div>
@@ -1118,19 +1118,19 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
 
 function StatusBanner({ syncing, error }) {
-  const { mode, user, signOut } = useAuth()
-
+  const { mode } = useAuth()
+  // Only show when syncing or error — hide idle mock mode noise
+  if (!syncing && !error) return null
   return (
-    <div className="status-banner">
-      <div>
-        <strong>{mode === 'supabase' ? 'Supabase mode' : 'Mock mode'}</strong>
-        <span>{user?.email || 'No active user'}</span>
-      </div>
-      <div className="status-actions">
-        {syncing ? <span className="sync-pill">Syncing…</span> : <span className="sync-pill muted-pill">Idle</span>}
-        {error ? <span className="error-pill">{error}</span> : null}
-        <button className="ghost-btn" onClick={signOut}>Sign out</button>
-      </div>
+    <div style={{
+      display:'flex', alignItems:'center', gap:8,
+      padding:'6px 16px', fontSize:'.75rem', fontWeight:500,
+      background: error ? 'rgba(217,79,61,.08)' : 'rgba(184,150,90,.08)',
+      borderBottom: `1px solid ${error ? 'rgba(217,79,61,.15)' : 'rgba(184,150,90,.12)'}`,
+      color: error ? 'var(--danger)' : 'var(--brass)'
+    }}>
+      <span style={{width:6,height:6,borderRadius:'50%',background:error?'var(--danger)':'var(--brass)',flexShrink:0}} />
+      <span>{error || (syncing ? 'Syncing…' : '')}</span>
     </div>
   )
 }
@@ -1397,17 +1397,17 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8}}>
           {SECTIONS.map(s => (
             <Link key={s.to} to={s.to} style={{
-              display:'flex', flexDirection:'column', alignItems:'center', gap:4,
-              padding:'12px 6px', borderRadius:'var(--radius)', background:'var(--surface)',
-              border:'1px solid var(--border2)', textDecoration:'none', position:'relative'
+              display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+              padding:'10px 4px 8px', borderRadius:'var(--radius-sm)', background:'var(--stone)',
+              border:'1px solid var(--border)', textDecoration:'none', position:'relative'
             }}>
               {s.count > 0 && (
-                <div style={{position:'absolute', top:6, right:6, background:s.color, color:'white', fontSize:'.6rem', fontWeight:700, borderRadius:999, minWidth:16, height:16, display:'grid', placeItems:'center', padding:'0 3px'}}>
+                <div style={{position:'absolute', top:4, right:4, background:s.color, color:'white', fontSize:'.55rem', fontWeight:700, borderRadius:999, minWidth:14, height:14, display:'grid', placeItems:'center', padding:'0 3px', lineHeight:1}}>
                   {s.count}
                 </div>
               )}
-              <span style={{fontSize:'1.3rem'}}>{s.icon}</span>
-              <span style={{fontSize:'.72rem', fontWeight:600, color:'var(--text2)', textAlign:'center'}}>{s.label}</span>
+              <span style={{fontSize:'1rem', lineHeight:1}}>{s.icon}</span>
+              <span style={{fontSize:'.65rem', fontWeight:600, color:'var(--text2)', textAlign:'center', lineHeight:1.2}}>{s.label}</span>
             </Link>
           ))}
         </div>
