@@ -415,14 +415,17 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 /* ── Auth ───────────────────────────────────────────────────────── */
 .auth-shell {
   min-height: 100vh;
+  min-width: 100vw;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 32px 20px;
-  background: var(--ink);
-  position: relative;
-  overflow: hidden;
+  background: #1C1C1E;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  overflow-y: auto;
+  z-index: 10;
 }
 .auth-shell::before {
   content: '';
@@ -433,12 +436,12 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
   background: radial-gradient(circle, rgba(184,150,90,.08) 0%, transparent 70%);
 }
 .auth-card {
-  background: var(--warm-white);
+  background: #FDFCFA;
   border-radius: var(--radius-xl);
   padding: 28px 24px;
   width: 100%;
   max-width: 420px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
 }
 .auth-card h1 {
   font-size: 1.8rem;
