@@ -1518,7 +1518,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
 
 function TaskItem({ task, onToggle, onEdit, onDelete }) {
-  const isOverdue = task.date && task.date < TODAY && !task.completed
+  const isTaskOverdue = task.date && task.date < TODAY && !task.completed
   const priorityColor = task.priority === 'High' ? 'var(--danger)' : task.priority === 'Medium' ? 'var(--warning)' : 'var(--muted)'
 
   return (
@@ -1537,7 +1537,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
       <div style={{flex:1, minWidth:0}} onClick={() => onEdit('task', task)} >
         <div style={{
           fontWeight:600, fontSize:'.9rem', lineHeight:1.3,
-          color: task.completed ? 'var(--muted)' : isOverdue ? 'var(--danger)' : 'var(--text)',
+          color: task.completed ? 'var(--muted)' : isTaskOverdue ? 'var(--danger)' : 'var(--text)',
           textDecoration: task.completed ? 'line-through' : 'none',
           marginBottom:2
         }}>
@@ -1546,10 +1546,10 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
             <span style={{marginLeft:6, fontSize:'.65rem', padding:'1px 5px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700}}>↻</span>
           }
         </div>
-        <div style={{fontSize:'.72rem', color: isOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
+        <div style={{fontSize:'.72rem', color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
           <span style={{width:6, height:6, borderRadius:'50%', background:priorityColor, display:'inline-block', flexShrink:0}} />
           <span>{task.category}</span>
-          {task.date && <span>{isOverdue ? '⚠ ' : ''}{task.date}</span>}
+          {task.date && <span>{isTaskOverdue ? '⚠ ' : ''}{task.date}</span>}
           {task.time && <span>{task.time}</span>}
         </div>
       </div>
