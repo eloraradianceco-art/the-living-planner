@@ -1566,7 +1566,6 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
 
 function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate }) {
   const [query, setQuery] = useState('')
-  const { prefersTouch, isMobile } = useResponsive()
   const [category, setCategory] = useState('All')
   const [status, setStatus] = useState('All')
 
@@ -1585,45 +1584,44 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
   }, [tasks, settings, category, status, query])
 
   const groups = {
+    Overdue: filtered.filter((task) => !task.completed && isOverdue(task.date)),
     Today: filtered.filter((task) => isToday(task.date)),
     'This Week': filtered.filter((task) => isThisWeek(task.date) && !isToday(task.date) && !isOverdue(task.date)),
     Upcoming: filtered.filter((task) => !isThisWeek(task.date) && task.date > new Date().toISOString().slice(0, 10)),
-    Overdue: filtered.filter((task) => !task.completed && isOverdue(task.date)),
+    Completed: filtered.filter((task) => task.completed),
   }
 
-  const quickStats = [
-    { label: 'Open', value: filtered.filter((task) => !task.completed).length },
-    { label: 'Done', value: filtered.filter((task) => task.completed).length },
-    { label: 'Recurring', value: filtered.filter((task) => task.recurrence && task.recurrence !== 'none').length },
-    { label: 'High Priority', value: filtered.filter((task) => task.priority === 'High').length },
-  ]
+  const openCount = filtered.filter(t => !t.completed).length
+  const doneCount = filtered.filter(t => t.completed).length
 
   return (
     <div className="screen-stack">
-      <section className="card premium-card">
-        <div className="section-title-row">
+      {/* Compact header */}
+      <section className="card" style={{padding:'12px 14px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
           <div>
-            <p className="eyebrow">Execution</p>
-            <h3>Tasks</h3>
-            <p className="muted">Search fast, filter what matters, and drag tasks into the calendar when you want them to become real commitments.</p>
+            <p className="eyebrow">Tasks</p>
+            <div style={{display:'flex', gap:10, marginTop:2}}>
+              <span style={{fontSize:'.78rem', color:'var(--text2)', fontWeight:600}}>{openCount} open</span>
+              <span style={{fontSize:'.78rem', color:'var(--muted)'}}>{doneCount} done</span>
+            </div>
           </div>
-          <div className="button-row">
-            <button className="secondary-btn" onClick={() => onQuickCreate('task', { recurrence: 'daily' })}>Add Recurring</button>
-            <button className="primary-btn premium-btn" onClick={() => onQuickCreate('task')}>Add Task</button>
+          <div style={{display:'flex', gap:6}}>
+            <button className="secondary-btn" style={{fontSize:'.78rem', padding:'6px 10px'}} onClick={() => onQuickCreate('task', { recurrence: 'daily' })}>+ Recurring</button>
+            <button className="primary-btn" style={{fontSize:'.78rem', padding:'6px 12px'}} onClick={() => onQuickCreate('task')}>+ Task</button>
           </div>
         </div>
-        <div className="stats-strip">
-          {quickStats.map((stat) => <div key={stat.label} className="mini-stat"><span>{stat.label}</span><strong>{stat.value}</strong></div>)}
-        </div>
-
-        {prefersTouch ? <p className="muted">Touch tip: tap <strong>Plan</strong> on a task to assign its date or time when drag-and-drop isn’t convenient.</p> : null}
-        <div className="filter-row">
-          <input placeholder="Search tasks" value={query} onChange={(e) => setQuery(e.target.value)} />
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        {/* Filters */}
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr 1fr', gap:8}}>
+          <input placeholder="Search tasks..." value={query} onChange={(e) => setQuery(e.target.value)}
+            style={{padding:'8px 10px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.83rem', background:'var(--surface)', color:'var(--text)'}} />
+          <select value={category} onChange={(e) => setCategory(e.target.value)}
+            style={{padding:'8px 6px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', background:'var(--surface)', color:'var(--text2)'}}>
             <option>All</option>
             {categories.map((item) => <option key={item}>{item}</option>)}
           </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select value={status} onChange={(e) => setStatus(e.target.value)}
+            style={{padding:'8px 6px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', background:'var(--surface)', color:'var(--text2)'}}>
             <option>All</option>
             <option>Open</option>
             <option>Done</option>
@@ -1631,18 +1629,22 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
         </div>
       </section>
 
-      {Object.entries(groups).map(([label, items]) => (
-        <section key={label} className="card premium-card">
-          <div className="section-title-row"><h3>{label}</h3><span className="status-pill">{items.length}</span></div>
-          {items.length === 0 ? <p>Nothing here.</p> : items.map((task) => <TaskItem key={task.id} task={task} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />)}
-        </section>
-      ))}
+      {Object.entries(groups).map(([label, items]) => {
+        if (items.length === 0) return null
+        return (
+          <section key={label} className="card" style={{padding:'12px 14px'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+              <h3 style={{fontSize:'.95rem', color: label === 'Overdue' ? 'var(--danger)' : 'var(--text)'}}>{label}</h3>
+              <span className={`status-pill${label === 'Overdue' ? ' alert-pill' : ''}`} style={{fontSize:'.72rem', padding:'3px 8px'}}>{items.length}</span>
+            </div>
+            {items.map((task) => <TaskItem key={task.id} task={task} onToggle={onToggle} onEdit={onEdit} onDelete={onDelete} />)}
+          </section>
+        )
+      })}
     </div>
   )
 }
 
-
-const hours = Array.from({ length: 16 }, (_, index) => `${String(index + 5).padStart(2, '0')}:00`)
 
 function DropSlot({ date, time, onQuickCreate, onDropItem, items, onEdit, onDelete, prefersTouch }) {
   const [dragOver, setDragOver] = useState(false)
@@ -1703,59 +1705,70 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     await onReschedule(payload.type, payload.id, { date, ...(time ? { time, startTime: time } : {}) })
   }
 
-  const navLabel = view === 'month'
-    ? selectedMonthLabel
-    : view === 'week'
-    ? `Week of ${formatDateLabel(weekDays[0], { month: 'short', day: 'numeric' })}`
+  const navLabel = view === 'month' ? selectedMonthLabel
+    : view === 'week' ? `Week of ${formatDateLabel(weekDays[0], { month: 'short', day: 'numeric' })}`
     : formatDateLabel(selectedDate, { weekday: 'short', month: 'short', day: 'numeric' })
 
   const step = view === 'month' ? 30 : view === 'week' ? 7 : 1
 
+  // Build 6-week grid for month view
+  const buildMonthGrid = () => {
+    if (monthDays.length === 0) return []
+    const firstDay = new Date(monthDays[0] + 'T12:00:00').getDay()
+    const weeks = []
+    let week = Array(firstDay).fill(null)
+    for (const day of monthDays) {
+      week.push(day)
+      if (week.length === 7) { weeks.push(week); week = [] }
+    }
+    if (week.length > 0) {
+      while (week.length < 7) week.push(null)
+      weeks.push(week)
+    }
+    return weeks
+  }
+  const monthGrid = buildMonthGrid()
+
   return (
     <div className="screen-stack">
-      {/* Header */}
-      <section className="card" style={{padding:'14px 16px'}}>
-        {/* Row 1: title + add button */}
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
-          <div>
-            <p className="eyebrow" style={{marginBottom:2}}>Calendar</p>
-            <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)'}}>{navLabel}</div>
-          </div>
-          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 14px', flexShrink:0}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
+      {/* ── Compact header ───────────────────────────────────────── */}
+      <section className="card" style={{padding:'10px 14px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+          <div style={{fontWeight:700, fontSize:'.95rem', color:'var(--text)'}}>{navLabel}</div>
+          <button className="primary-btn" style={{fontSize:'.78rem', padding:'6px 12px'}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
         </div>
-        {/* Row 2: back / today / forward */}
-        <div style={{display:'flex', gap:6, marginBottom:10}}>
-          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹ Back</button>
-          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(TODAY)}>Today</button>
-          <button className="cal-nav-btn" style={{flex:1}} onClick={() => setSelectedDate(addDays(selectedDate, step))}>Next ›</button>
+        <div style={{display:'flex', gap:6, marginBottom:8}}>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹</button>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(TODAY)}>Today</button>
+          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, step))}>›</button>
         </div>
-        {/* Row 3: view toggle */}
         <div style={{display:'flex', gap:6}}>
           {['day','week','month'].map((v) => (
-            <button key={v} onClick={() => setView(v)}
-              style={{flex:1, padding:'7px 4px', borderRadius:'999px', border:'1.5px solid', fontSize:'.82rem', fontWeight:600, cursor:'pointer', fontFamily:'inherit',
-                borderColor: view===v ? 'var(--teal)' : 'var(--border2)',
-                background: view===v ? 'var(--teal)' : 'var(--surface)',
-                color: view===v ? 'var(--navy)' : 'var(--text2)'}}>
-              {v.charAt(0).toUpperCase()+v.slice(1)}
+            <button key={v} onClick={() => setView(v)} style={{
+              flex:1, padding:'6px 4px', borderRadius:'999px', border:'1.5px solid', fontSize:'.78rem',
+              fontWeight:600, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize',
+              borderColor: view===v ? 'var(--teal)' : 'var(--border2)',
+              background: view===v ? 'var(--teal)' : 'var(--surface)',
+              color: view===v ? 'var(--navy)' : 'var(--text2)'}}>
+              {v}
             </button>
           ))}
         </div>
       </section>
 
-      {/* Day view */}
+      {/* ── Day view ─────────────────────────────────────────────── */}
       {view === 'day' && (
         <section className="card">
           <div className="section-title-row">
-            <h3>Daily Schedule</h3>
-            <span className="status-pill">{prefersTouch ? 'Tap a slot' : 'Drag to reschedule'}</span>
+            <h3 style={{fontSize:'1rem'}}>Daily Schedule</h3>
+            <span className="status-pill" style={{fontSize:'.72rem'}}>{prefersTouch ? 'Tap a slot' : 'Drag to reschedule'}</span>
           </div>
           {isMobile && upcomingScheduled.length > 0 && (
             <div className="mobile-agenda-strip">
               {upcomingScheduled.map((item) => (
                 <button key={`${item.itemType}-${item.id}`} className="agenda-chip" onClick={() => onEdit(item.itemType, item)}>
-                  <strong style={{fontSize:'.78rem', color:'var(--teal)'}}>{item.startTime}</strong>
-                  <span style={{fontSize:'.82rem', color:'var(--text)', fontWeight:600}}>{item.title}</span>
+                  <strong style={{fontSize:'.75rem', color:'var(--teal)'}}>{item.startTime}</strong>
+                  <span style={{fontSize:'.8rem', color:'var(--text)', fontWeight:600}}>{item.title}</span>
                 </button>
               ))}
             </div>
@@ -1766,20 +1779,19 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               return (
                 <div className="timeline-row" key={hour}>
                   <div className="timeline-hour">{hour}</div>
-                  <div
-                    className={items.length === 0 ? (false ? 'timeline-slot drop-active' : 'timeline-slot') : 'timeline-slot'}
+                  <div className="timeline-slot"
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}
-                  >
+                    onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}>
                     {items.length === 0
                       ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}>{prefersTouch ? 'Tap to add' : 'Add here'}</button>
                       : items.map((item) => (
-                        <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                        <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable
+                          onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
                           <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
-                            <strong style={{fontSize:'.9rem'}}>{item.title}</strong>
-                            <span style={{fontSize:'.78rem', color:'var(--muted)'}}>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
+                            <strong style={{fontSize:'.88rem'}}>{item.title}</strong>
+                            <span style={{fontSize:'.75rem', color:'var(--muted)'}}>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
                           </button>
-                          <button className="ghost-btn" style={{fontSize:'.78rem', padding:'5px 10px'}} onClick={() => onDelete(item.itemType, item.id)}>Delete</button>
+                          <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onDelete(item.itemType, item.id)}>✕</button>
                         </div>
                       ))}
                   </div>
@@ -1790,10 +1802,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </section>
       )}
 
-      {/* Week view */}
+      {/* ── Week view ─────────────────────────────────────────────── */}
       {view === 'week' && (
         <section className="card">
-          <div className="section-title-row"><h3>Weekly View</h3></div>
+          <div className="section-title-row"><h3 style={{fontSize:'1rem'}}>Weekly View</h3></div>
           <div className="week-grid">
             {weekDays.map((date) => {
               const items = scheduled.filter((item) => item.date === date)
@@ -1801,11 +1813,14 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                 <div key={date} className="week-card droppable-day"
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), date) } catch {} }}>
-                  <button className="day-chip" onClick={() => { setSelectedDate(date); setView('day') }}>{formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}</button>
-                  {items.length === 0 ? <p className="muted" style={{fontSize:'.78rem'}}>Open</p> : items.map((item) => (
-                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)} draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
-                      <span style={{fontSize:'.72rem', color:'var(--teal)'}}>{item.startTime}</span>
-                      <strong style={{fontSize:'.82rem'}}>{item.title}</strong>
+                  <button className="day-chip" onClick={() => { setSelectedDate(date); setView('day') }}>
+                    {formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </button>
+                  {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
+                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)}
+                      draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                      <span style={{fontSize:'.7rem', color:'var(--teal)'}}>{item.startTime}</span>
+                      <strong style={{fontSize:'.8rem'}}>{item.title}</strong>
                     </button>
                   ))}
                 </div>
@@ -1815,27 +1830,43 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </section>
       )}
 
-      {/* Month view */}
+      {/* ── Month view — proper calendar table ────────────────────── */}
       {view === 'month' && (
-        <section className="card">
-          <div className="section-title-row"><h3>{selectedMonthLabel}</h3></div>
-          <div className="month-grid">
-            {monthDays.map((date) => {
-              const count = scheduled.filter((item) => item.date === date).length
-              return (
-                <button key={date} className={date === selectedDate ? 'month-cell active-cell' : 'month-cell'} onClick={() => { setSelectedDate(date); setView('day') }}>
-                  <strong style={{fontSize:'.82rem'}}>{formatDateLabel(date, { month: 'short', day: 'numeric' })}</strong>
-                  {count > 0 && <span style={{fontSize:'.72rem', color:'var(--teal)'}}>{count} item{count > 1 ? 's' : ''}</span>}
-                  <div className="mini-progress"><div style={{ width: `${Math.min(count * 25, 100)}%` }} /></div>
-                </button>
-              )
-            })}
-          </div>
+        <section className="card" style={{padding:'12px 10px'}}>
+          <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)', marginBottom:10, textAlign:'center'}}>{selectedMonthLabel}</div>
+          <table className="month-table">
+            <thead>
+              <tr>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <th key={d}>{d}</th>)}</tr>
+            </thead>
+            <tbody>
+              {monthGrid.map((week, wi) => (
+                <tr key={wi}>
+                  {week.map((date, di) => {
+                    if (!date) return <td key={di} />
+                    const count = scheduled.filter(item => item.date === date).length
+                    const isToday_ = date === TODAY
+                    const isSelected = date === selectedDate
+                    return (
+                      <td key={di}>
+                        <div
+                          className={`month-day-cell${isToday_ ? ' today' : ''}${isSelected ? ' selected' : ''}`}
+                          onClick={() => { setSelectedDate(date); setView('day') }}>
+                          <div className="month-day-num">{new Date(date + 'T12:00:00').getDate()}</div>
+                          {count > 0 && <div className="month-day-dot">{count} ·</div>}
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </section>
       )}
     </div>
   )
 }
+
 
 function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate }) {
   return (
@@ -2807,7 +2838,7 @@ function HealthPage() {
   )
 }
 
-function GrowthPage({ scores, habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
+function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
   const weekStart = startOfWeek(TODAY)
   const weekEnd = endOfWeek(TODAY)
   const weekLogs = habitLogs.filter((log) => log.date >= weekStart && log.date <= weekEnd)
@@ -2890,6 +2921,31 @@ function GrowthPage({ scores, habits, habitLogs, onToggleHabit, onEdit, onDelete
           </label>
         </div>
       </section>
+
+      {/* Goals moved here from More */}
+      <section className="card premium-card">
+        <div className="section-title-row">
+          <div><p className="eyebrow">Goals</p><h3>Your Goals</h3></div>
+          <button className="primary-btn" style={{fontSize:'.8rem', padding:'6px 12px'}} onClick={() => onQuickCreate('goal')}>+ Goal</button>
+        </div>
+        {goals.length === 0 ? <p className="muted" style={{fontSize:'.85rem'}}>No goals yet. Add something to work toward.</p>
+          : goals.map((goal) => (
+          <div key={goal.id} className="progress-block">
+            <div className="metric-row compact-row" style={{padding:'6px 0'}}>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontWeight:600, fontSize:'.9rem', color:'var(--text)'}}>{goal.title}</div>
+                <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{goal.category} · {goal.targetDate}</div>
+              </div>
+              <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
+                <strong style={{color:'var(--teal)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
+                <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('goal', goal)}>Edit</button>
+                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('goal', goal.id)}>✕</button>
+              </div>
+            </div>
+            <div className="mini-progress"><div style={{ width: `${getGoalProgress(goal.id, tasks, projects)}%` }} /></div>
+          </div>
+        ))}
+      </section>
     </div>
   )
 }
@@ -2916,113 +2972,35 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
   )
 }
 
-function MorePage({ goals, tasks, projects, expenses, notes, budget, profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
+function MorePage({ goals, tasks, projects, notes, budget, profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
   const { signOut } = useAuth()
   const [noteQuery, setNoteQuery] = useState('')
-  const [expenseQuery, setExpenseQuery] = useState('')
-  const totalSpent = expenses.reduce((sum, item) => sum + Number(item.amount), 0)
 
   const filteredNotes = useMemo(() => notes.filter((note) => !noteQuery || note.title.toLowerCase().includes(noteQuery.toLowerCase()) || note.content.toLowerCase().includes(noteQuery.toLowerCase())), [notes, noteQuery])
-  const filteredExpenses = useMemo(() => expenses.filter((expense) => !expenseQuery || expense.category.toLowerCase().includes(expenseQuery.toLowerCase()) || (expense.note || '').toLowerCase().includes(expenseQuery.toLowerCase())), [expenses, expenseQuery])
 
   return (
     <div className="screen-stack">
-      <section className="card">
-        <p className="eyebrow">Quick Access</p>
-        <h3 style={{margin:'4px 0 12px'}}>All Sections</h3>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8}}>
-          {[
-            {to:'/finance', icon:'💰', label:'Finance', desc:'Budget, savings, bills'},
-            {to:'/wellness', icon:'🌿', label:'Wellness', desc:'Reading, routine'},
-            {to:'/productivity', icon:'⚡', label:'Productivity', desc:'Tasks, checklists'},
-            {to:'/lifestyle', icon:'🌍', label:'Lifestyle', desc:'Contacts, trips, groceries'},
-            {to:'/health', icon:'💊', label:'Health', desc:'Meds, sleep, trackers'},
-            {to:'/growth', icon:'📈', label:'Growth', desc:'Habits, scorecard'},
-          ].map(s => (
-            <Link key={s.to} to={s.to} style={{display:'block', padding:'12px 14px', borderRadius:'var(--radius)', border:'1px solid var(--border2)', background:'var(--surface)', textDecoration:'none'}}>
-              <div style={{fontSize:'1.2rem', marginBottom:4}}>{s.icon}</div>
-              <div style={{fontWeight:700, fontSize:'.88rem', color:'var(--text)'}}>{s.label}</div>
-              <div style={{fontSize:'.74rem', color:'var(--muted)'}}>{s.desc}</div>
-            </Link>
-          ))}
-        </div>
-      </section>
-      {!settings.onboardingComplete ? <OnboardingChecklist settings={settings} profile={profile} tasks={tasks} goals={goals} projects={projects} updateSettings={updateSettings} /> : null}
 
+      {/* ── Profile ────────────────────────────────────────────────── */}
       <section className="card">
-        <div className="section-title-row">
-          <h3>Goals</h3>
-          <button className="primary-btn" onClick={() => onQuickCreate('goal')}>Add Goal</button>
+        <div className="section-title-row" style={{marginBottom:14}}>
+          <div><p className="eyebrow">Account</p><h3>Profile</h3></div>
         </div>
-        {goals.map((goal) => (
-          <div key={goal.id} className="metric-row card-row">
-            <div>
-              <strong>{goal.title}</strong>
-              <p>{goal.category} • {goal.targetDate}</p>
-            </div>
-            <div className="item-actions">
-              <span>{getGoalProgress(goal.id, tasks, projects)}%</span>
-              <button className="ghost-btn" onClick={() => onEdit('goal', goal)}>Edit</button>
-              <button className="ghost-btn" onClick={() => onDelete('goal', goal.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="card">
-        <div className="section-title-row">
-          <h3>Finances</h3>
-          <button className="primary-btn" onClick={() => onQuickCreate('expense')}>Add Expense</button>
-        </div>
-        <input placeholder="Search expenses" value={expenseQuery} onChange={(e) => setExpenseQuery(e.target.value)} />
-        <div className="metric-row"><span>Spent</span><strong>${totalSpent.toFixed(2)}</strong></div>
-        <div className="metric-row"><span>Weekly Target</span><strong>${budget.weeklyTarget.toFixed(2)}</strong></div>
-        <div className="mini-progress"><div style={{ width: `${Math.min((totalSpent / budget.weeklyTarget) * 100, 100)}%` }} /></div>
-        {filteredExpenses.map((expense) => (
-          <div key={expense.id} className="metric-row card-row">
-            <span>{expense.category}: ${Number(expense.amount).toFixed(2)} — {expense.note}</span>
-            <div className="item-actions">
-              <button className="ghost-btn" onClick={() => onEdit('expense', expense)}>Edit</button>
-              <button className="ghost-btn" onClick={() => onDelete('expense', expense.id)}>Delete</button>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <section className="card">
-        <div className="section-title-row">
-          <h3>Notes</h3>
-          <button className="primary-btn" onClick={() => onQuickCreate('note')}>Add Note</button>
-        </div>
-        <input placeholder="Search notes" value={noteQuery} onChange={(e) => setNoteQuery(e.target.value)} />
-        {filteredNotes.map((note) => (
-          <div key={note.id} className="note-card">
-            <div className="metric-row compact-row">
-              <strong>{note.title}</strong>
-              <div className="item-actions">
-                <button className="ghost-btn" onClick={() => onEdit('note', note)}>Edit</button>
-                <button className="ghost-btn" onClick={() => onDelete('note', note.id)}>Delete</button>
-              </div>
-            </div>
-            <p>{note.content}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="card">
-        <div className="section-title-row"><h3>Profile</h3></div>
-        <div className="form-grid">
-          <label>
+        <div style={{display:'grid', gap:12}}>
+          <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
             Display Name
-            <input value={profile.displayName || ''} onChange={(e) => updateProfile({ ...profile, displayName: e.target.value })} />
+            <input value={profile.displayName || ''} onChange={(e) => updateProfile({ ...profile, displayName: e.target.value })}
+              style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}} />
           </label>
-          <label>
+          <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
             Timezone
-            <input value={profile.timezone || ''} onChange={(e) => updateProfile({ ...profile, timezone: e.target.value })} />
+            <input value={profile.timezone || ''} onChange={(e) => updateProfile({ ...profile, timezone: e.target.value })}
+              style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}} />
           </label>
-          <label>
+          <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
             Planner Mode
-            <select value={profile.plannerMode || 'Balanced'} onChange={(e) => updateProfile({ ...profile, plannerMode: e.target.value })}>
+            <select value={profile.plannerMode || 'Balanced'} onChange={(e) => updateProfile({ ...profile, plannerMode: e.target.value })}
+              style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}}>
               <option>Balanced</option>
               <option>Execution</option>
               <option>Wellness</option>
@@ -3032,30 +3010,59 @@ function MorePage({ goals, tasks, projects, expenses, notes, budget, profile, se
         </div>
       </section>
 
+      {/* ── Settings ───────────────────────────────────────────────── */}
       <section className="card">
-        <div className="section-title-row"><h3>Settings</h3></div>
-        <div className="setting-row">
-          <span>Show completed tasks</span>
-          <input type="checkbox" checked={settings.showCompletedTasks} onChange={(e) => updateSettings({ ...settings, showCompletedTasks: e.target.checked })} />
+        <div className="section-title-row" style={{marginBottom:12}}>
+          <div><p className="eyebrow">Preferences</p><h3>Settings</h3></div>
         </div>
-        <div className="setting-row">
-          <span>Compact calendar</span>
-          <input type="checkbox" checked={settings.compactCalendar} onChange={(e) => updateSettings({ ...settings, compactCalendar: e.target.checked })} />
+        {[
+          ['Show completed tasks', 'showCompletedTasks'],
+          ['Compact calendar', 'compactCalendar'],
+        ].map(([label, key]) => (
+          <div key={key} className="setting-row">
+            <span style={{fontSize:'.9rem', color:'var(--text2)'}}>{label}</span>
+            <input type="checkbox" checked={settings[key]} onChange={(e) => updateSettings({ ...settings, [key]: e.target.checked })} />
+          </div>
+        ))}
+      </section>
+
+      {/* ── Notes ──────────────────────────────────────────────────── */}
+      <section className="card">
+        <div className="section-title-row" style={{marginBottom:10}}>
+          <div><p className="eyebrow">Notes</p><h3>Quick Notes</h3></div>
+          <button className="primary-btn" style={{fontSize:'.8rem', padding:'6px 12px'}} onClick={() => onQuickCreate('note')}>+ Note</button>
         </div>
-        <div className="setting-row">
-          <span>Onboarding complete</span>
-          <input type="checkbox" checked={settings.onboardingComplete} onChange={(e) => updateSettings({ ...settings, onboardingComplete: e.target.checked })} />
+        <input placeholder="Search notes..." value={noteQuery} onChange={(e) => setNoteQuery(e.target.value)}
+          style={{width:'100%', padding:'9px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.85rem', marginBottom:10, color:'var(--text)', background:'var(--surface)'}} />
+        {filteredNotes.length === 0 ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet.</p>
+          : filteredNotes.map((note) => (
+          <div key={note.id} style={{padding:'10px 0', borderBottom:'1px solid var(--surface)'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4}}>
+              <strong style={{fontSize:'.9rem', color:'var(--text)'}}>{note.title}</strong>
+              <div style={{display:'flex', gap:6, flexShrink:0}}>
+                <button className="ghost-btn" style={{fontSize:'.75rem', padding:'3px 8px'}} onClick={() => onEdit('note', note)}>Edit</button>
+                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:'.9rem'}} onClick={() => onDelete('note', note.id)}>✕</button>
+              </div>
+            </div>
+            <p style={{fontSize:'.82rem', color:'var(--muted)', lineHeight:1.5}}>{note.content}</p>
+          </div>
+        ))}
+      </section>
+
+      {/* ── Sign out ───────────────────────────────────────────────── */}
+      <section className="card">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <p className="eyebrow">Account</p>
+            <div style={{fontSize:'.85rem', color:'var(--muted)'}}>Signed in as {profile.displayName || 'User'}</div>
+          </div>
+          <button className="danger-btn" style={{fontSize:'.85rem', padding:'8px 16px'}} onClick={signOut}>Sign Out</button>
         </div>
-        <div className="button-row"><button className="ghost-btn" onClick={signOut}>Sign out</button></div>
       </section>
     </div>
   )
 }
 
-
-// ── Main App ──────────────────────────────────────────────────────────────
-
-const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
 
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
@@ -3091,13 +3098,13 @@ function PlannerApp() {
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+          <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} />} />
           <Route path="/wellness" element={<WellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
           <Route path="/health" element={<HealthPage />} />
-          <Route path="/more" element={<MorePage goals={goals} tasks={tasks} projects={projects} expenses={expenses} notes={notes} budget={budget} profile={profile} settings={settings} updateProfile={async (nextProfile) => { await updateProfile(nextProfile); pushToast('Profile saved', '', 'success') }} updateSettings={async (nextSettings) => { await updateSettings(nextSettings); pushToast('Settings saved', '', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Item deleted', '', 'success') }} onQuickCreate={openCreate} />} />
+          <Route path="/more" element={<MorePage goals={goals} tasks={tasks} projects={projects} notes={notes} budget={budget} profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />} />
         </Routes>
         <QuickAddModal
           isOpen={modalState.open}
