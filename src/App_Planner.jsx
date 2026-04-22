@@ -1,4 +1,31 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { 
+              {tab === 'coping' && (
+                <div>
+                  {Object.entries(COPING_SKILLS).map(([category, skills]) => (
+                    <div key={category} style={{marginBottom:20}}>
+                      <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:10}}>{category}</div>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                        {skills.map(skill => (
+                          <button key={skill} style={{
+                            padding:'6px 12px', borderRadius:999,
+                            border:'1.5px solid var(--border2)',
+                            background:'var(--stone)', color:'var(--ink2)',
+                            fontSize:'.78rem', fontWeight:500, cursor:'pointer',
+                            fontFamily:'var(--sans)', transition:'all .15s'
+                          }}
+                          onMouseEnter={e=>{e.target.style.background='var(--brass-dim)';e.target.style.borderColor='var(--brass)';e.target.style.color='var(--brass)'}}
+                          onMouseLeave={e=>{e.target.style.background='var(--stone)';e.target.style.borderColor='var(--border2)';e.target.style.color='var(--ink2)'}}
+                          >{skill}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div style={{marginTop:12, padding:'12px 14px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', color:'var(--text2)', lineHeight:1.6}}>
+                    💡 Tap any skill as a reminder. These are tools — use what works for you in the moment.
+                  </div>
+                </div>
+              )}
+createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 
@@ -1038,8 +1065,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
       <header className="topbar premium-topbar living-planner-topbar">
         <Link to="/" className="topbar-copy" style={{textDecoration:'none'}}>
           <p className="eyebrow">The Living Planner</p>
-          <h1>The Living Planner</h1>
-          <p className="muted topbar-date">{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <p style={{color:"rgba(255,255,255,.38)",fontSize:".72rem",marginTop:1}}>{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </Link>
 
         <div className="topbar-actions">
@@ -1050,9 +1076,6 @@ function Layout({ children, onQuickAdd, banner, profile }) {
               <span>{profile?.plannerMode || 'Balanced'} mode</span>
             </div>
           </div>
-          <button className="primary-btn premium-btn" onClick={onQuickAdd}>
-            {isMobile ? '＋' : 'Quick Add'}
-          </button>
         </div>
       </header>
 
@@ -1284,17 +1307,28 @@ function MetricTile({ label, value, helper }) {
 function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
   const max = Math.max(...data.map((item) => item[maxKey] || 0), 1)
   return (
-    <div className="mini-chart bars-chart" aria-hidden="true">
-      {data.map((item) => (
-        <div key={item.label} className="bar-group">
-          <span className="bar-label">{item.label}</span>
-          <div className="bar-track"><div className="bar-fill" style={{ height: `${Math.max(((item[dataKey] || 0) / max) * 100, 6)}%` }} /></div>
-        </div>
-      ))}
+    <div style={{display:'flex', alignItems:'flex-end', gap:6, height:64, padding:'0 4px'}}>
+      {data.map((item) => {
+        const val = item[dataKey] || 0
+        const total = item[maxKey] || 0
+        const pct = max > 0 ? Math.max((val / max) * 100, total > 0 ? 8 : 0) : 0
+        return (
+          <div key={item.label} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end'}}>
+            <div style={{fontSize:'.65rem', color:'var(--brass)', fontWeight:700}}>{val > 0 ? val : ''}</div>
+            <div style={{
+              width:'100%', borderRadius:'4px 4px 0 0',
+              height: total === 0 ? 4 : `${pct}%`,
+              background: val >= total && total > 0 ? 'var(--brass)' : val > 0 ? 'var(--brass-glow)' : 'var(--stone2)',
+              border: '1px solid var(--brass-glow)',
+              minHeight: 4, transition:'height .3s ease'
+            }} />
+            <div style={{fontSize:'.62rem', color:'var(--slate)', fontWeight:600, textAlign:'center'}}>{item.label}</div>
+          </div>
+        )
+      })}
     </div>
   )
 }
-
 function MiniLineChart({ data }) {
   const width = 240; const height = 80
   const values = data.map((item) => item.value)
@@ -2036,6 +2070,10 @@ function FinancePage({ expenses, budget, setBudget }) {
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>💰</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Finance</p>
+      </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {TABS.map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
@@ -2246,6 +2284,10 @@ function WellnessPage() {
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>🌿</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Wellness</p>
+      </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {[{ id: 'reading', label: '📚 Reading' }, { id: 'routine', label: '🌅 Daily Routine' }].map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
@@ -2388,6 +2430,10 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>⚡</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
+      </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'cleaning', label: '🧹 Cleaning' }].map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
@@ -2534,6 +2580,10 @@ function LifestylePage() {
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>🌍</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Lifestyle</p>
+      </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {TABS.map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
@@ -2724,13 +2774,38 @@ function HealthPage() {
   const TABS = [
     { id: 'meds', label: '💊 Medications' }, { id: 'sleep', label: '😴 Sleep' },
     { id: 'anxiety', label: '🧘 Anxiety' }, { id: 'migraines', label: '🤕 Migraines' },
+    { id: 'coping', label: '🛡 Coping Skills' },
   ]
+
+  const COPING_SKILLS = {
+    'Distractions': [
+      'Clean or organize your environment','Dance','Doodle on paper','Draw','Garden',
+      'Go for a drive','Go for a walk','Go shopping','Hug a stuffed animal',
+      'Listen to music','Paint','Photography','Play a game','Play an instrument',
+      'Put a puzzle together','Read','Sing','Take a break','Take a shower or a bath',
+      'Watch funny videos','Watch a movie','Write'
+    ],
+    'Cognitive Coping': [
+      'Act opposite of negative feelings','Brainstorm solutions','Make a gratitude list',
+      'Read an inspirational quote','Reward yourself when successful','Slowly count to ten',
+      'Take a class','Think about someone you love','Think of something funny',
+      'Use positive self-talk','Visualize your favorite place','Write a list of goals',
+      'Write a list of pros and cons','Write a list of strengths','Write a positive note'
+    ],
+    'Tension Releasers': [
+      'Chew gum','Cry','Exercise or play sports','Laugh','Stretch','Use a stress ball'
+    ]
+  }
 
   const ANXIETY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
   const anxietyColor = (n) => n <= 3 ? 'var(--success)' : n <= 6 ? 'var(--warning)' : 'var(--danger)'
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>💊</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Health</p>
+      </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {TABS.map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
@@ -3164,6 +3239,10 @@ function MorePage({ goals, tasks, projects, notes, budget, profile, settings, up
 
   return (
     <div className="screen-stack">
+      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
+        <span style={{fontSize:"1.1rem"}}>⚙</span>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Settings</p>
+      </div>
 
       {/* ── Profile ────────────────────────────────────────────────── */}
       <section className="card">
