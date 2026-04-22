@@ -31,9 +31,9 @@
   /* Semantic */
   --text:       #1C1C1E;
   --text2:      #3A3A3C;
-  --muted:      #8E8E93;
+  --muted:      #6B6B70;
   --border:     rgba(28,28,30,.08);
-  --border2:    rgba(28,28,30,.12);
+  --border2:    rgba(28,28,30,.15);
   --surface:    #F0ECE7;
   --success:    #34A853;
   --danger:     #D94F3D;
@@ -132,7 +132,7 @@ img { max-width: 100%; }
   color: var(--brass);
   margin: 0 0 3px;
 }
-.muted { color: var(--muted); font-size: .88rem; }
+.muted { color: var(--slate); font-size: .88rem; }
 
 /* ── Content area ───────────────────────────────────────────────── */
 .content { padding: 14px; max-width: 100%; overflow-x: hidden; }
@@ -280,7 +280,7 @@ img { max-width: 100%; }
 
 .ghost-btn {
   background: transparent;
-  color: var(--muted);
+  color: var(--text2);
   border: 1px solid var(--border2);
   border-radius: 999px;
   padding: 7px 14px;
@@ -678,7 +678,7 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 /* ── Quick Add Modal ────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(28,28,30,.6);
+  background: rgba(28,28,30,.75);
   backdrop-filter: blur(4px);
   display: flex; align-items: flex-end; justify-content: center;
   padding: 0;
@@ -855,3 +855,27 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 
 /* ── Index.html background fix ──────────────────────────────────── */
 #root { background: var(--stone); min-height: 100vh; }
+
+/* ── Additional text visibility fixes ──────────────────────────── */
+.modal-sheet label { color: var(--ink); font-weight: 600; }
+.modal-sheet input, .modal-sheet select, .modal-sheet textarea { 
+  color: var(--ink); background: var(--stone); 
+}
+.modal-tabs .pill { color: var(--text2); font-weight: 600; }
+.form-grid { display: grid; gap: 14px; }
+.form-grid label { display: grid; gap: 5px; font-size: .82rem; font-weight: 600; color: var(--ink); }
+.full-span { grid-column: 1 / -1; }
+.modal-sheet h2 { color: var(--ink); }
+.modal-sheet .pill-row { flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+/* Nav active indicator */
+.nav-item.active .nav-icon { transform: translateY(-1px); }
+/* Topbar link */
+.topbar-copy { cursor: pointer; }
+/* Score bar text */
+.score-line span { color: var(--ink) !important; }
+/* Card h3 always dark */
+.card h3 { color: var(--ink); }
+/* Review card text */
+.review-card p { color: var(--ink2); }
+/* Eyebrow on dark backgrounds */
+.hero-focus-card .eyebrow { color: var(--brass); opacity: 1; }
