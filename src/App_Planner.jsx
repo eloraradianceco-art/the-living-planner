@@ -2458,13 +2458,9 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const FREQ_KEY_PREFIX = { daily:'d', weekly:'w', monthly:'m', quarterly:'q', yearly:'y' }
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
-  const [newRoom, setNewRoom] = useState({ label: '', tasks: '' })
 
   const saveChecklists = (c) => { setChecklists(c); lsSet('checklists', c) }
-  const saveCleaning = (c) => { setCleaning(c); lsSet('cleaning', c) }
-  const saveCleaningLog = (l) => { setCleaningLog(l); lsSet('cleaningLog', l) }
 
-  const monthKey = `${cleaning.year}-${cleaning.month}`
 
   return (
     <div className="screen-stack">
