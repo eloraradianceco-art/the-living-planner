@@ -924,7 +924,7 @@ function AuthPage() {
         <h1 style={{color:'white', fontSize:'2rem', fontFamily:"'DM Serif Display', serif", lineHeight:1.2, marginBottom:16}}>
           Plan with clarity.<br/>Live with purpose.
         </h1>
-        <p style={{color:'rgba(255,255,255,.6)', fontSize:'.95rem', lineHeight:1.7, marginBottom:32}}>
+        <p style={{color:'rgba(255,255,255,.80)', fontSize:'.95rem', lineHeight:1.7, marginBottom:32}}>
           One place for your tasks, goals, habits, finances, health, and everything in between.
         </p>
         <div style={{display:'grid', gap:10}}>
@@ -933,7 +933,7 @@ function AuthPage() {
             See What's Inside →
           </button>
           <button onClick={() => setStep('signin')}
-            style={{background:'rgba(255,255,255,.08)', color:'rgba(255,255,255,.7)', border:'1.5px solid rgba(255,255,255,.15)', borderRadius:999, padding:'12px 24px', fontWeight:600, fontSize:'.9rem', cursor:'pointer', fontFamily:'inherit'}}>
+            style={{background:'rgba(255,255,255,.12)', color:'rgba(255,255,255,.90)', border:'1.5px solid rgba(255,255,255,.25)', borderRadius:999, padding:'12px 24px', fontWeight:600, fontSize:'.9rem', cursor:'pointer', fontFamily:'inherit'}}>
             I already have an account
           </button>
         </div>
@@ -953,11 +953,11 @@ function AuthPage() {
         <h2 style={{color:'white', fontFamily:"'DM Serif Display', serif", fontSize:'1.6rem', marginBottom:20}}>What's inside your planner</h2>
         <div style={{display:'grid', gap:10, marginBottom:28}}>
           {SECTIONS.map(s => (
-            <div key={s.title} style={{background:'rgba(255,255,255,.06)', border:'1px solid rgba(0,194,179,.2)', borderRadius:'var(--radius)', padding:'12px 14px', display:'flex', gap:12, alignItems:'flex-start'}}>
+            <div key={s.title} style={{background:'rgba(255,255,255,.09)', border:'1px solid rgba(184,150,90,.25)', borderRadius:'var(--radius)', padding:'12px 14px', display:'flex', gap:12, alignItems:'flex-start'}}>
               <div style={{fontSize:'1.3rem', flexShrink:0}}>{s.icon}</div>
               <div>
-                <div style={{fontWeight:700, color:'white', fontSize:'.9rem', marginBottom:3}}>{s.title}</div>
-                <div style={{fontSize:'.78rem', color:'rgba(255,255,255,.55)', lineHeight:1.5}}>{s.desc}</div>
+                <div style={{fontWeight:700, color:'#FFFFFF', fontSize:'.9rem', marginBottom:3}}>{s.title}</div>
+                <div style={{fontSize:'.78rem', color:'rgba(255,255,255,.70)', lineHeight:1.5}}>{s.desc}</div>
               </div>
             </div>
           ))}
