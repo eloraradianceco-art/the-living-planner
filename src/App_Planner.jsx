@@ -2590,7 +2590,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
             ['Remove distractions','Phone away, tabs closed. Your environment shapes your focus.'],
             ['Keep your mind fresh','Protect sleep, eat well, move daily. Energy is the foundation.'],
             ['Work when most productive','Know your peak hours and protect them for deep work.'],
-            ['Set reminders','Don't rely on memory — systems beat willpower.'],
+            ["Set reminders","Don't rely on memory — systems beat willpower."],
             ['Turn off email alerts','Check email on a schedule, not whenever it arrives.'],
             ['Batch your tasks','Group similar tasks together to reduce mental switching costs.'],
             ['Brain dump your thoughts','Clear your head into a list first, then prioritise.'],
@@ -2629,14 +2629,14 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
           <p className="eyebrow">High Performance</p>
           <h3 style={{margin:'4px 0 14px'}}>8 Habits of Highly Productive People</h3>
           {[
-            ['Ruthlessly cut away the unimportant','Focus on the important. If it doesn't move the needle, cut it.'],
+            ["Ruthlessly cut away the unimportant","If it doesn't move the needle, cut it."],
             ['Allocate breaks strategically','Rest when you are tired — scheduled breaks prevent burnout.'],
             ['Remove productivity pitstops','Identify the things that limit your productivity and eliminate them.'],
             ['Tap into your inspiration','Channel your inner drive. Work that excites you gets done faster and better.'],
-            ['Create barriers to entry','Don't make yourself too accessible. Guard your deep work time.'],
+            ["Create barriers to entry","Don't make yourself too accessible. Guard your deep work time."],
             ['Optimize time pockets','Make the best of every minute — commutes, waiting rooms, transitions.'],
             ['Set timelines','So things get done. Deadlines create momentum.'],
-            ['Automate everything possible','Outsource, delegate, and automate so you can focus on your highest leverage work.'],
+            ["Automate everything possible","Outsource, delegate, and automate so you can focus on your highest leverage work."],
           ].map(([habit, desc], i) => (
             <div key={i} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
               <div style={{
