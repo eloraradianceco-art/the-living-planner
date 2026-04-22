@@ -1457,7 +1457,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           </div>
           {overdueTasks.slice(0,4).map((task) => (
             <button key={task.id} onClick={() => onEdit('task', task)}
-              style={{width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--surface)', background:'none', border:'none', borderBottom:'1px solid var(--surface)', cursor:'pointer', textAlign:'left'}}>
+              style={{width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--surface)', background:'none', cursor:'pointer', textAlign:'left'}}>
               <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{task.title}</span>
               <span style={{fontSize:'.75rem', color:'var(--danger)', fontWeight:600, flexShrink:0}}>{task.date}</span>
             </button>
