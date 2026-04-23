@@ -2038,12 +2038,12 @@ function FinancePage({ expenses, budget, setBudget }) {
   const lsSet = (k, v) => { try { localStorage.setItem(LS_KEY(k), JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('overview')
-  const [debts, setDebts] = useState(() => lsGet('debts', []))
+  const [debts, setDebts] = useState(() => { try { const v = localStorage.getItem('planner.f.debts'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
-  const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', []))
   const [newBudgetLine, setNewBudgetLine] = useState({ category: '', budgeted: '', actual: '' })
-  const saveDebts = (d) => { setDebts(d); lsSet('debts', d) }
-  const saveMonthlyBudget = (b) => { setMonthlyBudget(b); lsSet('monthlyBudget', b) }
+  const [budgetLines, setBudgetLines] = useState(() => { try { const v = localStorage.getItem('planner.f.budgetlines'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const saveDebts = (d) => { setDebts(d); try { localStorage.setItem('planner.f.debts', JSON.stringify(d)) } catch {} }
+  const saveBudgetLines = (b) => { setBudgetLines(b); try { localStorage.setItem('planner.f.budgetlines', JSON.stringify(b)) } catch {} }
   const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', { income: 0, bills: [], subscriptions: [] }))
@@ -2321,8 +2321,8 @@ function FinancePage({ expenses, budget, setBudget }) {
             <p className="eyebrow">Monthly Budget</p>
             <h3 style={{margin:'4px 0 6px'}}>Planned vs Actual</h3>
             <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Track each spending category for the month.</p>
-            {monthlyBudget.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No budget lines yet.</p>}
-            {monthlyBudget.map((line,i) => {
+            {budgetLines.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No budget lines yet.</p>}
+            {budgetLines.map((line,i) => {
               const budgeted = parseFloat(line.budgeted||0)
               const actual = parseFloat(line.actual||0)
               const pct = budgeted > 0 ? Math.min(100, (actual/budgeted)*100) : 0
@@ -2333,14 +2333,14 @@ function FinancePage({ expenses, budget, setBudget }) {
                     <div style={{fontWeight:600,fontSize:'.88rem',color:'var(--ink)'}}>{line.category}</div>
                     <div style={{display:'flex',gap:8,alignItems:'center'}}>
                       <span style={{fontSize:'.8rem',color:over?'var(--danger)':'var(--muted)'}}>${actual.toFixed(0)} / ${budgeted.toFixed(0)}</span>
-                      <button onClick={()=>saveMonthlyBudget(monthlyBudget.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                      <button onClick={()=>saveBudgetLines(budgetLines.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                     </div>
                   </div>
                   <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
                     <div style={{height:'100%',width:`${pct}%`,background:over?'var(--danger)':pct>80?'var(--warning)':'var(--success)',borderRadius:999}} />
                   </div>
                   <input type="number" placeholder="Update actual spent" style={{width:'100%',marginTop:6,padding:'6px 10px',border:'1px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',background:'var(--stone)'}}
-                    onBlur={e=>{if(!e.target.value)return;const u=[...monthlyBudget];u[i]={...line,actual:e.target.value};saveMonthlyBudget(u);e.target.value=''}} />
+                    onBlur={e=>{if(!e.target.value)return;const u=[...budgetLines];u[i]={...line,actual:e.target.value};saveBudgetLines(u);e.target.value=''}} />
                 </div>
               )
             })}
@@ -2353,17 +2353,17 @@ function FinancePage({ expenses, budget, setBudget }) {
                 <input placeholder="Actual $" type="number" value={newBudgetLine.actual} onChange={e=>setNewBudgetLine(p=>({...p,actual:e.target.value}))}
                   style={{flex:1,padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
               </div>
-              <button className="primary-btn" onClick={()=>{if(!newBudgetLine.category||!newBudgetLine.budgeted)return;saveMonthlyBudget([...monthlyBudget,{...newBudgetLine,id:Date.now()}]);setNewBudgetLine({category:'',budgeted:'',actual:''})}}>Add Budget Line</button>
+              <button className="primary-btn" onClick={()=>{if(!newBudgetLine.category||!newBudgetLine.budgeted)return;saveBudgetLines([...budgetLines,{...newBudgetLine,id:Date.now()}]);setNewBudgetLine({category:'',budgeted:'',actual:''})}}>Add Budget Line</button>
             </div>
-            {monthlyBudget.length > 0 && (
+            {budgetLines.length > 0 && (
               <div style={{marginTop:14,padding:'12px',background:'var(--stone)',borderRadius:'var(--radius-sm)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem'}}>
                   <span style={{fontWeight:700,color:'var(--ink)'}}>Total Budgeted</span>
-                  <span style={{fontWeight:700,color:'var(--teal)'}}>${monthlyBudget.reduce((s,l)=>s+parseFloat(l.budgeted||0),0).toFixed(0)}</span>
+                  <span style={{fontWeight:700,color:'var(--teal)'}}>${budgetLines.reduce((s,l)=>s+parseFloat(l.budgeted||0),0).toFixed(0)}</span>
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem',marginTop:4}}>
                   <span style={{fontWeight:700,color:'var(--ink)'}}>Total Spent</span>
-                  <span style={{fontWeight:700,color:'var(--danger)'}}>${monthlyBudget.reduce((s,l)=>s+parseFloat(l.actual||0),0).toFixed(0)}</span>
+                  <span style={{fontWeight:700,color:'var(--danger)'}}>${budgetLines.reduce((s,l)=>s+parseFloat(l.actual||0),0).toFixed(0)}</span>
                 </div>
               </div>
             )}
