@@ -3023,11 +3023,9 @@ function LifestylePage() {
   const saveTrips = (t) => { setTrips(t); try { localStorage.setItem('planner.l.trips', JSON.stringify(t)) } catch {} }
   const saveBirthdays = (b) => { setBirthdays(b); try { localStorage.setItem('planner.l.birthdays', JSON.stringify(b)) } catch {} }
   const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
-  const [birthdays, setBirthdays] = useState(() => lsGet('birthdays', []))
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
   const [contacts, setContacts] = useState(() => lsGet('contacts', []))
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
-  const [trips, setTrips] = useState(() => lsGet('trips', []))
   const [brainDump, setBrainDump] = useState(() => lsGet('brainDump', ''))
   const [form, setForm] = useState({})
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
@@ -3215,7 +3213,6 @@ function LifestylePage() {
           </div>
         </section>
       )}
-    </div>
 
       {tab === 'trips' && (
         <div>
