@@ -2390,6 +2390,7 @@ function FinancePage({ expenses, budget, setBudget }) {
         </section>
       )}
     </div>
+    </div>
   )
 }
 
@@ -3264,7 +3265,7 @@ function LifestylePage() {
           </section>
         </div>
       )}
-
+    </div>
   )
 }
 
@@ -3892,6 +3893,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
         )
       })}
     </div>
+    </div>
   )
 }
 
@@ -4114,6 +4116,7 @@ on className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick=
           </div>
         ))}
       </section>
+    </div>
     </div>
   )
 }
