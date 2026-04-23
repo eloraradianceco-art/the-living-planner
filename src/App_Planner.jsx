@@ -875,11 +875,18 @@ function AuthPage() {
   const [step, setStep] = useState('welcome') // welcome | features | signin
 
   useEffect(() => {
-    document.body.style.background = '#1C1C1E'
-    document.documentElement.style.background = '#1C1C1E'
+    // Force dark background - override all CSS
+    const style = document.createElement('style')
+    style.id = 'auth-bg-override'
+    style.textContent = 'html, body, #root { background: #1C1C1E !important; }'
+    document.head.appendChild(style)
+    document.body.style.setProperty('background', '#1C1C1E', 'important')
+    document.documentElement.style.setProperty('background', '#1C1C1E', 'important')
     return () => {
-      document.body.style.background = ''
-      document.documentElement.style.background = ''
+      const el = document.getElementById('auth-bg-override')
+      if (el) el.remove()
+      document.body.style.removeProperty('background')
+      document.documentElement.style.removeProperty('background')
     }
   }, [])
   const [isSignup, setIsSignup] = useState(false)
@@ -2031,6 +2038,12 @@ function FinancePage({ expenses, budget, setBudget }) {
   const lsSet = (k, v) => { try { localStorage.setItem(LS_KEY(k), JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('overview')
+  const [debts, setDebts] = useState(() => lsGet('debts', []))
+  const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
+  const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', []))
+  const [newBudgetLine, setNewBudgetLine] = useState({ category: '', budgeted: '', actual: '' })
+  const saveDebts = (d) => { setDebts(d); lsSet('debts', d) }
+  const saveMonthlyBudget = (b) => { setMonthlyBudget(b); lsSet('monthlyBudget', b) }
   const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', { income: 0, bills: [], subscriptions: [] }))
@@ -2049,7 +2062,7 @@ function FinancePage({ expenses, budget, setBudget }) {
   const daysArray = Array.from({ length: noSpend.days }, (_, i) => i + 1)
 
   const TABS = [
-    { id: 'overview', label: 'Overview' },
+    { id: 'overview', label: '📊 Overview' }, { id: 'debt', label: '📉 Debt Tracker' }, { id: 'budget', label: '📋 Monthly Budget' }, { id: 'nospend', label: '🌿 No-Spend' },
     { id: 'savings', label: 'Savings' },
     { id: 'nospend', label: 'No-Spend' },
     { id: 'monthly', label: 'Monthly' },
@@ -2242,6 +2255,123 @@ function FinancePage({ expenses, budget, setBudget }) {
         </section>
       )}
 
+
+      {tab === 'debt' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Debt Payoff Tracker</p>
+            <h3 style={{margin:'4px 0 6px'}}>Your Balances</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Avalanche method: pay minimums on all, attack highest rate first.</p>
+            {debts.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No debts tracked yet.</p>}
+            {debts.map((debt,i) => {
+              const progress = Math.max(0, Math.min(100, 100 - (parseFloat(debt.balance) / parseFloat(debt.originalBalance||debt.balance)) * 100))
+              return (
+                <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid var(--stone2)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:'.9rem',color:'var(--ink)'}}>{debt.name}</div>
+                      <div style={{fontSize:'.75rem',color:'var(--muted)'}}>Rate: {debt.rate}% · Min: ${debt.minPayment}/mo</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <div style={{fontWeight:700,color:'var(--danger)',fontSize:'1rem'}}>${parseFloat(debt.balance||0).toLocaleString()}</div>
+                      <button onClick={()=>saveDebts(debts.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${progress}%`,background:'var(--success)',borderRadius:999,transition:'width .4s'}} />
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
+                    <input type="number" placeholder="Update balance" style={{flex:1,padding:'6px 10px',border:'1px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',background:'var(--stone)',marginRight:8}}
+                      onBlur={e=>{if(!e.target.value)return;const updated=[...debts];updated[i]={...debt,balance:e.target.value};saveDebts(updated);e.target.value=''}} />
+                    <span style={{fontSize:'.72rem',color:'var(--success)',fontWeight:600,alignSelf:'center'}}>{progress.toFixed(0)}% paid</span>
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{display:'grid',gap:8,marginTop:12}}>
+              <input placeholder="Debt name (e.g. Chase Card)" value={newDebt.name} onChange={e=>setNewDebt(p=>({...p,name:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                <input placeholder="Balance $" type="number" value={newDebt.balance} onChange={e=>setNewDebt(p=>({...p,balance:e.target.value,originalBalance:e.target.value}))}
+                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+                <input placeholder="APR %" type="number" value={newDebt.rate} onChange={e=>setNewDebt(p=>({...p,rate:e.target.value}))}
+                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+                <input placeholder="Min $/mo" type="number" value={newDebt.minPayment} onChange={e=>setNewDebt(p=>({...p,minPayment:e.target.value}))}
+                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <button className="primary-btn" onClick={()=>{if(!newDebt.name||!newDebt.balance)return;saveDebts([...debts,{...newDebt,id:Date.now()}]);setNewDebt({name:'',balance:'',rate:'',minPayment:''})}}>Add Debt</button>
+            </div>
+          </section>
+          {debts.length > 0 && (
+            <section className="card">
+              <p className="eyebrow">Summary</p>
+              <h3 style={{margin:'4px 0 12px'}}>Total Debt</h3>
+              <div style={{fontFamily:'var(--serif)',fontSize:'2rem',fontWeight:500,color:'var(--danger)',marginBottom:4}}>
+                ${debts.reduce((s,d)=>s+parseFloat(d.balance||0),0).toLocaleString()}
+              </div>
+              <div style={{fontSize:'.8rem',color:'var(--muted)'}}>Combined minimum payments: ${debts.reduce((s,d)=>s+parseFloat(d.minPayment||0),0).toFixed(0)}/mo</div>
+            </section>
+          )}
+        </div>
+      )}
+
+      {tab === 'budget' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Monthly Budget</p>
+            <h3 style={{margin:'4px 0 6px'}}>Planned vs Actual</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Track each spending category for the month.</p>
+            {monthlyBudget.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No budget lines yet.</p>}
+            {monthlyBudget.map((line,i) => {
+              const budgeted = parseFloat(line.budgeted||0)
+              const actual = parseFloat(line.actual||0)
+              const pct = budgeted > 0 ? Math.min(100, (actual/budgeted)*100) : 0
+              const over = actual > budgeted
+              return (
+                <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid var(--stone2)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <div style={{fontWeight:600,fontSize:'.88rem',color:'var(--ink)'}}>{line.category}</div>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <span style={{fontSize:'.8rem',color:over?'var(--danger)':'var(--muted)'}}>${actual.toFixed(0)} / ${budgeted.toFixed(0)}</span>
+                      <button onClick={()=>saveMonthlyBudget(monthlyBudget.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                    </div>
+                  </div>
+                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${pct}%`,background:over?'var(--danger)':pct>80?'var(--warning)':'var(--success)',borderRadius:999}} />
+                  </div>
+                  <input type="number" placeholder="Update actual spent" style={{width:'100%',marginTop:6,padding:'6px 10px',border:'1px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',background:'var(--stone)'}}
+                    onBlur={e=>{if(!e.target.value)return;const u=[...monthlyBudget];u[i]={...line,actual:e.target.value};saveMonthlyBudget(u);e.target.value=''}} />
+                </div>
+              )
+            })}
+            <div style={{display:'grid',gap:8,marginTop:12}}>
+              <input placeholder="Category (e.g. Groceries, Gas, Dining)" value={newBudgetLine.category} onChange={e=>setNewBudgetLine(p=>({...p,category:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+              <div style={{display:'flex',gap:8}}>
+                <input placeholder="Budgeted $" type="number" value={newBudgetLine.budgeted} onChange={e=>setNewBudgetLine(p=>({...p,budgeted:e.target.value}))}
+                  style={{flex:1,padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+                <input placeholder="Actual $" type="number" value={newBudgetLine.actual} onChange={e=>setNewBudgetLine(p=>({...p,actual:e.target.value}))}
+                  style={{flex:1,padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <button className="primary-btn" onClick={()=>{if(!newBudgetLine.category||!newBudgetLine.budgeted)return;saveMonthlyBudget([...monthlyBudget,{...newBudgetLine,id:Date.now()}]);setNewBudgetLine({category:'',budgeted:'',actual:''})}}>Add Budget Line</button>
+            </div>
+            {monthlyBudget.length > 0 && (
+              <div style={{marginTop:14,padding:'12px',background:'var(--stone)',borderRadius:'var(--radius-sm)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem'}}>
+                  <span style={{fontWeight:700,color:'var(--ink)'}}>Total Budgeted</span>
+                  <span style={{fontWeight:700,color:'var(--teal)'}}>${monthlyBudget.reduce((s,l)=>s+parseFloat(l.budgeted||0),0).toFixed(0)}</span>
+                </div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem',marginTop:4}}>
+                  <span style={{fontWeight:700,color:'var(--ink)'}}>Total Spent</span>
+                  <span style={{fontWeight:700,color:'var(--danger)'}}>${monthlyBudget.reduce((s,l)=>s+parseFloat(l.actual||0),0).toFixed(0)}</span>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {tab === 'nospend' && (
       <section className="card">
         <p className="eyebrow">Save More</p>
         <h3 style={{margin:'4px 0 10px'}}>35 No-Spend Weekend Ideas</h3>
@@ -2267,135 +2397,302 @@ function WellnessPage() {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.w.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.w.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('reading')
+  const [tab, setTab] = useState('mood')
   const [books, setBooks] = useState(() => lsGet('books', []))
-  const [newBook, setNewBook] = useState({ title: '', author: '', status: 'Reading', pages: '', pagesRead: 0 })
+  const [newBook, setNewBook] = useState({ title: '', author: '', status: 'Reading' })
   const [routine, setRoutine] = useState(() => lsGet('routine', []))
   const [newRoutineItem, setNewRoutineItem] = useState({ time: '', label: '', type: 'morning' })
   const [routineLog, setRoutineLog] = useState(() => lsGet('routineLog', {}))
+  const [wellnessLog, setWellnessLog] = useState(() => lsGet('wellnessLog', {}))
+  const [journalEntries, setJournalEntries] = useState(() => lsGet('journal', []))
+  const [journalText, setJournalText] = useState('')
+  const [journalPrompt, setJournalPrompt] = useState(0)
 
   const saveBooks = (b) => { setBooks(b); lsSet('books', b) }
   const saveRoutine = (r) => { setRoutine(r); lsSet('routine', r) }
   const saveLog = (l) => { setRoutineLog(l); lsSet('routineLog', l) }
+  const saveWellness = (w) => { setWellnessLog(w); lsSet('wellnessLog', w) }
+  const saveJournal = (j) => { setJournalEntries(j); lsSet('journal', j) }
 
   const todayKey = TODAY
   const todayLog = routineLog[todayKey] || []
+  const todayWellness = wellnessLog[todayKey] || {}
   const toggleRoutineItem = (id) => {
     const next = todayLog.includes(id) ? todayLog.filter(x => x !== id) : [...todayLog, id]
     saveLog({ ...routineLog, [todayKey]: next })
   }
+  const logWellness = (field, value) => saveWellness({ ...wellnessLog, [todayKey]: { ...todayWellness, [field]: value } })
 
-  const STATUS_COLORS = { Reading: 'var(--teal)', Completed: 'var(--success)', 'Want to Read': 'var(--warning)' }
+  const MOOD_OPTIONS = [
+    { emoji: '😄', label: 'Great', value: 5 },
+    { emoji: '🙂', label: 'Good', value: 4 },
+    { emoji: '😐', label: 'Okay', value: 3 },
+    { emoji: '😔', label: 'Low', value: 2 },
+    { emoji: '😩', label: 'Rough', value: 1 },
+  ]
+  const SLEEP_OPTIONS = ['< 5h', '5-6h', '6-7h', '7-8h', '8-9h', '9h+']
+  const JOURNAL_PROMPTS = [
+    'What am I grateful for today?',
+    'What challenged me today and what did I learn?',
+    'What would make today feel complete?',
+    'Where did I see God at work today?',
+    'What is one thing I want to let go of?',
+    'What am I proud of this week?',
+    'What does rest look like for me right now?',
+    'What relationships need my attention?',
+    'Where am I growing the most?',
+    'What would I tell my future self about today?',
+  ]
+
+  const STATUS_COLORS = { Reading: 'var(--teal)', Completed: 'var(--success)', 'Want to Read': 'var(--brass)' }
 
   return (
     <div className="screen-stack">
-      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
-        <span style={{fontSize:"1.1rem"}}>🌿</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Wellness</p>
+      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
+        <span style={{fontSize:'1.1rem'}}>🌿</span>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Wellness</p>
       </div>
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {[{ id: 'reading', label: '📚 Reading' }, { id: 'routine', label: '🌅 Daily Routine' }].map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+
+      <div className="pill-row" style={{overflowX:'auto',flexWrap:'nowrap',paddingBottom:4}}>
+        {[{id:'mood',label:'😊 Mood'},{id:'sleep',label:'😴 Sleep'},{id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},{id:'reading',label:'📚 Reading'}].map(t => (
+          <button key={t.id} className={tab===t.id?'pill active-pill':'pill'}
+            onClick={() => setTab(t.id)} style={{whiteSpace:'nowrap',fontSize:'.82rem'}}>{t.label}
+          </button>
         ))}
       </div>
 
-      {tab === 'reading' && (
-        <section className="card">
-          <p className="eyebrow">Reading Tracker</p>
-          <h3 style={{ margin: '4px 0 14px' }}>Your Books</h3>
-          {books.map((book, i) => (
-            <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--surface)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '.95rem', color: 'var(--text)' }}>{book.title}</div>
-                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{book.author}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <span style={{ fontSize: '.72rem', padding: '3px 8px', borderRadius: 999, background: STATUS_COLORS[book.status] + '18', color: STATUS_COLORS[book.status], fontWeight: 700 }}>{book.status}</span>
-                  <button onClick={() => saveBooks(books.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
-                </div>
+      {/* ── Mood ─────────────────────────────────────────────────── */}
+      {tab === 'mood' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Daily Check-In</p>
+            <h3 style={{margin:'4px 0 14px'}}>How are you feeling today?</h3>
+            <div style={{display:'flex',gap:8,justifyContent:'space-between',marginBottom:16}}>
+              {MOOD_OPTIONS.map(m => (
+                <button key={m.value} onClick={() => logWellness('mood', m.value)} style={{
+                  flex:1,padding:'10px 4px',borderRadius:'var(--radius-sm)',border:'2px solid',
+                  cursor:'pointer',textAlign:'center',background:'transparent',fontFamily:'var(--sans)',
+                  borderColor: todayWellness.mood===m.value ? 'var(--brass)' : 'var(--border2)',
+                  background: todayWellness.mood===m.value ? 'var(--brass-dim)' : 'transparent',
+                  transition:'all .15s'
+                }}>
+                  <div style={{fontSize:'1.4rem',marginBottom:3}}>{m.emoji}</div>
+                  <div style={{fontSize:'.62rem',fontWeight:600,color:todayWellness.mood===m.value?'var(--brass)':'var(--muted)'}}>{m.label}</div>
+                </button>
+              ))}
+            </div>
+            {todayWellness.mood && (
+              <div style={{padding:'10px 12px',background:'var(--brass-dim)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',color:'var(--brass2)',textAlign:'center'}}>
+                {todayWellness.mood >= 4 ? '✦ Carry that energy forward today.' : todayWellness.mood >= 3 ? '✦ That's okay. One step at a time.' : '✦ Reach out to someone. You matter.'}
               </div>
-              {book.pages > 0 && (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.75rem', color: 'var(--muted)', marginBottom: 4 }}>
-                    <span>Progress</span><span>{book.pagesRead}/{book.pages} pages</span>
-                  </div>
-                  <div style={{ background: 'var(--surface)', borderRadius: 999, height: 6, overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((book.pagesRead / book.pages) * 100, 100)}%`, height: '100%', background: 'var(--teal)', borderRadius: 999 }} />
-                  </div>
-                  <input type="range" min={0} max={book.pages} value={book.pagesRead}
-                    onChange={e => saveBooks(books.map((b, j) => j === i ? { ...b, pagesRead: Number(e.target.value) } : b))}
-                    style={{ width: '100%', accentColor: 'var(--teal)', marginTop: 6 }} />
-                </div>
-              )}
+            )}
+          </section>
+
+          <section className="card">
+            <p className="eyebrow">Energy Level</p>
+            <h3 style={{margin:'4px 0 12px'}}>Rate your energy today</h3>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                <button key={n} onClick={() => logWellness('energy', n)} style={{
+                  width:36,height:36,borderRadius:'var(--radius-sm)',border:'1.5px solid',cursor:'pointer',
+                  fontWeight:700,fontSize:'.85rem',fontFamily:'var(--sans)',
+                  borderColor: todayWellness.energy===n ? 'var(--brass)' : 'var(--border2)',
+                  background: todayWellness.energy===n ? 'var(--brass)' : 'var(--stone)',
+                  color: todayWellness.energy===n ? 'white' : 'var(--ink2)'
+                }}>{n}</button>
+              ))}
             </div>
+          </section>
+
+          <section className="card">
+            <p className="eyebrow">Mood History</p>
+            <h3 style={{margin:'4px 0 12px'}}>This Week</h3>
+            <div style={{display:'flex',gap:6}}>
+              {getWeekDays(TODAY).map(date => {
+                const log = wellnessLog[date] || {}
+                const mood = MOOD_OPTIONS.find(m => m.value === log.mood)
+                return (
+                  <div key={date} style={{flex:1,textAlign:'center'}}>
+                    <div style={{fontSize:'1.1rem',marginBottom:3}}>{mood ? mood.emoji : '—'}</div>
+                    <div style={{fontSize:'.6rem',color:'var(--muted)',fontWeight:600}}>{new Date(date+'T12:00:00').toLocaleDateString('en-US',{weekday:'narrow'})}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ── Sleep ────────────────────────────────────────────────── */}
+      {tab === 'sleep' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Sleep Log</p>
+            <h3 style={{margin:'4px 0 14px'}}>How much did you sleep last night?</h3>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
+              {SLEEP_OPTIONS.map(opt => (
+                <button key={opt} onClick={() => logWellness('sleep', opt)} style={{
+                  padding:'8px 14px',borderRadius:999,border:'1.5px solid',cursor:'pointer',
+                  fontSize:'.82rem',fontWeight:600,fontFamily:'var(--sans)',
+                  borderColor: todayWellness.sleep===opt ? 'var(--brass)' : 'var(--border2)',
+                  background: todayWellness.sleep===opt ? 'var(--brass-dim)' : 'transparent',
+                  color: todayWellness.sleep===opt ? 'var(--brass)' : 'var(--muted)'
+                }}>{opt}</button>
+              ))}
+            </div>
+            <div style={{fontWeight:600,fontSize:'.85rem',color:'var(--ink)',marginBottom:8}}>Sleep quality</div>
+            <div style={{display:'flex',gap:6,marginBottom:14}}>
+              {['Poor','Fair','Good','Great'].map(q => (
+                <button key={q} onClick={() => logWellness('sleepQuality', q)} style={{
+                  flex:1,padding:'8px 4px',borderRadius:'var(--radius-sm)',border:'1.5px solid',cursor:'pointer',
+                  fontSize:'.78rem',fontWeight:600,fontFamily:'var(--sans)',textAlign:'center',
+                  borderColor: todayWellness.sleepQuality===q ? 'var(--brass)' : 'var(--border2)',
+                  background: todayWellness.sleepQuality===q ? 'var(--brass-dim)' : 'transparent',
+                  color: todayWellness.sleepQuality===q ? 'var(--brass)' : 'var(--muted)'
+                }}>{q}</button>
+              ))}
+            </div>
+          </section>
+
+          <section className="card">
+            <p className="eyebrow">Sleep Tips</p>
+            <h3 style={{margin:'4px 0 12px'}}>Better sleep starts here</h3>
+            {['Keep a consistent sleep/wake time even on weekends','Avoid screens 30-60 min before bed','Keep your room cool, dark, and quiet','Avoid caffeine after 2pm','Wind down with a routine — prayer, reading, stretching','Limit alcohol — it fragments sleep in the second half of the night'].map((tip,i) => (
+              <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
+                <div style={{width:20,height:20,borderRadius:'50%',background:'var(--brass-dim)',color:'var(--brass)',display:'grid',placeItems:'center',fontSize:'.68rem',fontWeight:700,flexShrink:0}}>{i+1}</div>
+                <div style={{fontSize:'.85rem',color:'var(--ink2)',lineHeight:1.5}}>{tip}</div>
+              </div>
+            ))}
+          </section>
+        </div>
+      )}
+
+      {/* ── Journal ──────────────────────────────────────────────── */}
+      {tab === 'journal' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Reflection</p>
+            <h3 style={{margin:'4px 0 10px'}}>Today's Entry</h3>
+            <div style={{padding:'10px 12px',background:'var(--brass-dim)',borderRadius:'var(--radius-sm)',marginBottom:12,cursor:'pointer'}}
+              onClick={() => setJournalPrompt((journalPrompt+1)%JOURNAL_PROMPTS.length)}>
+              <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em',marginBottom:3}}>TODAY'S PROMPT — TAP TO CHANGE</div>
+              <div style={{fontSize:'.88rem',color:'var(--ink)',fontStyle:'italic',fontFamily:'var(--serif)'}}>{JOURNAL_PROMPTS[journalPrompt]}</div>
+            </div>
+            <textarea value={journalText} onChange={e=>setJournalText(e.target.value)}
+              placeholder="Write freely. This is your space."
+              style={{width:'100%',minHeight:140,padding:'12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',fontFamily:'var(--serif)',color:'var(--ink)',background:'var(--stone)',resize:'none',lineHeight:1.7}} />
+            <button className="primary-btn" style={{width:'100%',marginTop:10,fontSize:'.88rem'}}
+              onClick={() => {
+                if(!journalText.trim()) return
+                const entry = {id:Date.now(),date:TODAY,text:journalText.trim(),prompt:JOURNAL_PROMPTS[journalPrompt]}
+                const updated = [entry,...journalEntries]
+                saveJournal(updated)
+                setJournalText('')
+              }}>Save Entry</button>
+          </section>
+          {journalEntries.slice(0,10).map(entry => (
+            <section key={entry.id} className="card">
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em'}}>{entry.date}</div>
+                <button onClick={()=>saveJournal(journalEntries.filter(e=>e.id!==entry.id))}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
+              </div>
+              {entry.prompt && <div style={{fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic',marginBottom:6}}>{entry.prompt}</div>}
+              <p style={{fontSize:'.88rem',color:'var(--ink2)',lineHeight:1.7,fontFamily:'var(--serif)',whiteSpace:'pre-wrap'}}>{entry.text}</p>
+            </section>
           ))}
-          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-            <input placeholder="Book title" value={newBook.title} onChange={e => setNewBook(p => ({ ...p, title: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input placeholder="Author" value={newBook.author} onChange={e => setNewBook(p => ({ ...p, author: e.target.value }))}
-                style={{ flex: 2, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <input type="number" placeholder="Pages" value={newBook.pages} onChange={e => setNewBook(p => ({ ...p, pages: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select value={newBook.status} onChange={e => setNewBook(p => ({ ...p, status: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
-                <option>Reading</option><option>Completed</option><option>Want to Read</option>
+        </div>
+      )}
+
+      {/* ── Routine ──────────────────────────────────────────────── */}
+      {tab === 'routine' && (
+        <section className="card">
+          <p className="eyebrow">Daily Routine Builder</p>
+          <h3 style={{margin:'4px 0 14px'}}>Your Rhythm</h3>
+          {routine.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>Build your morning and evening rhythm below.</p>}
+          {routine.map(item => {
+            const done = todayLog.includes(item.id)
+            return (
+              <div key={item.id} onClick={() => toggleRoutineItem(item.id)} style={{
+                display:'flex',alignItems:'center',gap:10,padding:'10px 0',
+                borderBottom:'1px solid var(--stone2)',cursor:'pointer'
+              }}>
+                <div style={{width:22,height:22,borderRadius:6,border:'2px solid',flexShrink:0,
+                  borderColor:done?'var(--success)':'var(--border2)',
+                  background:done?'var(--success)':'var(--warm-white)',
+                  display:'grid',placeItems:'center'}}>
+                  {done && <span style={{color:'white',fontSize:'.72rem',fontWeight:800}}>✓</span>}
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'.9rem',fontWeight:500,color:done?'var(--muted)':'var(--ink)',textDecoration:done?'line-through':'none'}}>{item.label}</div>
+                  <div style={{fontSize:'.72rem',color:'var(--muted)'}}>{item.time} · {item.type}</div>
+                </div>
+                <button onClick={e=>{e.stopPropagation();saveRoutine(routine.filter(r=>r.id!==item.id))}}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+              </div>
+            )
+          })}
+          <div style={{display:'grid',gap:8,marginTop:12}}>
+            <input placeholder="Routine item (e.g. Prayer, Workout, Read)" value={newRoutineItem.label}
+              onChange={e=>setNewRoutineItem(p=>({...p,label:e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+            <div style={{display:'flex',gap:8}}>
+              <input placeholder="Time (6:00 AM)" value={newRoutineItem.time}
+                onChange={e=>setNewRoutineItem(p=>({...p,time:e.target.value}))}
+                style={{flex:1,padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              <select value={newRoutineItem.type} onChange={e=>setNewRoutineItem(p=>({...p,type:e.target.value}))}
+                style={{flex:1,padding:'9px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}}>
+                <option value="morning">Morning</option>
+                <option value="evening">Evening</option>
+                <option value="anytime">Anytime</option>
               </select>
-              <button className="primary-btn" style={{ padding: '9px 16px', fontSize: '.82rem' }}
-                onClick={() => { if (!newBook.title) return; saveBooks([...books, { ...newBook, pagesRead: 0 }]); setNewBook({ title: '', author: '', status: 'Reading', pages: '', pagesRead: 0 }) }}>Add Book</button>
             </div>
+            <button className="primary-btn" onClick={() => {
+              if(!newRoutineItem.label) return
+              saveRoutine([...routine,{...newRoutineItem,id:Date.now()}])
+              setNewRoutineItem({time:'',label:'',type:'morning'})
+            }}>Add to Routine</button>
           </div>
         </section>
       )}
 
-      {tab === 'routine' && (
+      {/* ── Reading ──────────────────────────────────────────────── */}
+      {tab === 'reading' && (
         <section className="card">
-          <p className="eyebrow">Daily Routine</p>
-          <h3 style={{ margin: '4px 0 6px' }}>Today's Routine</h3>
-          <p className="muted" style={{ fontSize: '.82rem', marginBottom: 14 }}>{todayLog.length} of {routine.length} items completed today</p>
-          {['morning', 'afternoon', 'evening'].map(type => {
-            const items = routine.filter(r => r.type === type)
-            if (!items.length) return null
-            return (
-              <div key={type} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: '.75rem', fontWeight: 700, color: 'var(--teal)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>
-                  {type === 'morning' ? '🌅' : type === 'afternoon' ? '☀️' : '🌙'} {type}
+          <div className="section-title-row">
+            <div><p className="eyebrow">Reading Tracker</p><h3>Your Library</h3></div>
+          </div>
+          {books.map((book,i) => (
+            <div key={i} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{book.title}</div>
+                  <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{book.author}</div>
                 </div>
-                {items.map((item, i) => {
-                  const done = todayLog.includes(item.id)
-                  return (
-                    <div key={i} onClick={() => toggleRoutineItem(item.id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--surface)', cursor: 'pointer' }}>
-                      <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: done ? 'var(--teal)' : 'var(--border2)', background: done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                        {done && <span style={{ color: 'var(--navy)', fontSize: '.8rem', fontWeight: 700 }}>✓</span>}
-                      </div>
-                      <span style={{ flex: 1, fontSize: '.9rem', color: done ? 'var(--muted)' : 'var(--text)', textDecoration: done ? 'line-through' : 'none' }}>{item.label}</span>
-                      {item.time && <span style={{ fontSize: '.75rem', color: 'var(--teal)' }}>{item.time}</span>}
-                      <button onClick={e => { e.stopPropagation(); saveRoutine(routine.filter(r => r.id !== item.id)) }}
-                        style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.9rem' }}>✕</button>
-                    </div>
-                  )
-                })}
+                <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
+                  <span style={{fontSize:'.68rem',padding:'2px 8px',borderRadius:999,background:(STATUS_COLORS[book.status]||'var(--muted)')+'22',color:STATUS_COLORS[book.status]||'var(--muted)',fontWeight:700}}>{book.status}</span>
+                  <button onClick={()=>saveBooks(books.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                </div>
               </div>
-            )
-          })}
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            <input placeholder="Routine item (Prayer, Workout...)" value={newRoutineItem.label} onChange={e => setNewRoutineItem(p => ({ ...p, label: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="time" value={newRoutineItem.time} onChange={e => setNewRoutineItem(p => ({ ...p, time: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <select value={newRoutineItem.type} onChange={e => setNewRoutineItem(p => ({ ...p, type: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
-                <option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option>
-              </select>
-              <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
-                onClick={() => { if (!newRoutineItem.label) return; saveRoutine([...routine, { ...newRoutineItem, id: Date.now() }]); setNewRoutineItem({ time: '', label: '', type: 'morning' }) }}>Add</button>
             </div>
+          ))}
+          {books.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No books yet. Add your first.</p>}
+          <div style={{display:'grid',gap:8,marginTop:12}}>
+            <input placeholder="Book title" value={newBook.title} onChange={e=>setNewBook(p=>({...p,title:e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+            <div style={{display:'flex',gap:8}}>
+              <input placeholder="Author" value={newBook.author} onChange={e=>setNewBook(p=>({...p,author:e.target.value}))}
+                style={{flex:1,padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              <select value={newBook.status} onChange={e=>setNewBook(p=>({...p,status:e.target.value}))}
+                style={{flex:1,padding:'9px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}}>
+                <option>Reading</option><option>Want to Read</option><option>Completed</option>
+              </select>
+            </div>
+            <button className="primary-btn" onClick={()=>{
+              if(!newBook.title)return
+              saveBooks([...books,{...newBook,id:Date.now()}])
+              setNewBook({title:'',author:'',status:'Reading'})
+            }}>Add Book</button>
           </div>
         </section>
       )}
@@ -2403,7 +2700,7 @@ function WellnessPage() {
   )
 }
 
-// ── PRODUCTIVITY PAGE ─────────────────────────────────────────────────────
+
 function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
@@ -2718,6 +3015,12 @@ function LifestylePage() {
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('braindump')
+  const [trips, setTrips] = useState(() => { try { const v = localStorage.getItem('planner.l.trips'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', notes: '', packing: '' })
+  const [birthdays, setBirthdays] = useState(() => { try { const v = localStorage.getItem('planner.l.birthdays'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [newBirthday, setNewBirthday] = useState({ name: '', date: '', relationship: '', notes: '' })
+  const saveTrips = (t) => { setTrips(t); try { localStorage.setItem('planner.l.trips', JSON.stringify(t)) } catch {} }
+  const saveBirthdays = (b) => { setBirthdays(b); try { localStorage.setItem('planner.l.birthdays', JSON.stringify(b)) } catch {} }
   const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
   const [birthdays, setBirthdays] = useState(() => lsGet('birthdays', []))
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
@@ -2729,7 +3032,7 @@ function LifestylePage() {
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
 
   const TABS = [
-    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' },
+    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' }, { id: 'trips', label: '✈ Trips' }, { id: 'birthdays', label: '🎂 Birthdays' },
     { id: 'birthdays', label: '🎂 Birthdays' }, { id: 'keydates', label: '📅 Key Dates' },
     { id: 'contacts', label: '👥 Contacts' }, { id: 'passwords', label: '🔑 Passwords' },
     { id: 'trips', label: '✈️ Trips' },
@@ -2912,6 +3215,117 @@ function LifestylePage() {
         </section>
       )}
     </div>
+
+      {tab === 'trips' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Trip Planner</p>
+            <h3 style={{margin:'4px 0 12px'}}>Upcoming & Past Trips</h3>
+            {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No trips planned yet.</p>}
+            {trips.map((trip, i) => (
+              <div key={i} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>{trip.destination}</div>
+                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{trip.startDate}{trip.endDate ? ' → '+trip.endDate : ''}</div>
+                  </div>
+                  <button onClick={()=>saveTrips(trips.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                </div>
+                {trip.notes && <div style={{fontSize:'.82rem',color:'var(--ink2)',marginBottom:6,lineHeight:1.5}}>{trip.notes}</div>}
+                {trip.packing && (
+                  <div style={{marginTop:6}}>
+                    <div style={{fontSize:'.68rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em',marginBottom:4}}>PACKING LIST</div>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                      {trip.packing.split(',').map((item,j) => (
+                        <span key={j} style={{fontSize:'.72rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass2)',fontWeight:500}}>{item.trim()}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{display:'grid',gap:8,marginTop:12}}>
+              <input placeholder="Destination" value={newTrip.destination} onChange={e=>setNewTrip(p=>({...p,destination:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+              <div style={{display:'flex',gap:8}}>
+                <input type="date" placeholder="Start" value={newTrip.startDate} onChange={e=>setNewTrip(p=>({...p,startDate:e.target.value}))}
+                  style={{flex:1,padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+                <input type="date" placeholder="End" value={newTrip.endDate} onChange={e=>setNewTrip(p=>({...p,endDate:e.target.value}))}
+                  style={{flex:1,padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <input placeholder="Notes (hotel, plan, ideas...)" value={newTrip.notes} onChange={e=>setNewTrip(p=>({...p,notes:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              <input placeholder="Packing list (comma separated)" value={newTrip.packing} onChange={e=>setNewTrip(p=>({...p,packing:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              <button className="primary-btn" onClick={()=>{if(!newTrip.destination)return;saveTrips([...trips,{...newTrip,id:Date.now()}]);setNewTrip({destination:'',startDate:'',endDate:'',notes:'',packing:''})}}>Add Trip</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab === 'birthdays' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Birthday Reminders</p>
+            <h3 style={{margin:'4px 0 12px'}}>Never miss one</h3>
+            {birthdays.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No birthdays added yet.</p>}
+            {[...birthdays].sort((a,b)=>{
+              const today = new Date()
+              const toNext = (dateStr) => {
+                if (!dateStr) return 999
+                const [,m,d] = dateStr.split('-').map(Number)
+                const next = new Date(today.getFullYear(), m-1, d)
+                if (next < today) next.setFullYear(today.getFullYear()+1)
+                return (next - today) / (1000*60*60*24)
+              }
+              return toNext(a.date) - toNext(b.date)
+            }).map((bd,i) => {
+              const daysUntil = (() => {
+                if (!bd.date) return null
+                const [,m,d] = bd.date.split('-').map(Number)
+                const next = new Date(new Date().getFullYear(), m-1, d)
+                if (next < new Date()) next.setFullYear(new Date().getFullYear()+1)
+                const diff = Math.round((next - new Date()) / (1000*60*60*24))
+                return diff
+              })()
+              return (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
+                  <div style={{width:44,height:44,borderRadius:'50%',background:'var(--brass-dim)',display:'grid',placeItems:'center',flexShrink:0}}>
+                    <span style={{fontSize:'1.2rem'}}>🎂</span>
+                  </div>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:700,fontSize:'.9rem',color:'var(--ink)'}}>{bd.name}</div>
+                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{bd.relationship} · {bd.date}</div>
+                    {bd.notes && <div style={{fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic'}}>{bd.notes}</div>}
+                  </div>
+                  <div style={{textAlign:'center',flexShrink:0}}>
+                    {daysUntil !== null && (
+                      <div style={{fontWeight:700,fontSize:'.85rem',color:daysUntil<=7?'var(--danger)':daysUntil<=30?'var(--warning)':'var(--teal)'}}>
+                        {daysUntil === 0 ? '🎉 Today!' : `${daysUntil}d`}
+                      </div>
+                    )}
+                    <button onClick={()=>saveBirthdays(birthdays.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.8rem'}}>✕</button>
+                  </div>
+                </div>
+              )
+            })}
+            <div style={{display:'grid',gap:8,marginTop:12}}>
+              <input placeholder="Name" value={newBirthday.name} onChange={e=>setNewBirthday(p=>({...p,name:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
+              <div style={{display:'flex',gap:8}}>
+                <input type="date" value={newBirthday.date} onChange={e=>setNewBirthday(p=>({...p,date:e.target.value}))}
+                  style={{flex:1,padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+                <input placeholder="Relationship" value={newBirthday.relationship} onChange={e=>setNewBirthday(p=>({...p,relationship:e.target.value}))}
+                  style={{flex:1,padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <input placeholder="Notes (gift ideas, traditions...)" value={newBirthday.notes} onChange={e=>setNewBirthday(p=>({...p,notes:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
+              <button className="primary-btn" onClick={()=>{if(!newBirthday.name)return;saveBirthdays([...birthdays,{...newBirthday,id:Date.now()}]);setNewBirthday({name:'',date:'',relationship:'',notes:''})}}>Add Birthday</button>
+            </div>
+          </section>
+        </div>
+      )}
+
   )
 }
 
@@ -2921,6 +3335,9 @@ function HealthPage() {
   const lsSet = (k, v) => { try { localStorage.setItem('planner.h.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('meds')
+  const [metricsLog, setMetricsLog] = useState(() => { try { const v = localStorage.getItem('planner.h.metrics'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
+  const saveMetrics = (m) => { setMetricsLog(m); try { localStorage.setItem('planner.h.metrics', JSON.stringify(m)) } catch {} }
   const [meds, setMeds] = useState(() => lsGet('meds', []))
   const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
   const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
@@ -2938,7 +3355,7 @@ function HealthPage() {
   const todayMeds = medLog[todayMedKey] || []
 
   const TABS = [
-    { id: 'meds', label: '💊 Medications' }, { id: 'sleep', label: '😴 Sleep' },
+    { id: 'meds', label: '💊 Medications' }, { id: 'metrics', label: '📈 Body Metrics' },
     { id: 'anxiety', label: '🧘 Anxiety' }, { id: 'migraines', label: '🤕 Migraines' },
     { id: 'coping', label: '🛡 Coping Skills' },
   ]
@@ -3207,6 +3624,65 @@ function HealthPage() {
           </div>
         </section>
       )}
+
+      {tab === 'metrics' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Body Metrics</p>
+            <h3 style={{margin:'4px 0 6px'}}>Log Today</h3>
+            <div style={{display:'grid',gap:10,marginBottom:14}}>
+              {[
+                {key:'weight',label:'Weight (lbs)',placeholder:'185'},
+                {key:'bp',label:'Blood Pressure',placeholder:'120/80'},
+                {key:'heartRate',label:'Resting Heart Rate (bpm)',placeholder:'68'},
+                {key:'waist',label:'Waist (inches)',placeholder:'32'},
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>{f.label}</label>
+                  <input value={newMetric[f.key]} onChange={e=>setNewMetric(p=>({...p,[f.key]:e.target.value}))}
+                    placeholder={f.placeholder}
+                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
+                </div>
+              ))}
+              <div>
+                <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>Notes</label>
+                <input value={newMetric.notes} onChange={e=>setNewMetric(p=>({...p,notes:e.target.value}))}
+                  placeholder="How I feel, context..."
+                  style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <button className="primary-btn" onClick={() => {
+                const hasData = newMetric.weight || newMetric.bp || newMetric.heartRate || newMetric.waist
+                if (!hasData) return
+                const entry = { ...newMetric, date: TODAY, id: Date.now() }
+                saveMetrics([entry, ...metricsLog])
+                setNewMetric({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
+              }}>Log Entry</button>
+            </div>
+          </section>
+          {metricsLog.length > 0 && (
+            <section className="card">
+              <p className="eyebrow">History</p>
+              <h3 style={{margin:'4px 0 12px'}}>Recent Entries</h3>
+              {metricsLog.slice(0,10).map(entry => (
+                <div key={entry.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <div style={{fontSize:'.75rem',fontWeight:700,color:'var(--brass)'}}>{entry.date}</div>
+                    <button onClick={()=>saveMetrics(metricsLog.filter(m=>m.id!==entry.id))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
+                  </div>
+                  <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:'.82rem',color:'var(--ink2)'}}>
+                    {entry.weight && <span>⚖ {entry.weight} lbs</span>}
+                    {entry.bp && <span>💓 {entry.bp}</span>}
+                    {entry.heartRate && <span>❤ {entry.heartRate} bpm</span>}
+                    {entry.waist && <span>📏 {entry.waist}"</span>}
+                  </div>
+                  {entry.notes && <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:4,fontStyle:'italic'}}>{entry.notes}</div>}
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+      )}
+
     </div>
   )
 }
@@ -3342,6 +3818,9 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
 
 function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) {
   const [activeFrame, setActiveFrame] = useState('all')
+  const [visionItems, setVisionItems] = useState(() => { try { const v = localStorage.getItem('planner.g.vision'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [newVision, setNewVision] = useState('')
+  const saveVision = (v) => { setVisionItems(v); try { localStorage.setItem('planner.g.vision', JSON.stringify(v)) } catch {} }
 
   const TIMEFRAMES = [
     {id:'all',label:'All'},
@@ -3445,7 +3924,28 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
               <span style={{color:'var(--muted)'}}>{linkedTasks.length} linked task{linkedTasks.length!==1?'s':''}</span>
               <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
-            </div>
+      
+      <section className="card" style={{background:'var(--ink)',border:'none'}}>
+        <p className="eyebrow" style={{color:'var(--brass)'}}>Vision & Affirmations</p>
+        <h3 style={{color:'var(--warm-white)',margin:'4px 0 12px',fontSize:'1.1rem'}}>Speak it before you see it</h3>
+        {visionItems.length === 0 && <p style={{color:'rgba(255,255,255,.45)',fontSize:'.85rem',marginBottom:10}}>Add affirmations or vision statements. Read them daily.</p>}
+        {visionItems.map((item,i) => (
+          <div key={i} style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'flex-start',gap:10}}>
+            <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0,marginTop:2}}>✦</span>
+            <div style={{flex:1,fontFamily:'var(--serif)',fontSize:'.95rem',color:'rgba(255,255,255,.85)',lineHeight:1.6,fontStyle:'italic'}}>{item.text}</div>
+            <button onClick={()=>saveVision(visionItems.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',cursor:'pointer',flexShrink:0}}>✕</button>
+          </div>
+        ))}
+        <div style={{display:'flex',gap:8,marginTop:12}}>
+          <input value={newVision} onChange={e=>setNewVision(e.target.value)}
+            placeholder="I am... I have... I will..."
+            style={{flex:1,padding:'10px 12px',border:'1px solid rgba(184,150,90,.3)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'rgba(255,255,255,.06)',color:'white',fontFamily:'var(--serif)'}} />
+          <button onClick={()=>{if(!newVision.trim())return;saveVision([...visionItems,{text:newVision.trim(),id:Date.now()}]);setNewVision('')}}
+            style={{padding:'10px 16px',borderRadius:'var(--radius-sm)',border:'none',background:'var(--brass)',color:'var(--ink)',fontWeight:700,cursor:'pointer',fontFamily:'var(--sans)',flexShrink:0}}>Add</button>
+        </div>
+      </section>
+
+      </div>
             <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
               <div style={{height:'100%',width:`${progress}%`,background:progress>=100?'var(--success)':'var(--brass)',borderRadius:999,transition:'width .4s'}} />
             </div>
@@ -3463,6 +3963,15 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
   const weekLogs = habitLogs.filter((log) => log.date >= weekStart && log.date <= weekEnd)
   const completedWeekLogs = weekLogs.filter((log) => log.completed).length
   const [showScoreInfo, setShowScoreInfo] = useState(false)
+  const [reviewAnswers, setReviewAnswers] = useState(() => { try { const v = localStorage.getItem('planner.gr.review'); return v ? JSON.parse(v) : {} } catch { return {} } })
+  const weeklyReviewPrompts = [
+    'What were my top 3 wins this week?',
+    'What did I struggle with and what will I do differently?',
+    'Did my actions align with my goals and values?',
+    'What habits did I keep? Which did I miss?',
+    'What am I grateful for this week?',
+    'What is my one focus for next week?',
+  ]
 
   const weeklyReview = {
     win: scores.Productivity >= 7 ? 'You protected momentum well this week.' : 'There is room to tighten follow-through next week.',
@@ -3635,7 +4144,30 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
               </div>
               <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
                 <strong style={{color:'var(--teal)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
-                <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('goal', goal)}>Edit</button>
+                <butt
+      <section className="card">
+        <p className="eyebrow">Weekly Review</p>
+        <h3 style={{margin:'4px 0 10px'}}>End of Week Reflection</h3>
+        <p className="muted" style={{fontSize:'.82rem',marginBottom:14}}>Take 10 minutes each week to reflect. Done consistently, this is one of the highest-leverage habits you can build.</p>
+        {weeklyReviewPrompts.map((prompt,i) => (
+          <div key={i} style={{marginBottom:14}}>
+            <div style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6,letterSpacing:'.03em'}}>{prompt}</div>
+            <textarea value={reviewAnswers[i]||''} onChange={e=>{const u={...reviewAnswers,[i]:e.target.value};setReviewAnswers(u);try{localStorage.setItem('planner.gr.review',JSON.stringify(u))}catch{}}}
+              placeholder="Write freely..."
+              style={{width:'100%',minHeight:70,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',fontFamily:'var(--serif)',color:'var(--ink)',background:'var(--stone)',resize:'none',lineHeight:1.6}} />
+          </div>
+        ))}
+        <button className="primary-btn" style={{width:'100%',fontSize:'.88rem'}}
+          onClick={()=>{
+            const entry = {date:TODAY,answers:{...reviewAnswers},id:Date.now()}
+            const prev = JSON.parse(localStorage.getItem('planner.gr.reviewHistory')||'[]')
+            localStorage.setItem('planner.gr.reviewHistory',JSON.stringify([entry,...prev].slice(0,52)))
+            setReviewAnswers({})
+            localStorage.removeItem('planner.gr.review')
+          }}>Save This Week's Review</button>
+      </section>
+
+on className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('goal', goal)}>Edit</button>
                 <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('goal', goal.id)}>✕</button>
               </div>
             </div>
