@@ -3101,23 +3101,6 @@ function LifestylePage() {
         </section>
       )}
 
-      {tab === 'birthdays' && (
-        <section className="card">
-          <p className="eyebrow">Birthday Tracker</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Birthdays</h3>
-          <SimpleList items={birthdays} onDelete={i => save('birthdays', setBirthdays, birthdays.filter((_, j) => j !== i))}
-            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.name}</div><div style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.date}{item.notes ? ' · ' + item.notes : ''}</div></>)} />
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-            <input placeholder="Name" value={form.bdName || ''} onChange={e => setForm(p => ({ ...p, bdName: e.target.value }))}
-              style={{ flex: 2, minWidth: 0, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input type="date" value={form.bdDate || ''} onChange={e => setForm(p => ({ ...p, bdDate: e.target.value }))}
-              style={{ flex: 1, minWidth: 0, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
-              onClick={() => { if (!form.bdName) return; save('birthdays', setBirthdays, [...birthdays, { name: form.bdName, date: form.bdDate, notes: form.bdNotes }]); setForm(p => ({ ...p, bdName: '', bdDate: '', bdNotes: '' })) }}>Add</button>
-          </div>
-        </section>
-      )}
-
       {tab === 'keydates' && (
         <section className="card">
           <p className="eyebrow">Key Dates</p>
@@ -3168,48 +3151,6 @@ function LifestylePage() {
                 style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
             ))}
             <button className="primary-btn" onClick={() => { if (!form.pwSrv) return; save('passwords', setPasswords, [...passwords, { service: form.pwSrv, username: form.pwUser, password: form.pwPass }]); setForm(p => ({ ...p, pwSrv: '', pwUser: '', pwPass: '' })) }}>Save</button>
-          </div>
-        </section>
-      )}
-
-      {tab === 'trips' && (
-        <section className="card">
-          <p className="eyebrow">Trip Planner</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Your Trips</h3>
-          {trips.map((trip, ti) => (
-            <div key={ti} style={{ marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--surface)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '.95rem' }}>{trip.destination}</div>
-                  <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{trip.dates}</div>
-                </div>
-                <button onClick={() => save('trips', setTrips, trips.filter((_, i) => i !== ti))}
-                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
-              </div>
-              <div style={{ fontSize: '.78rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.08em' }}>Packing List</div>
-              {(trip.packing || '').split(',').map(item => item.trim()).filter(Boolean).map((item, pi) => {
-                const packKey = `${ti}-${pi}`
-                const packed = (trip.packed || []).includes(packKey)
-                return (
-                  <div key={pi} onClick={() => save('trips', setTrips, trips.map((t, i) => i !== ti ? t : { ...t, packed: packed ? (t.packed || []).filter(k => k !== packKey) : [...(t.packed || []), packKey] }))}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', cursor: 'pointer', borderBottom: '1px solid var(--surface)' }}>
-                    <div style={{ width: 18, height: 18, borderRadius: 4, border: '2px solid', borderColor: packed ? 'var(--teal)' : 'var(--border2)', background: packed ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                      {packed && <span style={{ color: 'var(--navy)', fontSize: '.65rem', fontWeight: 700 }}>✓</span>}
-                    </div>
-                    <span style={{ fontSize: '.85rem', textDecoration: packed ? 'line-through' : 'none', color: packed ? 'var(--muted)' : 'var(--text)' }}>{item}</span>
-                  </div>
-                )
-              })}
-            </div>
-          ))}
-          <div style={{ display: 'grid', gap: 8 }}>
-            <input placeholder="Destination" value={form.tripDest || ''} onChange={e => setForm(p => ({ ...p, tripDest: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Dates (Apr 25 - Apr 30)" value={form.tripDates || ''} onChange={e => setForm(p => ({ ...p, tripDates: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Packing list (comma-separated: Passport, Charger, Shoes)" value={form.tripPack || ''} onChange={e => setForm(p => ({ ...p, tripPack: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" onClick={() => { if (!form.tripDest) return; save('trips', setTrips, [...trips, { destination: form.tripDest, dates: form.tripDates, packing: form.tripPack, packed: [] }]); setForm(p => ({ ...p, tripDest: '', tripDates: '', tripPack: '' })) }}>Add Trip</button>
           </div>
         </section>
       )}
