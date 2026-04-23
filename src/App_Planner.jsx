@@ -2372,22 +2372,23 @@ function FinancePage({ expenses, budget, setBudget }) {
       )}
 
       {tab === 'nospend' && (
-      <section className="card">
-        <p className="eyebrow">Save More</p>
-        <h3 style={{margin:'4px 0 10px'}}>35 No-Spend Weekend Ideas</h3>
-        <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Free things to do that keep money in your pocket.</p>
-        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-          {['De-clutter and sell your stuff','Attend free music or movies in the park','Have a picnic','Hike','Go to a park','Bike ride','Play board games','Host a potluck','Learn a new skill','Read a book','Make a new recipe','Play with your kids','Create art for your home','Sort and organize photos','Build a fire','DIY something','Visit a free museum','Volunteer','Camp in your backyard','Go fishing','Go to the beach','Explore your library','Take pictures','Make a budget','Re-design a room','Make lists','Write your goals','Garden','Slow down and relax','Host a clothing swap','Write','Draw or paint','Play a video game','Organize your cabinets','Sit outside with coffee or tea'].map(item => (
-            <span key={item} style={{
-              padding:'5px 10px',borderRadius:999,
-              border:'1px solid var(--border2)',
-              background:'var(--stone)',
-              fontSize:'.75rem',color:'var(--ink2)',
-              display:'inline-block'
-            }}>{item}</span>
-          ))}
-        </div>
-      </section>
+        <section className="card">
+          <p className="eyebrow">Save More</p>
+          <h3 style={{margin:'4px 0 10px'}}>35 No-Spend Weekend Ideas</h3>
+          <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Free things to do that keep money in your pocket.</p>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+            {['De-clutter and sell your stuff','Attend free music or movies in the park','Have a picnic','Hike','Go to a park','Bike ride','Play board games','Host a potluck','Learn a new skill','Read a book','Make a new recipe','Play with your kids','Create art for your home','Sort and organize photos','Build a fire','DIY something','Visit a free museum','Volunteer','Camp in your backyard','Go fishing','Go to the beach','Explore your library','Take pictures','Make a budget','Re-design a room','Make lists','Write your goals','Garden','Slow down and relax','Host a clothing swap','Write','Draw or paint','Play a video game','Organize your cabinets','Sit outside with coffee or tea'].map(item => (
+              <span key={item} style={{
+                padding:'5px 10px',borderRadius:999,
+                border:'1px solid var(--border2)',
+                background:'var(--stone)',
+                fontSize:'.75rem',color:'var(--ink2)',
+                display:'inline-block'
+              }}>{item}</span>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
