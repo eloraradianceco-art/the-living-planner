@@ -1529,6 +1529,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       </section>
 
     </div>
+    </div>
   )
 }
 
@@ -2028,6 +2029,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
         )
       })}
     </div>
+    </div>
   )
 }
 
@@ -2390,7 +2392,7 @@ function FinancePage({ expenses, budget, setBudget }) {
         </section>
       )}
     </div>
-    </div>
+  </div>
   )
 }
 
