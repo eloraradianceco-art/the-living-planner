@@ -1870,7 +1870,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                           onClick={() => { setSelectedDate(date); setView('day') }}>
                           <div className="month-day-num">{new Date(date + 'T12:00:00').getDate()}</div>
                           {count > 0 && <div className="month-day-dot">{count} ·</div>}
-                        </div>
+                         </div>
                       </td>
                     )
                   })}
@@ -2027,7 +2027,6 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
           </section>
         )
       })}
-    </div>
     </div>
   )
 }
@@ -2398,7 +2397,6 @@ function FinancePage({ expenses, budget, setBudget }) {
           </div>
         </section>
       )}
-  </div>
     </div>
   )
 }
@@ -3016,7 +3014,6 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         </section>
       )}
 
-</div>
   )
 }
 
@@ -3902,7 +3899,6 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
         )
       })}
     </div>
-    </div>
   )
 }
 
@@ -4093,8 +4089,14 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
                 <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{goal.category} · {goal.targetDate}</div>
               </div>
               <div style={{display:'flex', alignItems:'center', gap:8, flexShrink:0}}>
-                <strong style={{color:'var(--teal)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
-                <butt
+                <strong style={{color:'var(--brass)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
+              </div>
+            </div>
+            <div className="mini-progress"><div style={{width:`${getGoalProgress(goal.id, tasks, projects)}%`,background:'var(--brass)',height:'100%',borderRadius:999}} /></div>
+          </div>
+        ))}
+      </section>
+
       <section className="card">
         <p className="eyebrow">Weekly Review</p>
         <h3 style={{margin:'4px 0 10px'}}>End of Week Reflection</h3>
@@ -4125,7 +4127,6 @@ on className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick=
           </div>
         ))}
       </section>
-    </div>
     </div>
   )
 }
