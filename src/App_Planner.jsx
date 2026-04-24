@@ -3014,6 +3014,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         </section>
       )}
 
+    </div>
   )
 }
 
