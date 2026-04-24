@@ -2611,6 +2611,13 @@ function HealthWellnessPage() {
               {[['Name', 'medName', 'text', 'e.g. Vitamin D, Metformin'], ['Dose', 'medDose', 'text', 'e.g. 500mg'], ['Time', 'medTime', 'text', 'e.g. Morning, With food']].map(([lbl, key, type, ph]) => (
                 <input key={key} type={type} placeholder={`${lbl} — ${ph}`} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                   style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              )}
+              <button className="primary-btn" onClick={() => {
+                if(!form.medName) return
+                saveMeds([...meds, {name:form.medName, dose:form.medDose||'', time:form.medTime||'', notes:form.medNotes||''}])
+                setForm(p => ({...p, medName:'', medDose:'', medTime:'', medNotes:''}))
+              }}>Add Medication</button>
+            </div>
             {meds.length > 0 && (
               <div style={{ marginTop: 14 }}>
                 {meds.map((med, i) => (
