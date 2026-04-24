@@ -1529,6 +1529,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       </section>
 
     </div>
+    </div>
   )
 }
 
@@ -1972,7 +1973,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
             <div style={{marginBottom:8}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
                 <span style={{fontSize:'.75rem', color:'var(--muted)'}}>
-                  {completedTasks}/{projectTasks.length} tasks · Due {project.dueDate}
+                  {`${completedTasks}/${projectTasks.length} tasks · Due ${project.dueDate}`}
                 </span>
                 <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--teal)'}}>{progress}%</span>
               </div>
@@ -2398,8 +2399,8 @@ function FinancePage({ expenses, budget, setBudget }) {
           </div>
         </section>
       )}
-    </div>
   </div>
+    </div>
   )
 }
 
@@ -2866,7 +2867,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
                     {FREQ_LABELS[freq]}
                     {done.length > 0 && (
                       <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass)':'var(--success)',fontWeight:700}}>
-                        {done.length}/{tasks.length}
+                        {done.length + '/' + tasks.length}
                       </span>
                     )}
                   </button>
@@ -3701,7 +3702,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
                 <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{habit.title}</div>
                 <div style={{display:'flex',gap:10,marginTop:2,fontSize:'.72rem',color:'var(--muted)'}}>
                   <span style={{color:CAT_COLOR[habit.category]||'var(--brass)',fontWeight:600}}>{habit.category}</span>
-                  <span>{weekComplete}/7 this week</span>
+                  <span>{weekComplete + '/7 this week'}</span>
                   {streak > 1 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
                 </div>
               </div>
@@ -3970,7 +3971,7 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
             <strong style={{
               minWidth:32, textAlign:'right', fontSize:'.9rem',
               color: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)'
-            }}>{value}/10</strong>
+            }}>{value + '/10'}</strong>
           </div>
         ))}
 
@@ -4047,7 +4048,7 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
             <div key={habit.id} className="metric-row card-row" style={{alignItems:'flex-start', paddingTop:12, paddingBottom:12}}>
               <div style={{flex:1, minWidth:0}}>
                 <div style={{fontWeight:600, fontSize:'.9rem', color:'var(--text)', marginBottom:2}}>{habit.title}</div>
-                <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{habit.category} · {weekComplete}/7 this week</div>
+                <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{habit.category + ' · ' + weekComplete + '/7'} this week</div>
               </div>
               <div style={{display:'flex', gap:6, flexShrink:0}}>
                 <button
@@ -4146,7 +4147,7 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
         <h3>Onboarding</h3>
         <button className="ghost-btn" onClick={() => updateSettings({ ...settings, onboardingComplete: true })}>Mark Complete</button>
       </div>
-      <p className="muted">{doneCount}/{steps.length} setup steps finished</p>
+      <p className="muted">{doneCount + '/' + steps.length + ' setup steps finished'}</p>
       {steps.map((step) => <div key={step.label} className="metric-row"><span>{step.label}</span><strong>{step.done ? 'Done' : 'Open'}</strong></div>)}
     </section>
   )
