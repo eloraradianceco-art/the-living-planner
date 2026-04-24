@@ -1525,7 +1525,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <div className="section-title-row" style={{marginBottom:8}}>
           <div><p className="eyebrow">This Week</p><h3>Execution</h3></div>
         </div>
-        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.replace('-', '/') }))} dataKey="completed" maxKey="total" />
+        <MiniBarChart data={completionSeries.map((item) => ({ ...item, label: item.label.split('-').join('/') }))} dataKey="completed" maxKey="total" />
       </section>
 
     </div>
