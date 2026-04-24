@@ -2511,7 +2511,6 @@ function HealthWellnessPage() {
                 </div>
                 <button onClick={e=>{e.stopPropagation();saveRoutine(routine.filter(r=>r.id!==item.id))}}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-              </div>
             )
           })}
           <div style={{display:'grid',gap:8,marginTop:12}}>
@@ -2578,7 +2577,6 @@ function HealthWellnessPage() {
           </div>
         </section>
       )}
-    </div>
 
       {tab === 'meds' && (
         <>
@@ -2858,13 +2856,14 @@ function HealthWellnessPage() {
       )}
 
     </div>
-    </div>
   )
 }
 
 
 
 
+
+}
 function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
