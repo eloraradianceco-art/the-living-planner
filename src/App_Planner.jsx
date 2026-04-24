@@ -1370,8 +1370,8 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     { to:'/goals',        icon:'🎯', label:'Goals',        color:'var(--brass)',  count: goals.length || null },
     { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',       count: null },
     { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',   count: null },
-    { to:'/health',       icon:'💊', label:'Health',       color:'#E85555',       count: null },
-    { to:'/wellness',     icon:'🌿', label:'Wellness',     color:'#22C55E',       count: null },
+    { to:'/wellness', icon:'🌿', label:'Health & Wellness', color:'#22C55E', count: null },
+    
     { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',       count: null },
     { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--slate)',   count: null },
   ]
@@ -2069,10 +2069,6 @@ function FinancePage({ expenses, budget, setBudget }) {
 
   const TABS = [
     { id: 'overview', label: '📊 Overview' }, { id: 'debt', label: '📉 Debt Tracker' }, { id: 'budget', label: '📋 Monthly Budget' }, { id: 'nospend', label: '🌿 No-Spend' },
-    { id: 'savings', label: 'Savings' },
-    { id: 'nospend', label: 'No-Spend' },
-    { id: 'monthly', label: 'Monthly' },
-    { id: 'subs', label: 'Subscriptions' },
   ]
 
   return (
@@ -2120,147 +2116,6 @@ function FinancePage({ expenses, budget, setBudget }) {
             </div>
           </section>
         </>
-      )}
-
-      {tab === 'savings' && (
-        <section className="card">
-          <p className="eyebrow">Savings Tracker</p>
-          <h3 style={{ margin: '4px 0 14px' }}>Your Savings Goal</h3>
-          <div style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
-            {[['Goal Label', 'text', 'label', savings.label], ['Goal Amount ($)', 'number', 'goal', savings.goal], ['Current Saved ($)', 'number', 'current', savings.current]].map(([lbl, type, key, val]) => (
-              <label key={key} style={{ display: 'grid', gap: 4, fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)' }}>
-                {lbl}
-                <input type={type} value={val}
-                  onChange={e => saveSavings({ ...savings, [key]: type === 'number' ? Number(e.target.value) : e.target.value })}
-                  style={{ padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.95rem' }} />
-              </label>
-            ))}
-          </div>
-          <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', padding: 16, textAlign: 'center' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--teal)', marginBottom: 6 }}>
-              ${savings.current.toFixed(2)} <span style={{ fontSize: '.9rem', color: 'var(--muted)', fontWeight: 400 }}>of ${savings.goal.toFixed(2)}</span>
-            </div>
-            <div style={{ background: 'var(--border2)', borderRadius: 999, height: 12, overflow: 'hidden', marginBottom: 8 }}>
-              <div style={{ width: `${savingsPct}%`, height: '100%', background: 'linear-gradient(90deg, var(--teal), var(--teal2))', borderRadius: 999, transition: 'width .4s' }} />
-            </div>
-            <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{savingsPct.toFixed(0)}% toward {savings.label}</div>
-          </div>
-        </section>
-      )}
-
-      {tab === 'nospend' && (
-        <section className="card">
-          <p className="eyebrow">No-Spend Challenge</p>
-          <h3 style={{ margin: '4px 0 6px' }}>Day Tracker</h3>
-          <p className="muted" style={{ fontSize: '.82rem', marginBottom: 12 }}>Tap a bubble to mark a no-spend day. {noSpendFilled} of {noSpend.days} days complete.</p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-            <span style={{ fontSize: '.85rem', color: 'var(--text2)' }}>Challenge days:</span>
-            {[7, 14, 21, 30].map(n => (
-              <button key={n} onClick={() => saveNoSpend({ ...noSpend, days: n, checked: [] })}
-                style={{ padding: '5px 12px', borderRadius: 999, border: '1.5px solid', fontSize: '.8rem', cursor: 'pointer', fontFamily: 'inherit',
-                  borderColor: noSpend.days === n ? 'var(--teal)' : 'var(--border2)',
-                  background: noSpend.days === n ? 'var(--teal)' : 'var(--surface)',
-                  color: noSpend.days === n ? 'var(--navy)' : 'var(--text2)', fontWeight: 600 }}>{n}</button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {daysArray.map(day => {
-              const checked = noSpend.checked.includes(day)
-              return (
-                <button key={day} onClick={() => {
-                  const next = checked ? noSpend.checked.filter(d => d !== day) : [...noSpend.checked, day]
-                  saveNoSpend({ ...noSpend, checked: next })
-                }} style={{
-                  width: 44, height: 44, borderRadius: '50%', border: '2px solid',
-                  borderColor: checked ? 'var(--teal)' : 'var(--border2)',
-                  background: checked ? 'var(--teal)' : 'var(--surface)',
-                  color: checked ? 'var(--navy)' : 'var(--muted)',
-                  fontWeight: 700, fontSize: '.85rem', cursor: 'pointer', fontFamily: 'inherit',
-                  display: 'grid', placeItems: 'center'
-                }}>{checked ? '✓' : day}</button>
-              )
-            })}
-          </div>
-          {noSpendFilled === noSpend.days && (
-            <div style={{ marginTop: 16, padding: 14, background: 'rgba(0,194,179,.1)', borderRadius: 'var(--radius)', textAlign: 'center', color: 'var(--teal)', fontWeight: 700 }}>
-              🎉 Challenge Complete! You made it {noSpend.days} days!
-            </div>
-          )}
-        </section>
-      )}
-
-      {tab === 'monthly' && (
-        <>
-          <section className="card">
-            <p className="eyebrow">Monthly Planner</p>
-            <h3 style={{ margin: '4px 0 12px' }}>Income & Bills</h3>
-            <label style={{ display: 'grid', gap: 4, fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)', marginBottom: 12 }}>
-              Monthly Income
-              <input type="number" value={monthlyBudget.income}
-                onChange={e => saveMonthly({ ...monthlyBudget, income: Number(e.target.value) })}
-                style={{ padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.95rem' }} />
-            </label>
-            <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8, fontSize: '.9rem' }}>Monthly Bills</div>
-            {monthlyBudget.bills.map((b, i) => (
-              <div key={i} className="metric-row card-row">
-                <span style={{ fontSize: '.9rem' }}>{b.label}</span>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <strong style={{ color: 'var(--danger)' }}>${Number(b.amount).toFixed(2)}</strong>
-                  <button onClick={() => saveMonthly({ ...monthlyBudget, bills: monthlyBudget.bills.filter((_, j) => j !== i) })}
-                    style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
-                </div>
-              </div>
-            ))}
-            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-              <input placeholder="Bill name" value={newBill.label} onChange={e => setNewBill(p => ({ ...p, label: e.target.value }))}
-                style={{ flex: 2, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <input type="number" placeholder="$" value={newBill.amount} onChange={e => setNewBill(p => ({ ...p, amount: e.target.value }))}
-                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
-                onClick={() => { if (!newBill.label) return; saveMonthly({ ...monthlyBudget, bills: [...monthlyBudget.bills, newBill] }); setNewBill({ label: '', amount: '' }) }}>Add</button>
-            </div>
-          </section>
-        </>
-      )}
-
-      {tab === 'subs' && (
-        <section className="card">
-          <p className="eyebrow">Subscriptions</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Subscription Tracker</h3>
-          {monthlyBudget.subscriptions.map((s, i) => (
-            <div key={i} className="metric-row card-row">
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{s.label}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{s.cycle}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <strong style={{ color: 'var(--warning)' }}>${Number(s.amount).toFixed(2)}</strong>
-                <button onClick={() => saveMonthly({ ...monthlyBudget, subscriptions: monthlyBudget.subscriptions.filter((_, j) => j !== i) })}
-                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
-              </div>
-            </div>
-          ))}
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            <input placeholder="Service name (Netflix, Gym...)" value={newSub.label} onChange={e => setNewSub(p => ({ ...p, label: e.target.value }))}
-              style={{ padding: '8px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="number" placeholder="Amount" value={newSub.amount} onChange={e => setNewSub(p => ({ ...p, amount: e.target.value }))}
-                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <select value={newSub.cycle} onChange={e => setNewSub(p => ({ ...p, cycle: e.target.value }))}
-                style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
-                <option value="monthly">Monthly</option>
-                <option value="annual">Annual</option>
-                <option value="weekly">Weekly</option>
-              </select>
-              <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
-                onClick={() => { if (!newSub.label) return; saveMonthly({ ...monthlyBudget, subscriptions: [...monthlyBudget.subscriptions, newSub] }); setNewSub({ label: '', amount: '', cycle: 'monthly' }) }}>Add</button>
-            </div>
-          </div>
-          <div style={{ marginTop: 14, padding: 12, background: 'var(--surface)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '.85rem', color: 'var(--text2)' }}>Total monthly</span>
-            <strong style={{ color: 'var(--warning)' }}>${totalSubs.toFixed(2)}</strong>
-          </div>
-        </section>
       )}
 
 
@@ -2402,11 +2257,13 @@ function FinancePage({ expenses, budget, setBudget }) {
 }
 
 // ── WELLNESS PAGE ─────────────────────────────────────────────────────────
-function WellnessPage() {
-  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.w.' + k); return v ? JSON.parse(v) : d } catch { return d } }
-  const lsSet = (k, v) => { try { localStorage.setItem('planner.w.' + k, JSON.stringify(v)) } catch {} }
+function HealthWellnessPage() {
+  // ── Shared ─────────────────────────────────────────────────────────────
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.hw.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.hw.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('mood')
+  // ── Wellness state ──────────────────────────────────────────────────────
+
   const [books, setBooks] = useState(() => lsGet('books', []))
   const [newBook, setNewBook] = useState({ title: '', author: '', status: 'Reading' })
   const [routine, setRoutine] = useState(() => lsGet('routine', []))
@@ -2455,15 +2312,74 @@ function WellnessPage() {
 
   const STATUS_COLORS = { Reading: 'var(--teal)', Completed: 'var(--success)', 'Want to Read': 'var(--brass)' }
 
+
+  // ── Health state ────────────────────────────────────────────────────────
+  const [tab, setTab] = useState('mood')
+  
+  
+
+  // tab state above
+  const [metricsLog, setMetricsLog] = useState(() => { try { const v = localStorage.getItem('planner.h.metrics'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
+  const saveMetrics = (m) => { setMetricsLog(m); try { localStorage.setItem('planner.h.metrics', JSON.stringify(m)) } catch {} }
+  const [meds, setMeds] = useState(() => lsGet('meds', []))
+  const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
+  const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
+  const [migraines, setMigraines] = useState(() => lsGet('migraines', []))
+  const [sleep, setSleep] = useState(() => lsGet('sleep', []))
+  const [form, setForm] = useState({})
+
+  const saveMeds = (m) => { setMeds(m); lsSet('meds', m) }
+  const saveMedLog = (l) => { setMedLog(l); lsSet('medLog', l) }
+  const saveAnxiety = (a) => { setAnxiety(a); lsSet('anxiety', a) }
+  const saveMigraines = (m) => { setMigraines(m); lsSet('migraines', m) }
+  const saveSleep = (s) => { setSleep(s); lsSet('sleep', s) }
+
+  const todayMedKey = TODAY
+  const todayMeds = medLog[todayMedKey] || []
+
+
+  const COPING_SKILLS = {
+    'Distractions': [
+      'Clean or organize your environment','Dance','Doodle on paper','Draw','Garden',
+      'Go for a drive','Go for a walk','Go shopping','Hug a stuffed animal',
+      'Listen to music','Paint','Photography','Play a game','Play an instrument',
+      'Put a puzzle together','Read','Sing','Take a break','Take a shower or a bath',
+      'Watch funny videos','Watch a movie','Write'
+    ],
+    'Cognitive Coping': [
+      'Act opposite of negative feelings','Brainstorm solutions','Make a gratitude list',
+      'Read an inspirational quote','Reward yourself when successful','Slowly count to ten',
+      'Take a class','Think about someone you love','Think of something funny',
+      'Use positive self-talk','Visualize your favorite place','Write a list of goals',
+      'Write a list of pros and cons','Write a list of strengths','Write a positive note'
+    ],
+    'Tension Releasers': [
+      'Chew gum','Cry','Exercise or play sports','Laugh','Stretch','Use a stress ball'
+    ]
+  }
+
+  const ANXIETY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  const anxietyColor = (n) => n <= 3 ? 'var(--success)' : n <= 6 ? 'var(--warning)' : 'var(--danger)'
+
+
+  const TABS = [
+    {id:'mood',label:'😊 Mood'},{id:'sleep',label:'😴 Sleep'},
+    {id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},
+    {id:'reading',label:'📚 Reading'},{id:'meds',label:'💊 Medications'},
+    {id:'metrics',label:'📈 Body Metrics'},{id:'anxiety',label:'🧘 Anxiety'},
+    {id:'migraines',label:'🤕 Migraines'},{id:'coping',label:'🛡 Coping Skills'},
+  ]
+
   return (
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>🌿</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Wellness</p>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
       </div>
 
       <div className="pill-row" style={{overflowX:'auto',flexWrap:'nowrap',paddingBottom:4}}>
-        {[{id:'mood',label:'😊 Mood'},{id:'sleep',label:'😴 Sleep'},{id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},{id:'reading',label:'📚 Reading'}].map(t => (
+        {TABS.map(t => (
           <button key={t.id} className={tab===t.id?'pill active-pill':'pill'}
             onClick={() => setTab(t.id)} style={{whiteSpace:'nowrap',fontSize:'.82rem'}}>{t.label}
           </button>
@@ -2533,49 +2449,6 @@ function WellnessPage() {
       )}
 
       {/* ── Sleep ────────────────────────────────────────────────── */}
-      {tab === 'sleep' && (
-        <div>
-          <section className="card">
-            <p className="eyebrow">Sleep Log</p>
-            <h3 style={{margin:'4px 0 14px'}}>How much did you sleep last night?</h3>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:14}}>
-              {SLEEP_OPTIONS.map(opt => (
-                <button key={opt} onClick={() => logWellness('sleep', opt)} style={{
-                  padding:'8px 14px',borderRadius:999,border:'1.5px solid',cursor:'pointer',
-                  fontSize:'.82rem',fontWeight:600,fontFamily:'var(--sans)',
-                  borderColor: todayWellness.sleep===opt ? 'var(--brass)' : 'var(--border2)',
-                  background: todayWellness.sleep===opt ? 'var(--brass-dim)' : 'transparent',
-                  color: todayWellness.sleep===opt ? 'var(--brass)' : 'var(--muted)'
-                }}>{opt}</button>
-              ))}
-            </div>
-            <div style={{fontWeight:600,fontSize:'.85rem',color:'var(--ink)',marginBottom:8}}>Sleep quality</div>
-            <div style={{display:'flex',gap:6,marginBottom:14}}>
-              {['Poor','Fair','Good','Great'].map(q => (
-                <button key={q} onClick={() => logWellness('sleepQuality', q)} style={{
-                  flex:1,padding:'8px 4px',borderRadius:'var(--radius-sm)',border:'1.5px solid',cursor:'pointer',
-                  fontSize:'.78rem',fontWeight:600,fontFamily:'var(--sans)',textAlign:'center',
-                  borderColor: todayWellness.sleepQuality===q ? 'var(--brass)' : 'var(--border2)',
-                  background: todayWellness.sleepQuality===q ? 'var(--brass-dim)' : 'transparent',
-                  color: todayWellness.sleepQuality===q ? 'var(--brass)' : 'var(--muted)'
-                }}>{q}</button>
-              ))}
-            </div>
-          </section>
-
-          <section className="card">
-            <p className="eyebrow">Sleep Tips</p>
-            <h3 style={{margin:'4px 0 12px'}}>Better sleep starts here</h3>
-            {['Keep a consistent sleep/wake time even on weekends','Avoid screens 30-60 min before bed','Keep your room cool, dark, and quiet','Avoid caffeine after 2pm','Wind down with a routine — prayer, reading, stretching','Limit alcohol — it fragments sleep in the second half of the night'].map((tip,i) => (
-              <div key={i} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
-                <div style={{width:20,height:20,borderRadius:'50%',background:'var(--brass-dim)',color:'var(--brass)',display:'grid',placeItems:'center',fontSize:'.68rem',fontWeight:700,flexShrink:0}}>{i+1}</div>
-                <div style={{fontSize:'.85rem',color:'var(--ink2)',lineHeight:1.5}}>{tip}</div>
-              </div>
-            ))}
-          </section>
-        </div>
-      )}
-
       {/* ── Journal ──────────────────────────────────────────────── */}
       {tab === 'journal' && (
         <div>
@@ -2706,8 +2579,290 @@ function WellnessPage() {
         </section>
       )}
     </div>
+
+      {tab === 'meds' && (
+        <>
+          <section className="card">
+            <p className="eyebrow">Today's Medications</p>
+            <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {TODAY}</h3>
+            {meds.map((med, i) => {
+              const taken = todayMeds.includes(med.name)
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--surface)' }}>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '.9rem', color: taken ? 'var(--muted)' : 'var(--text)', textDecoration: taken ? 'line-through' : 'none' }}>{med.name}</div>
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{med.dose} · {med.time} · {med.type}</div>
+                  </div>
+                  <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== med.name) : [...todayMeds, med.name] })}
+                    style={{ padding: '6px 14px', borderRadius: 999, border: '1.5px solid', cursor: 'pointer', fontSize: '.82rem', fontWeight: 700, fontFamily: 'inherit',
+                      borderColor: taken ? 'var(--success)' : 'var(--teal)',
+                      background: taken ? 'rgba(34,197,94,.1)' : 'var(--teal)',
+                      color: taken ? 'var(--success)' : 'var(--navy)' }}>
+                    {taken ? '✓ Taken' : 'Take'}
+                  </button>
+                </div>
+              )
+            })}
+            {meds.length === 0 && <p className="muted" style={{ fontSize: '.85rem' }}>No medications added yet.</p>}
+          </section>
+          <section className="card">
+            <p className="eyebrow">Medication Summary</p>
+            <h3 style={{ margin: '4px 0 12px' }}>Add Medication / Supplement</h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {[['Name', 'medName', 'text', 'e.g. Vitamin D, Metformin'], ['Dose', 'medDose', 'text', 'e.g. 500mg'], ['Time', 'medTime', 'text', 'e.g. Morning, With food']].map(([lbl, key, type, ph]) => (
+                <input key={key} type={type} placeholder={`${lbl} — ${ph}`} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                  style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            {meds.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                {meds.map((med, i) => (
+                  <div key={i} className="metric-row card-row">
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: '.88rem' }}>{med.name}</span>
+                      <span style={{ fontSize: '.75rem', color: 'var(--muted)', marginLeft: 8 }}>{med.dose} · {med.time}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: '.72rem', padding: '2px 8px', borderRadius: 999, background: 'var(--teal-dim)', color: 'var(--teal)' }}>{med.type}</span>
+                      <button onClick={() => saveMeds(meds.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
+
+      {tab === 'sleep' && (
+        <section className="card">
+          <p className="eyebrow">Sleep Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Sleep Log</h3>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Bedtime <input type="time" value={form.sleepBed || ''} onChange={e => setForm(p => ({ ...p, sleepBed: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
+              </label>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Wake time <input type="time" value={form.sleepWake || ''} onChange={e => setForm(p => ({ ...p, sleepWake: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Quality (1-10)
+                <input type="range" min={1} max={10} value={form.sleepQ || 5} onChange={e => setForm(p => ({ ...p, sleepQ: Number(e.target.value) }))}
+                  style={{ accentColor: 'var(--teal)' }} />
+              </label>
+              <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--teal)', minWidth: 24 }}>{form.sleepQ || 5}</span>
+            </div>
+            <input placeholder="Notes (dreams, woke up, restless...)" value={form.sleepNote || ''} onChange={e => setForm(p => ({ ...p, sleepNote: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" onClick={() => {
+              const entry = { date: TODAY, bed: form.sleepBed, wake: form.sleepWake, quality: form.sleepQ || 5, notes: form.sleepNote }
+              saveSleep([entry, ...sleep].slice(0, 30))
+              setForm(p => ({ ...p, sleepBed: '', sleepWake: '', sleepQ: 5, sleepNote: '' }))
+            }}>Log Sleep</button>
+          </div>
+          {sleep.slice(0, 7).map((entry, i) => (
+            <div key={i} className="metric-row card-row">
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{entry.bed} → {entry.wake}{entry.notes ? ' · ' + entry.notes : ''}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: entry.quality >= 7 ? 'rgba(34,197,94,.15)' : entry.quality >= 5 ? 'rgba(240,180,41,.15)' : 'rgba(232,85,85,.15)', display: 'grid', placeItems: 'center' }}>
+                  <span style={{ fontSize: '.82rem', fontWeight: 700, color: entry.quality >= 7 ? 'var(--success)' : entry.quality >= 5 ? 'var(--warning)' : 'var(--danger)' }}>{entry.quality}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === 'anxiety' && (
+        <section className="card">
+          <p className="eyebrow">Anxiety Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Daily Check-In</h3>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)', marginBottom: 10 }}>How's your anxiety right now? (1 = calm, 10 = severe)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ANXIETY_LEVELS.map(n => (
+                <button key={n} onClick={() => setForm(p => ({ ...p, anxLevel: n }))}
+                  style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid', cursor: 'pointer', fontWeight: 700, fontSize: '.88rem', fontFamily: 'inherit',
+                    borderColor: form.anxLevel === n ? anxietyColor(n) : 'var(--border2)',
+                    background: form.anxLevel === n ? anxietyColor(n) + '18' : 'var(--surface)',
+                    color: form.anxLevel === n ? anxietyColor(n) : 'var(--text2)' }}>{n}</button>
+              ))}
+            </div>
+          </div>
+          <input placeholder="Triggers or notes..." value={form.anxNote || ''} onChange={e => setForm(p => ({ ...p, anxNote: e.target.value }))}
+            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem', marginBottom: 10 }} />
+          <button className="primary-btn" style={{ width: '100%' }} onClick={() => {
+            if (!form.anxLevel) return
+            saveAnxiety([{ date: TODAY, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), level: form.anxLevel, notes: form.anxNote }, ...anxiety].slice(0, 60))
+            setForm(p => ({ ...p, anxLevel: null, anxNote: '' }))
+          }}>Log Entry</button>
+          <div style={{ marginTop: 14 }}>
+            {anxiety.slice(0, 7).map((entry, i) => (
+              <div key={i} className="metric-row card-row">
+                <div>
+                  <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{entry.date} · {entry.time}</div>
+                  {entry.notes && <div style={{ fontSize: '.8rem', color: 'var(--text2)' }}>{entry.notes}</div>}
+                </div>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'grid', placeItems: 'center', background: anxietyColor(entry.level) + '18', flexShrink: 0 }}>
+                  <span style={{ fontWeight: 700, color: anxietyColor(entry.level) }}>{entry.level}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {tab === 'migraines' && (
+        <section className="card">
+          <p className="eyebrow">Migraine & Headache Tracker</p>
+          <h3 style={{ margin: '4px 0 12px' }}>Log an Episode</h3>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Type
+                <select value={form.migType || 'Headache'} onChange={e => setForm(p => ({ ...p, migType: e.target.value }))}
+                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
+                  <option>Headache</option><option>Migraine</option><option>Cluster</option><option>Tension</option>
+                </select>
+              </label>
+              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
+                Pain (1-10)
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="range" min={1} max={10} value={form.migPain || 5} onChange={e => setForm(p => ({ ...p, migPain: Number(e.target.value) }))}
+                    style={{ flex: 1, accentColor: 'var(--danger)' }} />
+                  <span style={{ fontWeight: 700, color: 'var(--danger)', minWidth: 16 }}>{form.migPain || 5}</span>
+                </div>
+              </label>
+            </div>
+            <input placeholder="Duration (e.g. 2 hours, all day)" value={form.migDur || ''} onChange={e => setForm(p => ({ ...p, migDur: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Triggers (stress, sleep, food, weather...)" value={form.migTrig || ''} onChange={e => setForm(p => ({ ...p, migTrig: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <input placeholder="Medication taken" value={form.migMed || ''} onChange={e => setForm(p => ({ ...p, migMed: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <button className="primary-btn" onClick={() => {
+              saveMigraines([{ date: TODAY, type: form.migType || 'Headache', pain: form.migPain || 5, duration: form.migDur, triggers: form.migTrig, medication: form.migMed }, ...migraines].slice(0, 60))
+              setForm(p => ({ ...p, migType: 'Headache', migPain: 5, migDur: '', migTrig: '', migMed: '' }))
+            }}>Log Episode</button>
+          </div>
+          <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: 8 }}>Last 30 days: {migraines.filter(m => m.date >= addDays(TODAY, -30)).length} episodes</div>
+          {migraines.slice(0, 7).map((entry, i) => (
+            <div key={i} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date} · {entry.type}</div>
+                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>
+                  {entry.duration && `${entry.duration} · `}{entry.triggers && `Triggers: ${entry.triggers}`}
+                  {entry.medication && ` · ${entry.medication}`}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(232,85,85,.12)', display: 'grid', placeItems: 'center' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '.82rem' }}>{entry.pain}</span>
+                </div>
+                <button onClick={() => saveMigraines(migraines.filter((_, j) => j !== i))}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {tab === 'coping' && (
+        <section className="card">
+          <p className="eyebrow">Coping Skills</p>
+          <h3 style={{margin:'4px 0 12px'}}>Your Toolkit</h3>
+          {Object.entries(COPING_SKILLS).map(([category, skills]) => (
+            <div key={category} style={{marginBottom:18}}>
+              <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:8}}>{category}</div>
+              <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                {skills.map(skill => (
+                  <span key={skill} style={{
+                    padding:'6px 12px', borderRadius:999,
+                    border:'1.5px solid var(--border2)',
+                    background:'var(--stone)', color:'var(--ink2)',
+                    fontSize:'.78rem', fontWeight:500,
+                    display:'inline-block'
+                  }}>{skill}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:8, padding:'10px 12px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.78rem', color:'var(--text2)', lineHeight:1.6}}>
+            💡 These are tools — use what works for you in the moment.
+          </div>
+        </section>
+      )}
+
+      {tab === 'metrics' && (
+        <div>
+          <section className="card">
+            <p className="eyebrow">Body Metrics</p>
+            <h3 style={{margin:'4px 0 6px'}}>Log Today</h3>
+            <div style={{display:'grid',gap:10,marginBottom:14}}>
+              {[
+                {key:'weight',label:'Weight (lbs)',placeholder:'185'},
+                {key:'bp',label:'Blood Pressure',placeholder:'120/80'},
+                {key:'heartRate',label:'Resting Heart Rate (bpm)',placeholder:'68'},
+                {key:'waist',label:'Waist (inches)',placeholder:'32'},
+              ].map(f => (
+                <div key={f.key}>
+                  <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>{f.label}</label>
+                  <input value={newMetric[f.key]} onChange={e=>setNewMetric(p=>({...p,[f.key]:e.target.value}))}
+                    placeholder={f.placeholder}
+                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
+                </div>
+              ))}
+              <div>
+                <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>Notes</label>
+                <input value={newMetric.notes} onChange={e=>setNewMetric(p=>({...p,notes:e.target.value}))}
+                  placeholder="How I feel, context..."
+                  style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
+              </div>
+              <button className="primary-btn" onClick={() => {
+                const hasData = newMetric.weight || newMetric.bp || newMetric.heartRate || newMetric.waist
+                if (!hasData) return
+                const entry = { ...newMetric, date: TODAY, id: Date.now() }
+                saveMetrics([entry, ...metricsLog])
+                setNewMetric({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
+              }}>Log Entry</button>
+            </div>
+          </section>
+          {metricsLog.length > 0 && (
+            <section className="card">
+              <p className="eyebrow">History</p>
+              <h3 style={{margin:'4px 0 12px'}}>Recent Entries</h3>
+              {metricsLog.slice(0,10).map(entry => (
+                <div key={entry.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                    <div style={{fontSize:'.75rem',fontWeight:700,color:'var(--brass)'}}>{entry.date}</div>
+                    <button onClick={()=>saveMetrics(metricsLog.filter(m=>m.id!==entry.id))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
+                  </div>
+                  <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:'.82rem',color:'var(--ink2)'}}>
+                    {entry.weight && <span>⚖ {entry.weight} lbs</span>}
+                    {entry.bp && <span>💓 {entry.bp}</span>}
+                    {entry.heartRate && <span>❤ {entry.heartRate} bpm</span>}
+                    {entry.waist && <span>📏 {entry.waist}"</span>}
+                  </div>
+                  {entry.notes && <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:4,fontStyle:'italic'}}>{entry.notes}</div>}
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+      )}
+
+    </div>
+    </div>
   )
 }
+
+
 
 
 function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
@@ -3039,10 +3194,9 @@ function LifestylePage() {
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
 
   const TABS = [
-    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' }, { id: 'trips', label: '✈ Trips' }, { id: 'birthdays', label: '🎂 Birthdays' },
-    { id: 'birthdays', label: '🎂 Birthdays' }, { id: 'keydates', label: '📅 Key Dates' },
+    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' },
+    { id: 'trips', label: '✈ Trips' }, { id: 'birthdays', label: '🎂 Birthdays' },
     { id: 'contacts', label: '👥 Contacts' }, { id: 'passwords', label: '🔑 Passwords' },
-    { id: 'trips', label: '✈️ Trips' },
   ]
 
   const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
@@ -3106,27 +3260,6 @@ function LifestylePage() {
             <button className="ghost-btn" style={{ marginTop: 10, fontSize: '.82rem' }}
               onClick={() => save('groceries', setGroceries, groceries.filter(g => !g.done))}>Clear Checked</button>
           )}
-        </section>
-      )}
-
-      {tab === 'keydates' && (
-        <section className="card">
-          <p className="eyebrow">Key Dates</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Important Dates</h3>
-          <SimpleList items={keyDates} onDelete={i => save('keyDates', setKeyDates, keyDates.filter((_, j) => j !== i))}
-            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.label}</div><div style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.date} · {item.category}</div></>)} />
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            <input placeholder="Label (Anniversary, Renewal...)" value={form.kdLabel || ''} onChange={e => setForm(p => ({ ...p, kdLabel: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input type="date" value={form.kdDate || ''} onChange={e => setForm(p => ({ ...p, kdDate: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <input placeholder="Category" value={form.kdCat || ''} onChange={e => setForm(p => ({ ...p, kdCat: e.target.value }))}
-                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
-                onClick={() => { if (!form.kdLabel) return; save('keyDates', setKeyDates, [...keyDates, { label: form.kdLabel, date: form.kdDate, category: form.kdCat }]); setForm(p => ({ ...p, kdLabel: '', kdDate: '', kdCat: '' })) }}>Add</button>
-            </div>
-          </div>
         </section>
       )}
 
@@ -3277,362 +3410,6 @@ function LifestylePage() {
 }
 
 // ── HEALTH PAGE ───────────────────────────────────────────────────────────
-function HealthPage() {
-  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.h.' + k); return v ? JSON.parse(v) : d } catch { return d } }
-  const lsSet = (k, v) => { try { localStorage.setItem('planner.h.' + k, JSON.stringify(v)) } catch {} }
-
-  const [tab, setTab] = useState('meds')
-  const [metricsLog, setMetricsLog] = useState(() => { try { const v = localStorage.getItem('planner.h.metrics'); return v ? JSON.parse(v) : [] } catch { return [] } })
-  const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
-  const saveMetrics = (m) => { setMetricsLog(m); try { localStorage.setItem('planner.h.metrics', JSON.stringify(m)) } catch {} }
-  const [meds, setMeds] = useState(() => lsGet('meds', []))
-  const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
-  const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
-  const [migraines, setMigraines] = useState(() => lsGet('migraines', []))
-  const [sleep, setSleep] = useState(() => lsGet('sleep', []))
-  const [form, setForm] = useState({})
-
-  const saveMeds = (m) => { setMeds(m); lsSet('meds', m) }
-  const saveMedLog = (l) => { setMedLog(l); lsSet('medLog', l) }
-  const saveAnxiety = (a) => { setAnxiety(a); lsSet('anxiety', a) }
-  const saveMigraines = (m) => { setMigraines(m); lsSet('migraines', m) }
-  const saveSleep = (s) => { setSleep(s); lsSet('sleep', s) }
-
-  const todayMedKey = TODAY
-  const todayMeds = medLog[todayMedKey] || []
-
-  const TABS = [
-    { id: 'meds', label: '💊 Medications' }, { id: 'metrics', label: '📈 Body Metrics' },
-    { id: 'anxiety', label: '🧘 Anxiety' }, { id: 'migraines', label: '🤕 Migraines' },
-    { id: 'coping', label: '🛡 Coping Skills' },
-  ]
-
-  const COPING_SKILLS = {
-    'Distractions': [
-      'Clean or organize your environment','Dance','Doodle on paper','Draw','Garden',
-      'Go for a drive','Go for a walk','Go shopping','Hug a stuffed animal',
-      'Listen to music','Paint','Photography','Play a game','Play an instrument',
-      'Put a puzzle together','Read','Sing','Take a break','Take a shower or a bath',
-      'Watch funny videos','Watch a movie','Write'
-    ],
-    'Cognitive Coping': [
-      'Act opposite of negative feelings','Brainstorm solutions','Make a gratitude list',
-      'Read an inspirational quote','Reward yourself when successful','Slowly count to ten',
-      'Take a class','Think about someone you love','Think of something funny',
-      'Use positive self-talk','Visualize your favorite place','Write a list of goals',
-      'Write a list of pros and cons','Write a list of strengths','Write a positive note'
-    ],
-    'Tension Releasers': [
-      'Chew gum','Cry','Exercise or play sports','Laugh','Stretch','Use a stress ball'
-    ]
-  }
-
-  const ANXIETY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  const anxietyColor = (n) => n <= 3 ? 'var(--success)' : n <= 6 ? 'var(--warning)' : 'var(--danger)'
-
-  return (
-    <div className="screen-stack">
-      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
-        <span style={{fontSize:"1.1rem"}}>💊</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Health</p>
-      </div>
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {TABS.map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
-        ))}
-      </div>
-
-      {tab === 'meds' && (
-        <>
-          <section className="card">
-            <p className="eyebrow">Today's Medications</p>
-            <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {TODAY}</h3>
-            {meds.map((med, i) => {
-              const taken = todayMeds.includes(med.name)
-              return (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--surface)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '.9rem', color: taken ? 'var(--muted)' : 'var(--text)', textDecoration: taken ? 'line-through' : 'none' }}>{med.name}</div>
-                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{med.dose} · {med.time} · {med.type}</div>
-                  </div>
-                  <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== med.name) : [...todayMeds, med.name] })}
-                    style={{ padding: '6px 14px', borderRadius: 999, border: '1.5px solid', cursor: 'pointer', fontSize: '.82rem', fontWeight: 700, fontFamily: 'inherit',
-                      borderColor: taken ? 'var(--success)' : 'var(--teal)',
-                      background: taken ? 'rgba(34,197,94,.1)' : 'var(--teal)',
-                      color: taken ? 'var(--success)' : 'var(--navy)' }}>
-                    {taken ? '✓ Taken' : 'Take'}
-                  </button>
-                </div>
-              )
-            })}
-            {meds.length === 0 && <p className="muted" style={{ fontSize: '.85rem' }}>No medications added yet.</p>}
-          </section>
-          <section className="card">
-            <p className="eyebrow">Medication Summary</p>
-            <h3 style={{ margin: '4px 0 12px' }}>Add Medication / Supplement</h3>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {[['Name', 'medName', 'text', 'e.g. Vitamin D, Metformin'], ['Dose', 'medDose', 'text', 'e.g. 500mg'], ['Time', 'medTime', 'text', 'e.g. Morning, With food']].map(([lbl, key, type, ph]) => (
-                <input key={key} type={type} placeholder={`${lbl} — ${ph}`} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                  style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-              ))}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select value={form.medType || 'Medication'} onChange={e => setForm(p => ({ ...p, medType: e.target.value }))}
-                  style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
-                  <option>Medication</option><option>Supplement</option><option>Vitamin</option><option>Probiotic</option>
-                </select>
-                <button className="primary-btn" style={{ padding: '9px 16px', fontSize: '.85rem' }}
-                  onClick={() => { if (!form.medName) return; saveMeds([...meds, { name: form.medName, dose: form.medDose, time: form.medTime, type: form.medType || 'Medication' }]); setForm(p => ({ ...p, medName: '', medDose: '', medTime: '' })) }}>Add</button>
-              </div>
-            </div>
-            {meds.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                {meds.map((med, i) => (
-                  <div key={i} className="metric-row card-row">
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: '.88rem' }}>{med.name}</span>
-                      <span style={{ fontSize: '.75rem', color: 'var(--muted)', marginLeft: 8 }}>{med.dose} · {med.time}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: '.72rem', padding: '2px 8px', borderRadius: 999, background: 'var(--teal-dim)', color: 'var(--teal)' }}>{med.type}</span>
-                      <button onClick={() => saveMeds(meds.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
-      )}
-
-      {tab === 'sleep' && (
-        <section className="card">
-          <p className="eyebrow">Sleep Tracker</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Sleep Log</h3>
-          <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
-                Bedtime <input type="time" value={form.sleepBed || ''} onChange={e => setForm(p => ({ ...p, sleepBed: e.target.value }))}
-                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
-              </label>
-              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
-                Wake time <input type="time" value={form.sleepWake || ''} onChange={e => setForm(p => ({ ...p, sleepWake: e.target.value }))}
-                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)' }} />
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
-                Quality (1-10)
-                <input type="range" min={1} max={10} value={form.sleepQ || 5} onChange={e => setForm(p => ({ ...p, sleepQ: Number(e.target.value) }))}
-                  style={{ accentColor: 'var(--teal)' }} />
-              </label>
-              <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--teal)', minWidth: 24 }}>{form.sleepQ || 5}</span>
-            </div>
-            <input placeholder="Notes (dreams, woke up, restless...)" value={form.sleepNote || ''} onChange={e => setForm(p => ({ ...p, sleepNote: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" onClick={() => {
-              const entry = { date: TODAY, bed: form.sleepBed, wake: form.sleepWake, quality: form.sleepQ || 5, notes: form.sleepNote }
-              saveSleep([entry, ...sleep].slice(0, 30))
-              setForm(p => ({ ...p, sleepBed: '', sleepWake: '', sleepQ: 5, sleepNote: '' }))
-            }}>Log Sleep</button>
-          </div>
-          {sleep.slice(0, 7).map((entry, i) => (
-            <div key={i} className="metric-row card-row">
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{entry.bed} → {entry.wake}{entry.notes ? ' · ' + entry.notes : ''}</div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: entry.quality >= 7 ? 'rgba(34,197,94,.15)' : entry.quality >= 5 ? 'rgba(240,180,41,.15)' : 'rgba(232,85,85,.15)', display: 'grid', placeItems: 'center' }}>
-                  <span style={{ fontSize: '.82rem', fontWeight: 700, color: entry.quality >= 7 ? 'var(--success)' : entry.quality >= 5 ? 'var(--warning)' : 'var(--danger)' }}>{entry.quality}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {tab === 'anxiety' && (
-        <section className="card">
-          <p className="eyebrow">Anxiety Tracker</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Daily Check-In</h3>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: '.85rem', fontWeight: 600, color: 'var(--text2)', marginBottom: 10 }}>How's your anxiety right now? (1 = calm, 10 = severe)</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {ANXIETY_LEVELS.map(n => (
-                <button key={n} onClick={() => setForm(p => ({ ...p, anxLevel: n }))}
-                  style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid', cursor: 'pointer', fontWeight: 700, fontSize: '.88rem', fontFamily: 'inherit',
-                    borderColor: form.anxLevel === n ? anxietyColor(n) : 'var(--border2)',
-                    background: form.anxLevel === n ? anxietyColor(n) + '18' : 'var(--surface)',
-                    color: form.anxLevel === n ? anxietyColor(n) : 'var(--text2)' }}>{n}</button>
-              ))}
-            </div>
-          </div>
-          <input placeholder="Triggers or notes..." value={form.anxNote || ''} onChange={e => setForm(p => ({ ...p, anxNote: e.target.value }))}
-            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem', marginBottom: 10 }} />
-          <button className="primary-btn" style={{ width: '100%' }} onClick={() => {
-            if (!form.anxLevel) return
-            saveAnxiety([{ date: TODAY, time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), level: form.anxLevel, notes: form.anxNote }, ...anxiety].slice(0, 60))
-            setForm(p => ({ ...p, anxLevel: null, anxNote: '' }))
-          }}>Log Entry</button>
-          <div style={{ marginTop: 14 }}>
-            {anxiety.slice(0, 7).map((entry, i) => (
-              <div key={i} className="metric-row card-row">
-                <div>
-                  <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>{entry.date} · {entry.time}</div>
-                  {entry.notes && <div style={{ fontSize: '.8rem', color: 'var(--text2)' }}>{entry.notes}</div>}
-                </div>
-                <div style={{ width: 36, height: 36, borderRadius: '50%', display: 'grid', placeItems: 'center', background: anxietyColor(entry.level) + '18', flexShrink: 0 }}>
-                  <span style={{ fontWeight: 700, color: anxietyColor(entry.level) }}>{entry.level}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {tab === 'migraines' && (
-        <section className="card">
-          <p className="eyebrow">Migraine & Headache Tracker</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Log an Episode</h3>
-          <div style={{ display: 'grid', gap: 8, marginBottom: 12 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
-                Type
-                <select value={form.migType || 'Headache'} onChange={e => setForm(p => ({ ...p, migType: e.target.value }))}
-                  style={{ padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }}>
-                  <option>Headache</option><option>Migraine</option><option>Cluster</option><option>Tension</option>
-                </select>
-              </label>
-              <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
-                Pain (1-10)
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="range" min={1} max={10} value={form.migPain || 5} onChange={e => setForm(p => ({ ...p, migPain: Number(e.target.value) }))}
-                    style={{ flex: 1, accentColor: 'var(--danger)' }} />
-                  <span style={{ fontWeight: 700, color: 'var(--danger)', minWidth: 16 }}>{form.migPain || 5}</span>
-                </div>
-              </label>
-            </div>
-            <input placeholder="Duration (e.g. 2 hours, all day)" value={form.migDur || ''} onChange={e => setForm(p => ({ ...p, migDur: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Triggers (stress, sleep, food, weather...)" value={form.migTrig || ''} onChange={e => setForm(p => ({ ...p, migTrig: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Medication taken" value={form.migMed || ''} onChange={e => setForm(p => ({ ...p, migMed: e.target.value }))}
-              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" onClick={() => {
-              saveMigraines([{ date: TODAY, type: form.migType || 'Headache', pain: form.migPain || 5, duration: form.migDur, triggers: form.migTrig, medication: form.migMed }, ...migraines].slice(0, 60))
-              setForm(p => ({ ...p, migType: 'Headache', migPain: 5, migDur: '', migTrig: '', migMed: '' }))
-            }}>Log Episode</button>
-          </div>
-          <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginBottom: 8 }}>Last 30 days: {migraines.filter(m => m.date >= addDays(TODAY, -30)).length} episodes</div>
-          {migraines.slice(0, 7).map((entry, i) => (
-            <div key={i} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date} · {entry.type}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>
-                  {entry.duration && `${entry.duration} · `}{entry.triggers && `Triggers: ${entry.triggers}`}
-                  {entry.medication && ` · ${entry.medication}`}
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(232,85,85,.12)', display: 'grid', placeItems: 'center' }}>
-                  <span style={{ fontWeight: 700, color: 'var(--danger)', fontSize: '.82rem' }}>{entry.pain}</span>
-                </div>
-                <button onClick={() => saveMigraines(migraines.filter((_, j) => j !== i))}
-                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {tab === 'coping' && (
-        <section className="card">
-          <p className="eyebrow">Coping Skills</p>
-          <h3 style={{margin:'4px 0 12px'}}>Your Toolkit</h3>
-          {Object.entries(COPING_SKILLS).map(([category, skills]) => (
-            <div key={category} style={{marginBottom:18}}>
-              <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:8}}>{category}</div>
-              <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-                {skills.map(skill => (
-                  <span key={skill} style={{
-                    padding:'6px 12px', borderRadius:999,
-                    border:'1.5px solid var(--border2)',
-                    background:'var(--stone)', color:'var(--ink2)',
-                    fontSize:'.78rem', fontWeight:500,
-                    display:'inline-block'
-                  }}>{skill}</span>
-                ))}
-              </div>
-            </div>
-          ))}
-          <div style={{marginTop:8, padding:'10px 12px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.78rem', color:'var(--text2)', lineHeight:1.6}}>
-            💡 These are tools — use what works for you in the moment.
-          </div>
-        </section>
-      )}
-
-      {tab === 'metrics' && (
-        <div>
-          <section className="card">
-            <p className="eyebrow">Body Metrics</p>
-            <h3 style={{margin:'4px 0 6px'}}>Log Today</h3>
-            <div style={{display:'grid',gap:10,marginBottom:14}}>
-              {[
-                {key:'weight',label:'Weight (lbs)',placeholder:'185'},
-                {key:'bp',label:'Blood Pressure',placeholder:'120/80'},
-                {key:'heartRate',label:'Resting Heart Rate (bpm)',placeholder:'68'},
-                {key:'waist',label:'Waist (inches)',placeholder:'32'},
-              ].map(f => (
-                <div key={f.key}>
-                  <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>{f.label}</label>
-                  <input value={newMetric[f.key]} onChange={e=>setNewMetric(p=>({...p,[f.key]:e.target.value}))}
-                    placeholder={f.placeholder}
-                    style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
-                </div>
-              ))}
-              <div>
-                <label style={{fontSize:'.8rem',fontWeight:600,color:'var(--text2)',marginBottom:4,display:'block'}}>Notes</label>
-                <input value={newMetric.notes} onChange={e=>setNewMetric(p=>({...p,notes:e.target.value}))}
-                  placeholder="How I feel, context..."
-                  style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}} />
-              </div>
-              <button className="primary-btn" onClick={() => {
-                const hasData = newMetric.weight || newMetric.bp || newMetric.heartRate || newMetric.waist
-                if (!hasData) return
-                const entry = { ...newMetric, date: TODAY, id: Date.now() }
-                saveMetrics([entry, ...metricsLog])
-                setNewMetric({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
-              }}>Log Entry</button>
-            </div>
-          </section>
-          {metricsLog.length > 0 && (
-            <section className="card">
-              <p className="eyebrow">History</p>
-              <h3 style={{margin:'4px 0 12px'}}>Recent Entries</h3>
-              {metricsLog.slice(0,10).map(entry => (
-                <div key={entry.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                    <div style={{fontSize:'.75rem',fontWeight:700,color:'var(--brass)'}}>{entry.date}</div>
-                    <button onClick={()=>saveMetrics(metricsLog.filter(m=>m.id!==entry.id))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
-                  </div>
-                  <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:'.82rem',color:'var(--ink2)'}}>
-                    {entry.weight && <span>⚖ {entry.weight} lbs</span>}
-                    {entry.bp && <span>💓 {entry.bp}</span>}
-                    {entry.heartRate && <span>❤ {entry.heartRate} bpm</span>}
-                    {entry.waist && <span>📏 {entry.waist}"</span>}
-                  </div>
-                  {entry.notes && <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:4,fontStyle:'italic'}}>{entry.notes}</div>}
-                </div>
-              ))}
-            </section>
-          )}
-        </div>
-      )}
-
-    </div>
-  )
-}
 
 function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuickCreate }) {
   const weekStart = startOfWeek(TODAY)
@@ -4303,10 +4080,10 @@ function PlannerApp() {
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} />} />
-          <Route path="/wellness" element={<WellnessPage />} />
+          <Route path="/wellness" element={<HealthWellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
-          <Route path="/health" element={<HealthPage />} />
+          <Route path="/health" element={<HealthWellnessPage />} />
           <Route path="/more" element={<MorePage profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
