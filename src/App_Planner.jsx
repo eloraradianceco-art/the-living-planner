@@ -2511,7 +2511,7 @@ function HealthWellnessPage() {
                 </div>
                 <button onClick={e=>{e.stopPropagation();saveRoutine(routine.filter(r=>r.id!==item.id))}}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-            )
+              </div>
           })}
           <div style={{display:'grid',gap:8,marginTop:12}}>
             <input placeholder="Routine item (e.g. Prayer, Workout, Read)" value={newRoutineItem.label}
