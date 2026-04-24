@@ -2396,7 +2396,7 @@ function HealthWellnessPage() {
               {MOOD_OPTIONS.map(m => (
                 <button key={m.value} onClick={() => logWellness('mood', m.value)} style={{
                   flex:1,padding:'10px 4px',borderRadius:'var(--radius-sm)',border:'2px solid',
-                  cursor:'pointer',textAlign:'center',background:'transparent',fontFamily:'var(--sans)',
+                  cursor:'pointer',textAlign:'center',fontFamily:'var(--sans)',
                   borderColor: todayWellness.mood===m.value ? 'var(--brass)' : 'var(--border2)',
                   background: todayWellness.mood===m.value ? 'var(--brass-dim)' : 'transparent',
                   transition:'all .15s'
