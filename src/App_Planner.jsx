@@ -1529,7 +1529,6 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       </section>
 
     </div>
-    </div>
   )
 }
 
