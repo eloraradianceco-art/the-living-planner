@@ -4120,9 +4120,14 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
           }}>Save This Week's Review</button>
       </section>
 
-on className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('goal', goal)}>Edit</button>
-                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('goal', goal.id)}>✕</button>
-              </div>
+      <section className="card">
+        <p className="eyebrow">Goals</p>
+        <h3 style={{margin:'4px 0 12px'}}>In Progress</h3>
+        {goals.filter(g => !g.completed).slice(0,3).map(goal => (
+          <div key={goal.id} style={{padding:'8px 0', borderBottom:'1px solid var(--stone2)'}}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
+              <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{goal.title}</span>
+              <strong style={{color:'var(--brass)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
             </div>
             <div className="mini-progress"><div style={{ width: `${getGoalProgress(goal.id, tasks, projects)}%` }} /></div>
           </div>
