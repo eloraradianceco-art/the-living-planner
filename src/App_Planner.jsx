@@ -2049,6 +2049,12 @@ function FinancePage({ expenses, budget, setBudget }) {
   const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', { income: 0, bills: [], subscriptions: [] }))
+  const fpWeekStart = startOfWeek(TODAY)
+  const fpWeekEnd = endOfWeek(TODAY)
+  const fpWeekExpenses = (expenses || []).filter(e => e.date >= fpWeekStart && e.date <= fpWeekEnd)
+  const fpWeekSpend = fpWeekExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const fpMonthExpenses = (expenses || []).filter(e => e.date && e.date.slice(0, 7) === TODAY.slice(0, 7))
+  const fpMonthSpend = fpMonthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
   const [newBill, setNewBill] = useState({ label: '', amount: '' })
   const [newSub, setNewSub] = useState({ label: '', amount: '', cycle: 'monthly' })
 
@@ -2094,6 +2100,8 @@ function FinancePage({ expenses, budget, setBudget }) {
               ['Monthly Bills', `$${totalBills.toFixed(2)}`, 'var(--danger)'],
               ['Subscriptions', `$${totalSubs.toFixed(2)}`, 'var(--warning)'],
               ['Other Expenses', `$${monthlyExpenses.toFixed(2)}`, 'var(--teal)'],
+              ['This Week', `$${fpWeekSpend.toFixed(2)}`, 'var(--brass)'],
+              ['This Month', `$${fpMonthSpend.toFixed(2)}`, 'var(--slate)'],
               ['Net', `$${(Number(monthlyBudget.income) - totalBills - totalSubs - monthlyExpenses).toFixed(2)}`, 'var(--navy)'],
             ].map(([label, val, color]) => (
               <div key={label} className="metric-row card-row">
