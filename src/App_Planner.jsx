@@ -3551,7 +3551,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
       {/* Suggestions */}
       <section className="card">
         <p className="eyebrow">Suggestions</p>
-        <h3 style={{margin:'4px 0 10px'}}>30 Powerful Habits</h3>
+        <h3 style={{margin:'4px 0 10px'}}>50 Powerful Habits</h3>
         <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Tap any habit to add it instantly.</p>
         <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
           {SUGGESTED.filter(([t]) => !habits.find(h=>h.title===t)).map(([title,cat]) => (
