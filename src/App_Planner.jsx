@@ -5530,12 +5530,12 @@ function PlannerApp() {
 
   // Check notification schedule on load
   useEffect(() => {
-    if (data.tasks && data.habits) {
+    if (tasks?.length || habits?.length) {
       setTimeout(() => {
-        PushManager.scheduleCheck(data.tasks || [], data.habits || [], data.goals || [], data.settings || {})
+        PushManager.scheduleCheck(tasks || [], habits || [], goals || [], settings || {})
       }, 2000)
     }
-  }, [data.tasks?.length, data.habits?.length])
+  }, [tasks?.length, habits?.length])
 
 
   return (
