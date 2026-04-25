@@ -3676,10 +3676,10 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
               <span style={{color:'var(--muted)'}}>{linkedTasks.length} linked task{linkedTasks.length!==1?'s':''}</span>
               <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
       
-      <section className="card" style={{background:'var(--ink)',border:'none'}}>
-        <p className="eyebrow" style={{color:'var(--brass)'}}>Vision & Affirmations</p>
-        <h3 style={{color:'var(--warm-white)',margin:'4px 0 12px',fontSize:'1.1rem'}}>Speak it before you see it</h3>
-        {visionItems.length === 0 && <p style={{color:'rgba(255,255,255,.45)',fontSize:'.85rem',marginBottom:10}}>Add affirmations or vision statements. Read them daily.</p>}
+      <section className="card" style={{background:'var(--ink)',border:'none',padding:'14px 16px'}}>
+        <p className="eyebrow" style={{color:'var(--brass)',fontSize:'.6rem'}}>Vision & Affirmations</p>
+        <h3 style={{color:'var(--warm-white)',margin:'2px 0 8px',fontSize:'.95rem'}}>Speak it before you see it</h3>
+        {visionItems.length === 0 && <p style={{color:'rgba(255,255,255,.45)',fontSize:'.8rem',marginBottom:8}}>Add affirmations or vision statements. Read them daily.</p>}
         {visionItems.map((item,i) => (
           <div key={i} style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'flex-start',gap:10}}>
             <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0,marginTop:2}}>✦</span>
@@ -3687,7 +3687,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
             <button onClick={()=>saveVision(visionItems.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',cursor:'pointer',flexShrink:0}}>✕</button>
           </div>
         ))}
-        <div style={{display:'flex',gap:8,marginTop:12}}>
+        <div style={{display:'flex',gap:8,marginTop:8}}>
           <input value={newVision} onChange={e=>setNewVision(e.target.value)}
             placeholder="I am... I have... I will..."
             style={{flex:1,padding:'10px 12px',border:'1px solid rgba(184,150,90,.3)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'rgba(255,255,255,.06)',color:'white',fontFamily:'var(--serif)'}} />
