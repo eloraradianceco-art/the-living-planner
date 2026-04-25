@@ -306,48 +306,17 @@ const defaultData = {
   expenses: [],
   notes: [],
   events: [],
-    habits: [
-    { id: 1, title: 'Wake up earlier', category: 'Health' },
-    { id: 2, title: 'Meditate daily', category: 'Wellness' },
-    { id: 3, title: 'Drink more water', category: 'Health' },
-    { id: 4, title: 'Stay active', category: 'Health' },
-    { id: 5, title: 'Practice gratitude', category: 'Wellness' },
-    { id: 6, title: 'Eat mindfully', category: 'Health' },
-    { id: 7, title: 'Cook your own meals', category: 'Health' },
-    { id: 8, title: 'Make gut health a priority', category: 'Health' },
-    { id: 9, title: 'Protect your skin', category: 'Health' },
-    { id: 10, title: 'Invest in yourself', category: 'Productivity' },
-    { id: 11, title: 'Track your goals', category: 'Productivity' },
-    { id: 12, title: 'Do hardest tasks first', category: 'Productivity' },
-    { id: 13, title: 'Hold yourself accountable', category: 'Productivity' },
-    { id: 14, title: 'Take action', category: 'Productivity' },
-    { id: 15, title: 'Create more things', category: 'Productivity' },
-    { id: 16, title: 'Deepen your relationships', category: 'Lifestyle' },
-    { id: 17, title: 'Choose the right friends', category: 'Lifestyle' },
-    { id: 18, title: 'Spend more time in nature', category: 'Lifestyle' },
-    { id: 19, title: 'Embrace the small things', category: 'Lifestyle' },
-    { id: 20, title: 'Invest in experiences', category: 'Lifestyle' },
-    { id: 21, title: 'Stay inspired', category: 'Wellness' },
-    { id: 22, title: 'Have mental reset days', category: 'Wellness' },
-    { id: 23, title: 'Ditch the scarcity mindset', category: 'Wellness' },
-    { id: 24, title: 'Know yourself better', category: 'Wellness' },
-    { id: 25, title: 'Challenge your views', category: 'Wellness' },
-    { id: 26, title: 'Be OK with saying no', category: 'Wellness' },
-    { id: 27, title: 'Diversify your income streams', category: 'Finances' },
-    { id: 28, title: 'Shop smarter', category: 'Finances' },
-    { id: 29, title: 'Go green', category: 'Lifestyle' },
-    { id: 30, title: 'Test your limits', category: 'Health' },
-  ],
+  habits: [],
   habitLogs: [],
-  budget: { weeklyTarget: 350 },
+  budget: { weeklyTarget: 200 },
   profile: {
-    displayName: 'Anthony',
+    displayName: '',
     timezone: 'America/Chicago',
     plannerMode: 'Balanced',
   },
   settings: {
     onboardingComplete: false,
-    showCompletedTasks: true,
+    showCompletedTasks: false,
     compactCalendar: false,
   },
 }
@@ -643,7 +612,7 @@ function useResponsive() {
 
 // ── Auth Context ──────────────────────────────────────────────────────────
 const AuthContext = createContext(null)
-const MOCK_EMAIL = 'demo@planner.local'
+const MOCK_EMAIL = ''
 
 function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
