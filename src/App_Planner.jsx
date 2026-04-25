@@ -4550,25 +4550,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
               <span style={{color:'var(--muted)'}}>{linkedTasks.length} linked task{linkedTasks.length!==1?'s':''}</span>
               <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
       
-      <section className="card" style={{background:'var(--ink)',border:'none',padding:'14px 16px'}}>
-        <p className="eyebrow" style={{color:'var(--brass)',fontSize:'.6rem'}}>Vision & Affirmations</p>
-        <h3 style={{color:'var(--warm-white)',margin:'2px 0 8px',fontSize:'.95rem'}}>Speak it before you see it</h3>
-        {visionItems.length === 0 && <p style={{color:'rgba(255,255,255,.45)',fontSize:'.8rem',marginBottom:8}}>Add affirmations or vision statements. Read them daily.</p>}
-        {visionItems.map((item,i) => (
-          <div key={i} style={{padding:'10px 0',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'flex-start',gap:10}}>
-            <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0,marginTop:2}}>✦</span>
-            <div style={{flex:1,fontFamily:'var(--serif)',fontSize:'.95rem',color:'rgba(255,255,255,.85)',lineHeight:1.6,fontStyle:'italic'}}>{item.text}</div>
-            <button onClick={()=>saveVision(visionItems.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'rgba(255,255,255,.3)',cursor:'pointer',flexShrink:0}}>✕</button>
-          </div>
-        ))}
-        <div style={{display:'flex',gap:8,marginTop:8}}>
-          <input value={newVision} onChange={e=>setNewVision(e.target.value)}
-            placeholder="I am... I have... I will..."
-            style={{flex:1,padding:'10px 12px',border:'1px solid rgba(184,150,90,.3)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'rgba(255,255,255,.06)',color:'white',fontFamily:'var(--serif)'}} />
-          <button onClick={()=>{if(!newVision.trim())return;saveVision([...visionItems,{text:newVision.trim(),id:Date.now()}]);setNewVision('')}}
-            style={{padding:'10px 16px',borderRadius:'var(--radius-sm)',border:'none',background:'var(--brass)',color:'var(--ink)',fontWeight:700,cursor:'pointer',fontFamily:'var(--sans)',flexShrink:0}}>Add</button>
-        </div>
-      </section>
+      
 
       </div>
             <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
@@ -4577,6 +4559,38 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
           </section>
         )
       })}
+
+      {/* ── Vision & Affirmations ───────────────────────────────────────── */}
+      <section className="card" style={{background:'var(--ink)',border:'none',padding:'12px 14px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+          <p className="eyebrow" style={{color:'var(--brass)',fontSize:'.6rem',margin:0}}>Vision & Affirmations</p>
+          <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.4)'}}>{visionItems.length} saved</span>
+        </div>
+        {visionItems.length === 0
+          ? <p style={{color:'rgba(255,255,255,.4)',fontSize:'.8rem',margin:'0 0 8px',fontStyle:'italic'}}>Speak it before you see it. Add yours below.</p>
+          : <div style={{maxHeight:140,overflowY:'auto',marginBottom:8}}>
+              {visionItems.map((item,i) => (
+                <div key={i} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
+                  <span style={{color:'var(--brass)',fontSize:'.85rem',flexShrink:0}}>✦</span>
+                  <div style={{flex:1,fontFamily:'var(--serif)',fontSize:'.85rem',color:'rgba(255,255,255,.8)',lineHeight:1.5,fontStyle:'italic'}}>{item.text}</div>
+                  <button onClick={()=>saveVision(visionItems.filter((_,j)=>j!==i))}
+                    style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',cursor:'pointer',flexShrink:0,fontSize:'.85rem'}}>✕</button>
+                </div>
+              ))}
+            </div>
+        }
+        <div style={{display:'flex',gap:6}}>
+          <input value={newVision} onChange={e=>setNewVision(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'&&newVision.trim()){saveVision([...visionItems,{text:newVision.trim(),id:Date.now()}]);setNewVision('')}}}
+            placeholder="I am... I have... I will..."
+            style={{flex:1,padding:'8px 10px',border:'1px solid rgba(184,150,90,.3)',borderRadius:'var(--radius-sm)',
+            fontSize:'.82rem',background:'rgba(255,255,255,.05)',color:'white',fontFamily:'var(--serif)'}} />
+          <button onClick={()=>{if(!newVision.trim())return;saveVision([...visionItems,{text:newVision.trim(),id:Date.now()}]);setNewVision('')}}
+            style={{padding:'8px 12px',borderRadius:'var(--radius-sm)',border:'none',background:'var(--brass)',
+            color:'var(--ink)',fontWeight:700,cursor:'pointer',fontSize:'.82rem',flexShrink:0}}>Add</button>
+        </div>
+      </section>
+
     </div>
   )
 }
@@ -4919,34 +4933,15 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
 
       {/* ── Sync / Data ────────────────────────────────────────────── */}
       <section className="card">
-        <div style={{marginBottom:12}}>
-          <p className="eyebrow">Data & Sync</p>
-          <h3 style={{margin:'4px 0 8px'}}>Cross-Device Sync</h3>
-        </div>
-        <div style={{display:'flex', alignItems:'center', gap:10, padding:'10px 12px', borderRadius:'var(--radius-sm)', background:'var(--surface)', marginBottom:12}}>
-          <div style={{width:10, height:10, borderRadius:'50%', background: hasSupabaseEnv ? 'var(--success)' : 'var(--warning)', flexShrink:0}} />
+        <p className="eyebrow">Data & Sync</p>
+        <h3 style={{margin:'4px 0 14px'}}>Cross-Device Sync</h3>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:'var(--radius-sm)',background:'var(--surface)'}}>
+          <div style={{width:12,height:12,borderRadius:'50%',background:hasSupabaseEnv?'var(--success)':'var(--warning)',flexShrink:0,boxShadow:hasSupabaseEnv?'0 0 8px var(--success)':undefined}} />
           <div>
-            <div style={{fontWeight:600, fontSize:'.88rem', color:'var(--text)'}}>{hasSupabaseEnv ? 'Supabase connected' : 'Demo mode — this device only'}</div>
-            <div style={{fontSize:'.75rem', color:'var(--muted)'}}>{hasSupabaseEnv ? 'Your data syncs across all devices.' : 'Data saves locally. Add Supabase to sync.'}</div>
+            <div style={{fontWeight:600,fontSize:'.9rem'}}>{hasSupabaseEnv ? '✓ Connected — syncing across all devices' : 'Local mode — this device only'}</div>
+            <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{hasSupabaseEnv ? 'Your tasks, goals, habits, and data are saved to the cloud.' : 'Contact support to enable cross-device sync.'}</div>
           </div>
         </div>
-        {!hasSupabaseEnv && (
-          <div style={{fontSize:'.8rem', color:'var(--text2)', lineHeight:1.7}}>
-            <div style={{fontWeight:700, marginBottom:6, color:'var(--text)'}}>To enable sync:</div>
-            <div style={{display:'grid', gap:6}}>
-              {[
-                '1. Create a free project at supabase.com',
-                '2. Copy your Project URL and anon key',
-                '3. In Vercel → Settings → Environment Variables:',
-                '   VITE_SUPABASE_URL = your project URL',
-                '   VITE_SUPABASE_ANON_KEY = your anon key',
-                '4. Redeploy — sync activates automatically'
-              ].map((step, i) => (
-                <div key={i} style={{padding:'6px 10px', background:'var(--surface)', borderRadius:'var(--radius-sm)', fontFamily:'monospace', fontSize:'.78rem', color:'var(--text2)'}}>{step}</div>
-              ))}
-            </div>
-          </div>
-        )}
       </section>
 
       {/* ── Sign out ───────────────────────────────────────────────── */}
@@ -4959,6 +4954,32 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           <button className="danger-btn" style={{fontSize:'.85rem', padding:'8px 16px'}} onClick={signOut}>Sign Out</button>
         </div>
       </section>
+
+      {/* ── Support & Contact ──────────────────────────────────────── */}
+      <section className="card" style={{background:'var(--ink)',border:'none'}}>
+        <p className="eyebrow" style={{color:'var(--brass)'}}>Support</p>
+        <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px'}}>We're here to help</h3>
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          <a href="mailto:support@thelivingplanner.app" style={{
+            display:'flex',alignItems:'center',gap:12,padding:'14px',
+            background:'rgba(255,255,255,.06)',borderRadius:10,
+            border:'1px solid rgba(184,150,90,.2)',textDecoration:'none'
+          }}>
+            <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>✉</div>
+            <div>
+              <div style={{color:'var(--warm-white)',fontWeight:600,fontSize:'.9rem'}}>Email Support</div>
+              <div style={{color:'var(--brass)',fontSize:'.8rem',marginTop:2}}>support@thelivingplanner.app</div>
+              <div style={{color:'rgba(255,255,255,.4)',fontSize:'.72rem',marginTop:2}}>We respond within 24 hours</div>
+            </div>
+          </a>
+          <div style={{padding:'12px 14px',background:'rgba(255,255,255,.04)',borderRadius:10,border:'1px solid rgba(255,255,255,.08)'}}>
+            <div style={{color:'rgba(255,255,255,.5)',fontSize:'.78rem',lineHeight:1.6}}>
+              For bugs, feature requests, billing questions, or anything else — reach out anytime. Built with care by a real person who wants this to work for you.
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   )
 }
