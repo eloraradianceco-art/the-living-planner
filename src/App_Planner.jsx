@@ -1050,7 +1050,7 @@ const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity'
 function Layout({ children, onQuickAdd, banner, profile }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
-  const { isDesktop, isMobile } = useResponsive()
+  const { isDesktop, isMobile, isTablet } = useResponsive()
 
   return (
     <div className="app-shell premium-shell living-planner-shell">
@@ -1073,7 +1073,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
       {banner}
 
-      <div className={isDesktop ? 'app-frame desktop-frame' : 'app-frame'}>
+      <div className={isDesktop ? 'app-frame desktop-frame' : isMobile ? 'app-frame mobile-frame' : 'app-frame tablet-frame'}>
         {isDesktop ? (
           <aside className="side-nav premium-card">
             <div className="side-nav-header">
