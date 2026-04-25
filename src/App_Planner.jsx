@@ -5528,6 +5528,16 @@ function PlannerApp() {
 
   if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 
+  // Check notification schedule on load
+  useEffect(() => {
+    if (data.tasks && data.habits) {
+      setTimeout(() => {
+        PushManager.scheduleCheck(data.tasks || [], data.habits || [], data.goals || [], data.settings || {})
+      }, 2000)
+    }
+  }, [data.tasks?.length, data.habits?.length])
+
+
   return (
     <>
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
@@ -5847,14 +5857,6 @@ function FaithPage() {
             return groups
           }, [])
 
-  // Check notification schedule on load
-  useEffect(() => {
-    if (data.tasks && data.habits && data.goals && data.settings) {
-      setTimeout(() => {
-        PushManager.scheduleCheck(data.tasks, data.habits, data.goals, data.settings)
-      }, 2000) // slight delay to let app settle
-    }
-  }, [data.tasks?.length, data.habits?.length])
 .map(group => (
             <div key={group.date} style={{marginBottom:14}}>
               <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6}}>
