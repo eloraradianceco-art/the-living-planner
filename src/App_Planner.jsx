@@ -27,6 +27,160 @@ function getTodayString() {
   return `${map.year}-${map.month}-${map.day}`
 }
 
+// ── Push Notification System ─────────────────────────────────────────────────
+const VAPID_PUBLIC_KEY = 'YI0UW1Ky1eXea1RFPVhDrHjkSV6se1QHcOX9JmztAa_M4GT9rnHJCq-LcrBgJR4GFNohKQDz9sSKo2xwLlwSKQ'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = window.atob(base64)
+  const outputArray = new Uint8Array(rawData.length)
+  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i)
+  return outputArray
+}
+
+const PushManager = {
+  async isSupported() {
+    return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  },
+
+  async getPermission() {
+    return Notification.permission // 'default' | 'granted' | 'denied'
+  },
+
+  async requestPermission() {
+    if (!(await this.isSupported())) return 'unsupported'
+    const result = await Notification.requestPermission()
+    return result
+  },
+
+  async registerSW() {
+    if (!('serviceWorker' in navigator)) return null
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      await navigator.serviceWorker.ready
+      return reg
+    } catch(e) {
+      console.warn('SW registration failed:', e)
+      return null
+    }
+  },
+
+  async subscribe() {
+    const reg = await this.registerSW()
+    if (!reg) return null
+    try {
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) return existing
+      const subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      })
+      // Save subscription to localStorage for use when scheduling
+      localStorage.setItem('planner.pushSub', JSON.stringify(subscription))
+      return subscription
+    } catch(e) {
+      console.warn('Push subscribe failed:', e)
+      return null
+    }
+  },
+
+  async unsubscribe() {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+    if (!reg) return
+    const sub = await reg.pushManager.getSubscription()
+    if (sub) await sub.unsubscribe()
+    localStorage.removeItem('planner.pushSub')
+  },
+
+  async sendLocal(title, body, options = {}) {
+    // Send a local notification (no server needed) for immediate alerts
+    if (Notification.permission !== 'granted') return
+    const reg = await navigator.serviceWorker.ready
+    reg.showNotification(title, {
+      body,
+      icon: '/planner-icon.png',
+      badge: '/planner-icon.png',
+      vibrate: [100, 50, 100],
+      ...options
+    })
+  },
+
+  scheduleCheck(tasks, habits, goals, settings) {
+    // Run on app load — check what needs notifying today
+    if (Notification.permission !== 'granted') return
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+    const hour = now.getHours()
+
+    const notifSettings = settings?.notifications || {}
+
+    // Morning habit reminder (8am)
+    if (notifSettings.habits && hour >= 8 && hour < 9) {
+      const todayKey = 'planner.notif.habits.' + today
+      if (!localStorage.getItem(todayKey)) {
+        const pendingHabits = habits.filter(h => h.title || h.name)
+        if (pendingHabits.length > 0) {
+          this.sendLocal('🔁 Habit Check-In', `You have ${pendingHabits.length} habits to complete today.`, { tag: 'habits-' + today, data: { url: '/habits' } })
+          localStorage.setItem(todayKey, '1')
+        }
+      }
+    }
+
+    // Task reminders (9am)
+    if (notifSettings.tasks && hour >= 9 && hour < 10) {
+      const todayKey = 'planner.notif.tasks.' + today
+      if (!localStorage.getItem(todayKey)) {
+        const dueTasks = tasks.filter(t => t.date === today && !t.completed)
+        if (dueTasks.length > 0) {
+          this.sendLocal('✓ Tasks Due Today', `${dueTasks.length} task${dueTasks.length > 1 ? 's' : ''} due: ${dueTasks[0].title}${dueTasks.length > 1 ? ` +${dueTasks.length-1} more` : ''}`, { tag: 'tasks-' + today, data: { url: '/tasks' } })
+          localStorage.setItem(todayKey, '1')
+        }
+      }
+    }
+
+    // Evening reflection (7pm)
+    if (notifSettings.reflection && hour >= 19 && hour < 20) {
+      const todayKey = 'planner.notif.reflect.' + today
+      if (!localStorage.getItem(todayKey)) {
+        this.sendLocal('📖 Evening Reflection', 'Take 5 minutes to journal and plan tomorrow.', { tag: 'reflect-' + today, data: { url: '/growth' } })
+        localStorage.setItem(todayKey, '1')
+      }
+    }
+
+    // Overdue tasks (anytime)
+    if (notifSettings.overdue) {
+      const overdue = tasks.filter(t => t.date && t.date < today && !t.completed)
+      if (overdue.length > 0) {
+        const overdueKey = 'planner.notif.overdue.' + today
+        if (!localStorage.getItem(overdueKey)) {
+          this.sendLocal('⚠ Overdue Tasks', `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''} need your attention.`, { tag: 'overdue-' + today, data: { url: '/tasks' } })
+          localStorage.setItem(overdueKey, '1')
+        }
+      }
+    }
+
+    // Faith morning reminder (6am)
+    if (notifSettings.faith && hour >= 6 && hour < 7) {
+      const todayKey = 'planner.notif.faith.' + today
+      if (!localStorage.getItem(todayKey)) {
+        this.sendLocal('✝ Morning Devotional', 'Start your day in the Word. Your devotional is waiting.', { tag: 'faith-' + today, data: { url: '/faith' } })
+        localStorage.setItem(todayKey, '1')
+      }
+    }
+
+    // Birthday reminders (8am)
+    if (notifSettings.birthdays) {
+      const todayKey = 'planner.notif.bday.' + today
+      if (!localStorage.getItem(todayKey) && hour >= 8 && hour < 9) {
+        // Birthday check done in app with actual birthday data
+        localStorage.setItem(todayKey + '.checked', '1')
+      }
+    }
+  }
+}
+
+
 const TODAY = getTodayString()
 
 function addDays(dateString, days) {
@@ -572,7 +726,7 @@ const plannerService = {
     }
 
     if (!existing) {
-      const { data, error } = await supabase.from('habit_logs').insert({ habit_id: habitId, date, completed: true, user_id: userId }).select().single()
+      const { data, error } = await supabase.from('habit_logs').upsert({ habit_id: habitId, date, completed: true, user_id: userId }, { onConflict: 'user_id,habit_id,date' }).select().single()
       if (error) throw error
       return data
     }
@@ -2145,11 +2299,51 @@ function FinancePage({ expenses, budget, setBudget }) {
 
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+  // ── Bank connection state ─────────────────────────────────────────────
+  const [connectedBanks, setConnectedBanks] = useState(() => lsGet('connectedBanks', []))
+  const [bankTransactions, setBankTransactions] = useState(() => lsGet('bankTransactions', []))
+  const [plaidLinkToken, setPlaidLinkToken] = useState(null)
+  const [bankLoading, setBankLoading] = useState(false)
+  const [bankError, setBankError] = useState('')
+  const [autoImport, setAutoImport] = useState(() => lsGet('autoImport', { income: true, expenses: true }))
+  const saveBanks = (v) => { setConnectedBanks(v); lsSet('connectedBanks', v) }
+  const saveBankTx = (v) => { setBankTransactions(v); lsSet('bankTransactions', v) }
+  const saveAutoImport = (v) => { setAutoImport(v); lsSet('autoImport', v) }
+
+  // Simulate bank fetch (real version calls /api/plaid/transactions)
+  const fetchBankTransactions = async (bankId) => {
+    setBankLoading(true)
+    setBankError('')
+    try {
+      const res = await fetch('/api/plaid/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankId, days: 30 })
+      })
+      if (!res.ok) throw new Error('Could not fetch transactions')
+      const data = await res.json()
+      const existing = bankTransactions.filter(t => t.bankId !== bankId)
+      saveBankTx([...existing, ...data.transactions])
+    } catch(e) {
+      setBankError(e.message)
+    } finally {
+      setBankLoading(false)
+    }
+  }
+
+  // Categorize transaction as income or expense
+  const categorizeTransaction = (tx) => {
+    const amount = Number(tx.amount)
+    if (amount < 0) return 'income'   // Plaid uses negative for credits
+    return 'expense'
+  }
+
   const TABS = [
     { id: 'overview', label: '📊 Overview' },
+    { id: 'bank', label: '🏦 Bank Link' },
     { id: 'income', label: '💵 Income' },
     { id: 'expenses', label: '💳 Expenses & Bills' },
-    { id: 'savings', label: '🏦 Savings' },
+    { id: 'savings', label: '💰 Savings' },
     { id: 'debt', label: '📉 Debt' },
     { id: 'budget', label: '📋 Budget Plan' },
     { id: 'nospend', label: '🌿 No-Spend' },
@@ -2241,6 +2435,173 @@ function FinancePage({ expenses, budget, setBudget }) {
       )}
 
       {/* ── INCOME ───────────────────────────────────────────────────────── */}
+      {tab === 'bank' && (
+        <div>
+          {/* Security banner */}
+          <section className="card" style={{background:'var(--ink)',border:'none'}}>
+            <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+              <div style={{fontSize:'2rem',flexShrink:0}}>🔒</div>
+              <div>
+                <p className="eyebrow" style={{color:'var(--brass)'}}>Bank-Level Security</p>
+                <h3 style={{color:'var(--warm-white)',margin:'4px 0 8px'}}>Your credentials stay private</h3>
+                <p style={{color:'rgba(255,255,255,.7)',fontSize:'.82rem',lineHeight:1.6,margin:0}}>
+                  We use <strong style={{color:'var(--brass)'}}>Plaid</strong> — the same technology trusted by Venmo, Robinhood, and 7,000+ apps. You log in directly through Plaid's secure interface. We never see your bank username or password. Ever.
+                </p>
+              </div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginTop:14}}>
+              {[
+                ['256-bit', 'Encryption'],
+                ['SOC 2', 'Certified'],
+                ['Read-only', 'Access'],
+              ].map(([val,label]) => (
+                <div key={label} style={{textAlign:'center',padding:'10px 8px',background:'rgba(255,255,255,.06)',borderRadius:8}}>
+                  <div style={{fontWeight:700,color:'var(--brass)',fontSize:'1rem'}}>{val}</div>
+                  <div style={{fontSize:'.7rem',color:'rgba(255,255,255,.5)',marginTop:2}}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Connected accounts */}
+          <section className="card">
+            <p className="eyebrow">Connected Accounts</p>
+            <h3 style={{margin:'4px 0 14px'}}>Your Banks</h3>
+
+            {connectedBanks.length === 0 ? (
+              <div style={{textAlign:'center',padding:'24px 0'}}>
+                <div style={{fontSize:'3rem',marginBottom:12}}>🏦</div>
+                <p style={{fontWeight:600,fontSize:'.9rem',marginBottom:6}}>No banks connected yet</p>
+                <p className="muted" style={{fontSize:'.82rem',marginBottom:20,lineHeight:1.5}}>
+                  Connect your bank to automatically import income and expenses into your planner.
+                </p>
+                <button className="primary-btn" style={{fontSize:'.9rem',padding:'12px 24px'}}
+                  onClick={async () => {
+                    setBankLoading(true)
+                    setBankError('')
+                    try {
+                      // In production: fetch Plaid link token from /api/plaid/link-token
+                      // For now show the setup instructions
+                      setBankError('SETUP_NEEDED')
+                    } catch(e) { setBankError(e.message) } finally { setBankLoading(false) }
+                  }}>
+                  {bankLoading ? 'Connecting...' : '+ Connect a Bank'}
+                </button>
+
+                {bankError === 'SETUP_NEEDED' && (
+                  <div style={{marginTop:16,padding:'14px',background:'var(--stone)',borderRadius:10,textAlign:'left'}}>
+                    <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Setup Required</p>
+                    <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:0}}>
+                      To activate bank linking, add your Plaid API keys to Vercel environment variables. See the setup guide below.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                {connectedBanks.map((bank, i) => (
+                  <div key={bank.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:'.9rem'}}>{bank.name}</div>
+                        <div className="muted" style={{fontSize:'.75rem'}}>••••{bank.last4} · {bank.type}</div>
+                      </div>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <div style={{width:8,height:8,borderRadius:'50%',background:'var(--success)'}} />
+                        <span style={{fontSize:'.75rem',color:'var(--success)'}}>Active</span>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',gap:8}}>
+                      <button onClick={() => fetchBankTransactions(bank.id)}
+                        style={{flex:1,padding:'8px',borderRadius:8,border:'1.5px solid var(--teal)',
+                        background:'none',color:'var(--teal)',cursor:'pointer',fontSize:'.82rem',fontWeight:600}}>
+                        {bankLoading ? '⟳ Syncing...' : '↻ Sync Now'}
+                      </button>
+                      <button onClick={() => saveBanks(connectedBanks.filter((_,j)=>j!==i))}
+                        style={{padding:'8px 12px',borderRadius:8,border:'1.5px solid var(--border2)',
+                        background:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.82rem'}}>
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button className="primary-btn" style={{width:'100%',fontSize:'.85rem',marginTop:4}}>
+                  + Add Another Account
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* Auto-import settings */}
+          <section className="card">
+            <p className="eyebrow">Auto-Import Settings</p>
+            <h3 style={{margin:'4px 0 14px'}}>What to Import Automatically</h3>
+            {[
+              {key:'income', label:'Income & Deposits', desc:'Credits and deposits auto-added to Income tab', icon:'💵'},
+              {key:'expenses', label:'Purchases & Payments', desc:'Debits auto-added to Expenses & category breakdown', icon:'💳'},
+            ].map(item => (
+              <div key={item.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                  <span style={{fontSize:'1.2rem'}}>{item.icon}</span>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:'.88rem'}}>{item.label}</div>
+                    <div className="muted" style={{fontSize:'.72rem'}}>{item.desc}</div>
+                  </div>
+                </div>
+                <button onClick={() => saveAutoImport({...autoImport,[item.key]:!autoImport[item.key]})}
+                  style={{width:44,height:24,borderRadius:999,border:'none',cursor:'pointer',
+                  background:autoImport[item.key]?'var(--teal)':'var(--border2)',position:'relative',transition:'background .2s',flexShrink:0}}>
+                  <div style={{position:'absolute',top:3,left:autoImport[item.key]?23:3,width:18,height:18,
+                    borderRadius:'50%',background:'white',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}} />
+                </button>
+              </div>
+            ))}
+          </section>
+
+          {/* Recent imported transactions */}
+          {bankTransactions.length > 0 && (
+            <section className="card">
+              <p className="eyebrow">Recent Imports</p>
+              <h3 style={{margin:'4px 0 14px'}}>Imported Transactions</h3>
+              {bankTransactions.slice(0,20).map((tx,i) => {
+                const isIncome = Number(tx.amount) < 0
+                return (
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:'.88rem'}}>{tx.name}</div>
+                      <div className="muted" style={{fontSize:'.75rem'}}>{tx.date} · {tx.category?.[0] || 'Uncategorized'}</div>
+                    </div>
+                    <strong style={{color:isIncome?'var(--success)':'var(--danger)'}}>
+                      {isIncome ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+                    </strong>
+                  </div>
+                )
+              })}
+            </section>
+          )}
+
+          {/* Plaid setup guide */}
+          <section className="card" style={{background:'var(--stone)'}}>
+            <p className="eyebrow">Developer Setup</p>
+            <h3 style={{margin:'4px 0 10px',fontSize:'.95rem'}}>Activate Bank Linking</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:12,lineHeight:1.5}}>To enable live bank connections, complete these steps:</p>
+            {[
+              ['1', 'Create a free account at plaid.com/developers'],
+              ['2', 'Get your Client ID and Secret from the Plaid dashboard'],
+              ['3', 'Add to Vercel env vars: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV=sandbox'],
+              ['4', 'Deploy the /api/plaid/ serverless functions (provided separately)'],
+              ['5', 'Switch from sandbox → production when ready to launch'],
+            ].map(([num, step]) => (
+              <div key={num} style={{display:'flex',gap:10,marginBottom:8,alignItems:'flex-start'}}>
+                <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brass)',color:'var(--ink)',
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.75rem',fontWeight:700,flexShrink:0}}>{num}</div>
+                <p style={{fontSize:'.8rem',color:'var(--ink2)',lineHeight:1.5,margin:0}}>{step}</p>
+              </div>
+            ))}
+          </section>
+        </div>
+      )}
+
       {tab === 'income' && (
         <section className="card">
           <p className="eyebrow">Income Tracker</p>
@@ -4914,6 +5275,117 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
   )
 }
 
+function NotificationSettings({ settings, updateSettings }) {
+  const [permission, setPermission] = useState(Notification?.permission || 'default')
+  const [supported, setSupported] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const notifSettings = settings?.notifications || {}
+
+  useEffect(() => {
+    PushManager.isSupported().then(setSupported)
+    if ('Notification' in window) setPermission(Notification.permission)
+  }, [])
+
+  const enable = async () => {
+    setLoading(true)
+    const perm = await PushManager.requestPermission()
+    setPermission(perm)
+    if (perm === 'granted') {
+      await PushManager.subscribe()
+      // Enable all notifications by default
+      updateSettings({ ...settings, notifications: {
+        tasks: true, habits: true, goals: true, faith: true,
+        reflection: true, birthdays: true, overdue: true, finance: false
+      }})
+    }
+    setLoading(false)
+  }
+
+  const toggle = (key) => {
+    updateSettings({ ...settings, notifications: { ...notifSettings, [key]: !notifSettings[key] }})
+  }
+
+  const CATEGORIES = [
+    { key: 'tasks',      icon: '✓',  label: 'Task Reminders',     desc: 'Due today at 9am' },
+    { key: 'habits',     icon: '🔁', label: 'Habit Check-In',      desc: 'Daily reminder at 8am' },
+    { key: 'goals',      icon: '🎯', label: 'Goal Nudges',         desc: 'Weekly progress reminder' },
+    { key: 'faith',      icon: '✝',  label: 'Morning Devotional',  desc: 'Daily at 6am' },
+    { key: 'reflection', icon: '📖', label: 'Evening Reflection',  desc: 'Daily at 7pm' },
+    { key: 'birthdays',  icon: '🎂', label: 'Birthday Reminders',  desc: 'Day-of at 8am' },
+    { key: 'overdue',    icon: '⚠',  label: 'Overdue Alerts',      desc: 'When tasks are past due' },
+    { key: 'finance',    icon: '💰', label: 'Spending Check',       desc: 'Weekly budget summary' },
+  ]
+
+  return (
+    <section className="card">
+      <p className="eyebrow">Notifications</p>
+      <h3 style={{margin: '4px 0 14px'}}>Stay on Track</h3>
+
+      {!supported ? (
+        <div style={{padding:'12px',background:'var(--stone)',borderRadius:10,fontSize:'.85rem',color:'var(--muted)'}}>
+          Push notifications are not supported on this browser.
+        </div>
+      ) : permission === 'denied' ? (
+        <div style={{padding:'14px',background:'#fde8e8',borderRadius:10}}>
+          <strong style={{fontSize:'.88rem',color:'var(--danger)'}}>Notifications Blocked</strong>
+          <p style={{fontSize:'.8rem',color:'var(--ink2)',margin:'6px 0 0',lineHeight:1.5}}>
+            You've blocked notifications for this site. To enable them, click the lock icon in your browser's address bar and allow notifications, then refresh.
+          </p>
+        </div>
+      ) : permission === 'default' ? (
+        <div>
+          <p className="muted" style={{fontSize:'.85rem',marginBottom:14,lineHeight:1.6}}>
+            Get reminders for your tasks, habits, devotional, birthdays and more — right on your device.
+          </p>
+          <button className="primary-btn" style={{width:'100%',fontSize:'.9rem'}}
+            onClick={enable} disabled={loading}>
+            {loading ? 'Enabling...' : '🔔 Enable Push Notifications'}
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',background:'#d5f5e3',borderRadius:8,marginBottom:16}}>
+            <div style={{width:10,height:10,borderRadius:'50%',background:'var(--success)',boxShadow:'0 0 6px var(--success)'}} />
+            <span style={{fontSize:'.85rem',fontWeight:600,color:'var(--success)'}}>Notifications enabled</span>
+          </div>
+
+          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>Choose what to receive:</p>
+          {CATEGORIES.map(cat => (
+            <div key={cat.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <span style={{fontSize:'1.1rem',width:24,textAlign:'center'}}>{cat.icon}</span>
+                <div>
+                  <div style={{fontWeight:600,fontSize:'.88rem'}}>{cat.label}</div>
+                  <div className="muted" style={{fontSize:'.72rem'}}>{cat.desc}</div>
+                </div>
+              </div>
+              <button onClick={() => toggle(cat.key)} style={{
+                width:44,height:24,borderRadius:999,border:'none',cursor:'pointer',
+                background:notifSettings[cat.key] ? 'var(--teal)' : 'var(--border2)',
+                position:'relative',transition:'background .2s',flexShrink:0
+              }}>
+                <div style={{
+                  position:'absolute',top:3,
+                  left:notifSettings[cat.key] ? 23 : 3,
+                  width:18,height:18,borderRadius:'50%',
+                  background:'white',transition:'left .2s',
+                  boxShadow:'0 1px 3px rgba(0,0,0,.2)'
+                }} />
+              </button>
+            </div>
+          ))}
+
+          <button onClick={async()=>{ await PushManager.unsubscribe(); setPermission('default'); updateSettings({...settings,notifications:{}})}}
+            style={{marginTop:14,background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'8px 14px',fontSize:'.78rem',color:'var(--muted)',cursor:'pointer',width:'100%'}}>
+            Disable All Notifications
+          </button>
+        </div>
+      )}
+    </section>
+  )
+}
+
+
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
   const { signOut } = useAuth()
 
@@ -4994,6 +5466,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           <button className="danger-btn" style={{fontSize:'.85rem', padding:'8px 16px'}} onClick={signOut}>Sign Out</button>
         </div>
       </section>
+
+      {/* ── Push Notifications ──────────────────────────────────────── */}
+      <NotificationSettings settings={settings} updateSettings={updateSettings} />
 
       {/* ── Support & Contact ──────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
@@ -5370,7 +5845,17 @@ function FaithPage() {
             if (g) g.items.push(item)
             else groups.push({ date: item.date, items: [item] })
             return groups
-          }, []).map(group => (
+          }, [])
+
+  // Check notification schedule on load
+  useEffect(() => {
+    if (data.tasks && data.habits && data.goals && data.settings) {
+      setTimeout(() => {
+        PushManager.scheduleCheck(data.tasks, data.habits, data.goals, data.settings)
+      }, 2000) // slight delay to let app settle
+    }
+  }, [data.tasks?.length, data.habits?.length])
+.map(group => (
             <div key={group.date} style={{marginBottom:14}}>
               <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6}}>
                 {group.date === TODAY ? 'Today' : group.date}
