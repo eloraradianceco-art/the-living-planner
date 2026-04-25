@@ -3396,6 +3396,39 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const [cleaningLog, saveCleaningLogDirect] = useState(() => lsGet('cleaning_log_v2', {}))
   const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); lsSet('cleaning_log_v2', updated) }
   const [cleaningFreq, setCleaningFreq] = useState('daily')
+  const [brainDump, setBrainDump] = useState(() => { try { return localStorage.getItem('planner.p.braindump')||'' } catch { return '' } })
+  const saveBrainDump = (v) => { setBrainDump(v); try { localStorage.setItem('planner.p.braindump', v) } catch {} }
+  const [focusMinutes, setFocusMinutes] = useState(25)
+  const [focusSeconds, setFocusSecondsState] = useState(0)
+  const [focusRunning, setFocusRunning] = useState(false)
+  const [focusMode, setFocusMode] = useState('work') // work | break
+  const [focusSessions, setFocusSessions] = useState(0)
+  const focusRef = React.useRef(null)
+  React.useEffect(() => {
+    if (focusRunning) {
+      focusRef.current = setInterval(() => {
+        setFocusSecondsState(prev => {
+          if (prev > 0) return prev - 1
+          setFocusRunning(false)
+          if (focusMode === 'work') {
+            setFocusSessions(s => s + 1)
+            setFocusMode('break')
+            setFocusMinutes(5)
+            return 0
+          } else {
+            setFocusMode('work')
+            setFocusMinutes(25)
+            return 0
+          }
+        })
+      }, 1000)
+    } else {
+      clearInterval(focusRef.current)
+    }
+    return () => clearInterval(focusRef.current)
+  }, [focusRunning, focusMode])
+  const focusTotal = focusMinutes * 60 + focusSeconds
+  const focusDisplay = `${String(focusMinutes).padStart(2,'0')}:${String(focusSeconds).padStart(2,'0')}`
 
   const CLEANING_SCHEDULE = {
     daily: [
@@ -3449,7 +3482,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
       </div>
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'notes', label: '📝 Notes' }, { id: 'cleaning', label: '🧹 Cleaning' }].map(t => (
+        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'notes', label: '📝 Notes' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'focus', label: '⏱ Focus Timer' }, { id: 'cleaning', label: '🧹 Cleaning' }, { id: 'tips', label: '💡 Time Tips' }].map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
             onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
         ))}
@@ -3475,6 +3508,80 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
           ))}
         </section>
       )}
+
+      {tab === 'braindump' && (
+        <section className="card">
+          <p className="eyebrow">Brain Dump</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Clear Your Head</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:10}}>Dump everything here — ideas, worries, random thoughts, to-do items, anything taking up mental space. Get it out.</p>
+          <textarea value={brainDump} onChange={e => saveBrainDump(e.target.value)}
+            placeholder="Start typing freely... no structure needed."
+            style={{ width: '100%', minHeight: 300, padding: 14, border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.9rem', fontFamily: 'var(--serif)', lineHeight: 1.7, resize: 'vertical', background: 'var(--warm-white)', color: 'var(--ink)', boxSizing: 'border-box' }} />
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
+            <p style={{ fontSize: '.75rem', color: 'var(--muted)', margin:0 }}>Saved automatically as you type.</p>
+            <button onClick={()=>saveBrainDump('')} style={{background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',color:'var(--muted)',cursor:'pointer'}}>Clear</button>
+          </div>
+        </section>
+      )}
+
+      {tab === 'focus' && (
+        <section className="card">
+          <p className="eyebrow">Focus Timer</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Pomodoro Technique</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:20}}>25 min focused work, 5 min break. Repeat. After 4 sessions take a longer break.</p>
+
+          {/* Timer display */}
+          <div style={{textAlign:'center',marginBottom:24}}>
+            <div style={{
+              width:180,height:180,borderRadius:'50%',margin:'0 auto 16px',
+              background: focusMode==='work' ? 'var(--ink)' : 'var(--success)',
+              display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+              boxShadow:`0 0 0 6px ${focusMode==='work' ? 'var(--ink)' : 'var(--success)'}22`
+            }}>
+              <div style={{fontSize:'.75rem',color:'rgba(255,255,255,.6)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>
+                {focusMode==='work' ? 'Focus' : 'Break'}
+              </div>
+              <div style={{fontSize:'3rem',fontWeight:700,color:'white',fontFamily:'var(--sans)',lineHeight:1}}>{focusDisplay}</div>
+              <div style={{fontSize:'.72rem',color:'rgba(255,255,255,.5)',marginTop:4}}>{focusSessions} sessions done</div>
+            </div>
+
+            {/* Controls */}
+            <div style={{display:'flex',gap:12,justifyContent:'center',marginBottom:16}}>
+              <button onClick={()=>setFocusRunning(r=>!r)} style={{
+                padding:'12px 28px',borderRadius:999,fontSize:'1rem',fontWeight:700,cursor:'pointer',
+                background: focusRunning ? 'var(--danger)' : 'var(--ink)',
+                color:'white',border:'none'
+              }}>{focusRunning ? '⏸ Pause' : '▶ Start'}</button>
+              <button onClick={()=>{setFocusRunning(false);setFocusMinutes(focusMode==='work'?25:5);setFocusSecondsState(0)}}
+                style={{padding:'12px 20px',borderRadius:999,fontSize:'1rem',cursor:'pointer',background:'var(--stone)',border:'1.5px solid var(--border)',color:'var(--ink)',fontWeight:600}}>↺ Reset</button>
+            </div>
+
+            {/* Mode presets */}
+            <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
+              {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
+                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusSecondsState(0)}}
+                  style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
+                  border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>{label} · {mins}m</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div style={{background:'var(--stone)',borderRadius:10,padding:'14px'}}>
+            <p style={{fontWeight:700,fontSize:'.85rem',marginBottom:8}}>Why Pomodoro Works</p>
+            {[
+              'Time pressure creates urgency — you work faster knowing the clock is running.',
+              'Forced breaks prevent mental fatigue and sustain output over hours.',
+              'Tracking sessions builds a visible record of deep work completed.',
+            ].map((tip,i)=>(
+              <div key={i} style={{display:'flex',gap:8,marginBottom:6,fontSize:'.8rem',color:'var(--ink2)'}}>
+                <span style={{color:'var(--brass)',fontWeight:700}}>{i+1}.</span>{tip}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
 
       {tab === 'checklists' && (
         <>
@@ -3797,6 +3904,227 @@ function LifestylePage() {
           </div>
         </section>
       )}
+
+      {tab === 'workout' && (
+        <section className="card">
+          <p className="eyebrow">Workout Tracker</p>
+          <h3 style={{margin:'4px 0 8px'}}>Log Your Training</h3>
+          {(() => {
+            const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
+            const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
+            const [wLogs, setWLogs] = React.useState(()=>lsG('workouts',[]))
+            const [wForm, setWForm] = React.useState({type:'Strength',duration:'',notes:'',date:TODAY})
+            const saveWLogs = (v) => { setWLogs(v); lsS('workouts',v) }
+            const TYPES = ['Strength','Cardio','HIIT','Yoga','Pilates','Cycling','Running','Swimming','Walking','Sports','Other']
+            const thisWeekLogs = wLogs.filter(l => l.date >= startOfWeek(TODAY) && l.date <= endOfWeek(TODAY))
+            const totalMins = thisWeekLogs.reduce((s,l)=>s+Number(l.duration||0),0)
+            return (
+              <div>
+                {/* Week summary */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+                  {[
+                    ['This Week',thisWeekLogs.length+' sessions','var(--teal)'],
+                    ['Minutes',totalMins+' min','var(--brass)'],
+                    ['Total Logged',wLogs.length+' all time','var(--success)'],
+                  ].map(([l,v,c])=>(
+                    <div key={l} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
+                      <div className="muted" style={{fontSize:'.7rem',marginBottom:3}}>{l}</div>
+                      <strong style={{color:c,fontSize:'.95rem'}}>{v}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Log form */}
+                <div style={{display:'grid',gap:8,marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:10}}>
+                  <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Log a Workout</p>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                    <select value={wForm.type} onChange={e=>setWForm(p=>({...p,type:e.target.value}))}
+                      style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+                      {TYPES.map(t=><option key={t}>{t}</option>)}
+                    </select>
+                    <input type="number" placeholder="Duration (min)" value={wForm.duration}
+                      onChange={e=>setWForm(p=>({...p,duration:e.target.value}))}
+                      style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+                  </div>
+                  <input type="date" value={wForm.date} onChange={e=>setWForm(p=>({...p,date:e.target.value}))}
+                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+                  <input placeholder="Notes (e.g. PRs hit, how you felt)" value={wForm.notes}
+                    onChange={e=>setWForm(p=>({...p,notes:e.target.value}))}
+                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+                  <button className="primary-btn" onClick={()=>{
+                    if(!wForm.duration) return
+                    saveWLogs([{...wForm,id:Date.now()},...wLogs])
+                    setWForm({type:'Strength',duration:'',notes:'',date:TODAY})
+                  }}>+ Log Workout</button>
+                </div>
+
+                {/* Recent logs */}
+                {wLogs.slice(0,15).map((log,i)=>(
+                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                    <div>
+                      <div style={{fontWeight:600,fontSize:'.88rem'}}>{log.type}</div>
+                      <div className="muted" style={{fontSize:'.75rem'}}>{log.date} · {log.duration} min{log.notes?' · '+log.notes:''}</div>
+                    </div>
+                    <button onClick={()=>saveWLogs(wLogs.filter((_,j)=>j!==i))}
+                      style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </section>
+      )}
+
+      {tab === 'period' && (
+        <section className="card">
+          <p className="eyebrow">Period Tracker</p>
+          <h3 style={{margin:'4px 0 8px'}}>Cycle Awareness</h3>
+          {(() => {
+            const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
+            const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
+            const [cycles, setCycles] = React.useState(()=>lsG('cycles',[]))
+            const [cycleLen, setCycleLen] = React.useState(()=>lsG('cycleLen',28))
+            const [periodLen, setPeriodLen] = React.useState(()=>lsG('periodLen',5))
+            const [lastStart, setLastStart] = React.useState(()=>lsG('lastPeriodStart',''))
+            const [symptoms, setSymptoms] = React.useState(()=>lsG('symptoms',{}))
+            const [logDate, setLogDate] = React.useState(TODAY)
+            const saveCycles = (v) => { setCycles(v); lsS('cycles',v) }
+
+            // Predictions
+            const nextStart = lastStart ? (() => {
+              const d = new Date(lastStart)
+              d.setDate(d.getDate() + cycleLen)
+              return d.toISOString().slice(0,10)
+            })() : null
+            const ovulationDay = lastStart ? (() => {
+              const d = new Date(lastStart)
+              d.setDate(d.getDate() + cycleLen - 14)
+              return d.toISOString().slice(0,10)
+            })() : null
+            const daysUntilNext = nextStart ? Math.ceil((new Date(nextStart) - new Date(TODAY)) / 86400000) : null
+            const currentPhase = lastStart ? (() => {
+              const daysSince = Math.ceil((new Date(TODAY) - new Date(lastStart)) / 86400000)
+              if (daysSince <= periodLen) return {phase:'Menstrual',color:'#E85555',desc:'Rest, hydrate, use heat therapy. Iron-rich foods help.'}
+              if (daysSince <= 13) return {phase:'Follicular',color:'#FF9800',desc:'Energy rising. Great time for new projects and harder workouts.'}
+              if (daysSince <= 16) return {phase:'Ovulatory',color:'#4CAF50',desc:'Peak energy and confidence. Best time for big decisions and social events.'}
+              return {phase:'Luteal',color:'#9C27B0',desc:'Wind down. Prioritize sleep, reduce stress, gentler exercise.'}
+            })() : null
+
+            const SYMPTOM_OPTIONS = ['Cramps','Bloating','Headache','Fatigue','Mood swings','Acne','Back pain','Cravings','Tender breasts','Nausea']
+
+            return (
+              <div>
+                {/* Settings */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+                  <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
+                    <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Cycle Length (days)</p>
+                    <input type="number" value={cycleLen} onChange={e=>{setCycleLen(Number(e.target.value));lsS('cycleLen',Number(e.target.value))}}
+                      style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700}} />
+                  </div>
+                  <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
+                    <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Period Length (days)</p>
+                    <input type="number" value={periodLen} onChange={e=>{setPeriodLen(Number(e.target.value));lsS('periodLen',Number(e.target.value))}}
+                      style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700}} />
+                  </div>
+                </div>
+
+                {/* Last period start */}
+                <div style={{marginBottom:16}}>
+                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Last Period Start Date</p>
+                  <div style={{display:'flex',gap:8}}>
+                    <input type="date" value={lastStart} onChange={e=>{setLastStart(e.target.value);lsS('lastPeriodStart',e.target.value)}}
+                      style={{flex:1,padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+                  </div>
+                </div>
+
+                {/* Current phase */}
+                {currentPhase && (
+                  <div style={{background:currentPhase.color+'18',border:`1.5px solid ${currentPhase.color}44`,borderRadius:12,padding:'14px',marginBottom:16}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                      <strong style={{color:currentPhase.color,fontSize:'1rem'}}>{currentPhase.phase} Phase</strong>
+                      {daysUntilNext !== null && (
+                        <span className="muted" style={{fontSize:'.78rem'}}>
+                          {daysUntilNext > 0 ? `Next in ${daysUntilNext}d` : daysUntilNext === 0 ? 'Due today' : `${Math.abs(daysUntilNext)}d late`}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{fontSize:'.82rem',color:'var(--ink2)',margin:0,lineHeight:1.5}}>{currentPhase.desc}</p>
+                  </div>
+                )}
+
+                {/* Predictions */}
+                {nextStart && (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+                    {[
+                      ['Next Period', nextStart, '#E85555'],
+                      ['Ovulation Est.', ovulationDay, '#4CAF50'],
+                    ].map(([label, date, col]) => (
+                      <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px',textAlign:'center'}}>
+                        <p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>{label}</p>
+                        <strong style={{color:col,fontSize:'.9rem'}}>{date}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Symptom log */}
+                <div style={{marginBottom:16}}>
+                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Log Symptoms for {logDate}</p>
+                  <input type="date" value={logDate} onChange={e=>setLogDate(e.target.value)}
+                    style={{width:'100%',padding:'8px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:10,boxSizing:'border-box'}} />
+                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                    {SYMPTOM_OPTIONS.map(s => {
+                      const daySymptoms = symptoms[logDate] || []
+                      const active = daySymptoms.includes(s)
+                      return (
+                        <button key={s} onClick={()=>{
+                          const cur = symptoms[logDate]||[]
+                          const next = active ? cur.filter(x=>x!==s) : [...cur,s]
+                          const updated = {...symptoms,[logDate]:next}
+                          setSymptoms(updated); lsS('symptoms',updated)
+                        }} style={{
+                          padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',fontWeight:500,
+                          background: active ? '#E85555' : 'var(--stone)',
+                          color: active ? 'white' : 'var(--ink2)',
+                          border: active ? 'none' : '1.5px solid var(--border2)'
+                        }}>{s}</button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Log period dates */}
+                <div>
+                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Period History</p>
+                  {cycles.length === 0 && <p className="muted" style={{fontSize:'.82rem'}}>No cycles logged yet.</p>}
+                  {cycles.slice(0,6).map((c,i)=>(
+                    <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'.85rem'}}>
+                      <span>{c.start} → {c.end}</span>
+                      <button onClick={()=>saveCycles(cycles.filter((_,j)=>j!==i))}
+                        style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{display:'flex',gap:8,marginTop:10}}>
+                    <input type="date" id="cycleStart" placeholder="Start"
+                      style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+                    <input type="date" id="cycleEnd" placeholder="End"
+                      style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+                    <button className="primary-btn" style={{padding:'8px 14px',fontSize:'.82rem'}} onClick={()=>{
+                      const s = document.getElementById('cycleStart').value
+                      const e = document.getElementById('cycleEnd').value
+                      if(!s||!e) return
+                      saveCycles([{start:s,end:e,id:Date.now()},...cycles])
+                      document.getElementById('cycleStart').value=''
+                      document.getElementById('cycleEnd').value=''
+                    }}>+ Log</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+        </section>
+      )}
+
 
       {tab === 'passwords' && (
         <section className="card">
