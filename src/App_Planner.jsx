@@ -3800,6 +3800,207 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
 }
 
 // ── LIFESTYLE PAGE ─────────────────────────────────────────────────────────
+function WorkoutTrackerTab() {
+  const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
+  const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
+  const [wLogs, setWLogs] = useState(()=>lsG('workouts',[]))
+  const [wForm, setWForm] = useState({type:'Strength',duration:'',notes:'',date:new Date().toISOString().slice(0,10)})
+  const saveWLogs = (v) => { setWLogs(v); lsS('workouts',v) }
+  const TYPES = ['Strength','Cardio','HIIT','Yoga','Pilates','Cycling','Running','Swimming','Walking','Sports','Other']
+  const today = new Date().toISOString().slice(0,10)
+  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
+  const weekStartStr = weekStart.toISOString().slice(0,10)
+  const thisWeekLogs = wLogs.filter(l => l.date >= weekStartStr && l.date <= today)
+  const totalMins = thisWeekLogs.reduce((s,l)=>s+Number(l.duration||0),0)
+
+  return (
+    <section className="card">
+      <p className="eyebrow">Workout Tracker</p>
+      <h3 style={{margin:'4px 0 14px'}}>Log Your Training</h3>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
+        {[
+          ['This Week',thisWeekLogs.length+' sessions','var(--teal)'],
+          ['Minutes',totalMins+' min','var(--brass)'],
+          ['Total',wLogs.length+' logged','var(--success)'],
+        ].map(([l,v,c])=>(
+          <div key={l} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
+            <div className="muted" style={{fontSize:'.7rem',marginBottom:3}}>{l}</div>
+            <strong style={{color:c,fontSize:'.9rem'}}>{v}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div style={{display:'grid',gap:8,marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:10}}>
+        <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Log a Workout</p>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+          <select value={wForm.type} onChange={e=>setWForm(p=>({...p,type:e.target.value}))}
+            style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+            {TYPES.map(t=><option key={t}>{t}</option>)}
+          </select>
+          <input type="number" placeholder="Duration (min)" value={wForm.duration}
+            onChange={e=>setWForm(p=>({...p,duration:e.target.value}))}
+            style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+        </div>
+        <input type="date" value={wForm.date} onChange={e=>setWForm(p=>({...p,date:e.target.value}))}
+          style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+        <input placeholder="Notes (e.g. PRs, how you felt)" value={wForm.notes}
+          onChange={e=>setWForm(p=>({...p,notes:e.target.value}))}
+          style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+        <button className="primary-btn" onClick={()=>{
+          if(!wForm.duration) return
+          saveWLogs([{...wForm,id:Date.now()},...wLogs])
+          setWForm({type:'Strength',duration:'',notes:'',date:today})
+        }}>+ Log Workout</button>
+      </div>
+
+      {wLogs.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}>No workouts logged yet.</p>}
+      {wLogs.slice(0,15).map((log,i)=>(
+        <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+          <div>
+            <div style={{fontWeight:600,fontSize:'.88rem'}}>{log.type}</div>
+            <div className="muted" style={{fontSize:'.75rem'}}>{log.date} · {log.duration} min{log.notes?' · '+log.notes:''}</div>
+          </div>
+          <button onClick={()=>saveWLogs(wLogs.filter((_,j)=>j!==i))}
+            style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem'}}>✕</button>
+        </div>
+      ))}
+    </section>
+  )
+}
+
+function PeriodTrackerTab() {
+  const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
+  const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
+  const today = new Date().toISOString().slice(0,10)
+  const [cycles, setCycles] = useState(()=>lsG('cycles',[]))
+  const [cycleLen, setCycleLen] = useState(()=>lsG('cycleLen',28))
+  const [periodLen, setPeriodLen] = useState(()=>lsG('periodLen',5))
+  const [lastStart, setLastStart] = useState(()=>lsG('lastPeriodStart',''))
+  const [symptoms, setSymptoms] = useState(()=>lsG('symptoms',{}))
+  const [logDate, setLogDate] = useState(today)
+  const [cycleStart, setCycleStart] = useState('')
+  const [cycleEnd, setCycleEnd] = useState('')
+  const saveCycles = (v) => { setCycles(v); lsS('cycles',v) }
+
+  const nextStart = lastStart ? (() => {
+    const d = new Date(lastStart); d.setDate(d.getDate() + Number(cycleLen))
+    return d.toISOString().slice(0,10)
+  })() : null
+  const ovulationDay = lastStart ? (() => {
+    const d = new Date(lastStart); d.setDate(d.getDate() + Number(cycleLen) - 14)
+    return d.toISOString().slice(0,10)
+  })() : null
+  const daysUntilNext = nextStart ? Math.ceil((new Date(nextStart) - new Date(today)) / 86400000) : null
+  const currentPhase = lastStart ? (() => {
+    const daysSince = Math.ceil((new Date(today) - new Date(lastStart)) / 86400000)
+    if (daysSince <= periodLen) return {phase:'Menstrual',color:'#E85555',desc:'Rest, hydrate, use heat therapy. Iron-rich foods help.'}
+    if (daysSince <= 13) return {phase:'Follicular',color:'#FF9800',desc:'Energy rising. Great time for new projects and harder workouts.'}
+    if (daysSince <= 16) return {phase:'Ovulatory',color:'#4CAF50',desc:'Peak energy and confidence. Best time for big decisions and social events.'}
+    return {phase:'Luteal',color:'#9C27B0',desc:'Wind down. Prioritize sleep, reduce stress, gentler exercise.'}
+  })() : null
+
+  const SYMPTOM_OPTIONS = ['Cramps','Bloating','Headache','Fatigue','Mood swings','Acne','Back pain','Cravings','Tender breasts','Nausea']
+
+  return (
+    <section className="card">
+      <p className="eyebrow">Period Tracker</p>
+      <h3 style={{margin:'4px 0 14px'}}>Cycle Awareness</h3>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+        <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
+          <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Cycle Length (days)</p>
+          <input type="number" value={cycleLen} onChange={e=>{setCycleLen(Number(e.target.value));lsS('cycleLen',Number(e.target.value))}}
+            style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700,boxSizing:'border-box'}} />
+        </div>
+        <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
+          <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Period Length (days)</p>
+          <input type="number" value={periodLen} onChange={e=>{setPeriodLen(Number(e.target.value));lsS('periodLen',Number(e.target.value))}}
+            style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700,boxSizing:'border-box'}} />
+        </div>
+      </div>
+
+      <div style={{marginBottom:16}}>
+        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Last Period Start Date</p>
+        <input type="date" value={lastStart} onChange={e=>{setLastStart(e.target.value);lsS('lastPeriodStart',e.target.value)}}
+          style={{width:'100%',padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',boxSizing:'border-box'}} />
+      </div>
+
+      {currentPhase && (
+        <div style={{background:currentPhase.color+'18',border:`1.5px solid ${currentPhase.color}44`,borderRadius:12,padding:'14px',marginBottom:16}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+            <strong style={{color:currentPhase.color,fontSize:'1rem'}}>{currentPhase.phase} Phase</strong>
+            {daysUntilNext !== null && (
+              <span className="muted" style={{fontSize:'.78rem'}}>
+                {daysUntilNext > 0 ? `Next in ${daysUntilNext}d` : daysUntilNext === 0 ? 'Due today' : `${Math.abs(daysUntilNext)}d late`}
+              </span>
+            )}
+          </div>
+          <p style={{fontSize:'.82rem',color:'var(--ink2)',margin:0,lineHeight:1.5}}>{currentPhase.desc}</p>
+        </div>
+      )}
+
+      {nextStart && (
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+          {[['Next Period',nextStart,'#E85555'],['Ovulation Est.',ovulationDay,'#4CAF50']].map(([label,date,col])=>(
+            <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px',textAlign:'center'}}>
+              <p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>{label}</p>
+              <strong style={{color:col,fontSize:'.9rem'}}>{date}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{marginBottom:16}}>
+        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Log Symptoms — {logDate}</p>
+        <input type="date" value={logDate} onChange={e=>setLogDate(e.target.value)}
+          style={{width:'100%',padding:'8px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:10,boxSizing:'border-box'}} />
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {SYMPTOM_OPTIONS.map(s => {
+            const active = (symptoms[logDate]||[]).includes(s)
+            return (
+              <button key={s} onClick={()=>{
+                const cur = symptoms[logDate]||[]
+                const next = active ? cur.filter(x=>x!==s) : [...cur,s]
+                const updated = {...symptoms,[logDate]:next}
+                setSymptoms(updated); lsS('symptoms',updated)
+              }} style={{
+                padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',fontWeight:500,
+                background:active?'#E85555':'var(--stone)',color:active?'white':'var(--ink2)',
+                border:active?'none':'1.5px solid var(--border2)'
+              }}>{s}</button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div>
+        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Period History</p>
+        {cycles.length === 0 && <p className="muted" style={{fontSize:'.82rem',marginBottom:10}}>No cycles logged yet.</p>}
+        {cycles.slice(0,8).map((c,i)=>(
+          <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'.85rem'}}>
+            <span>{c.start} → {c.end}</span>
+            <button onClick={()=>saveCycles(cycles.filter((_,j)=>j!==i))}
+              style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+          </div>
+        ))}
+        <div style={{display:'flex',gap:8,marginTop:10}}>
+          <input type="date" value={cycleStart} onChange={e=>setCycleStart(e.target.value)}
+            style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+          <input type="date" value={cycleEnd} onChange={e=>setCycleEnd(e.target.value)}
+            style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+          <button className="primary-btn" style={{padding:'8px 14px',fontSize:'.82rem'}} onClick={()=>{
+            if(!cycleStart||!cycleEnd) return
+            saveCycles([{start:cycleStart,end:cycleEnd,id:Date.now()},...cycles])
+            setCycleStart(''); setCycleEnd('')
+          }}>+ Log</button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+
 function LifestylePage() {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
@@ -3897,226 +4098,9 @@ function LifestylePage() {
         </section>
       )}
 
-      {tab === 'workout' && (
-        <section className="card">
-          <p className="eyebrow">Workout Tracker</p>
-          <h3 style={{margin:'4px 0 8px'}}>Log Your Training</h3>
-          {(() => {
-            const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
-            const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
-            const [wLogs, setWLogs] = React.useState(()=>lsG('workouts',[]))
-            const [wForm, setWForm] = React.useState({type:'Strength',duration:'',notes:'',date:TODAY})
-            const saveWLogs = (v) => { setWLogs(v); lsS('workouts',v) }
-            const TYPES = ['Strength','Cardio','HIIT','Yoga','Pilates','Cycling','Running','Swimming','Walking','Sports','Other']
-            const thisWeekLogs = wLogs.filter(l => l.date >= startOfWeek(TODAY) && l.date <= endOfWeek(TODAY))
-            const totalMins = thisWeekLogs.reduce((s,l)=>s+Number(l.duration||0),0)
-            return (
-              <div>
-                {/* Week summary */}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
-                  {[
-                    ['This Week',thisWeekLogs.length+' sessions','var(--teal)'],
-                    ['Minutes',totalMins+' min','var(--brass)'],
-                    ['Total Logged',wLogs.length+' all time','var(--success)'],
-                  ].map(([l,v,c])=>(
-                    <div key={l} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
-                      <div className="muted" style={{fontSize:'.7rem',marginBottom:3}}>{l}</div>
-                      <strong style={{color:c,fontSize:'.95rem'}}>{v}</strong>
-                    </div>
-                  ))}
-                </div>
+      {tab === 'workout' && <WorkoutTrackerTab />}
 
-                {/* Log form */}
-                <div style={{display:'grid',gap:8,marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:10}}>
-                  <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Log a Workout</p>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-                    <select value={wForm.type} onChange={e=>setWForm(p=>({...p,type:e.target.value}))}
-                      style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
-                      {TYPES.map(t=><option key={t}>{t}</option>)}
-                    </select>
-                    <input type="number" placeholder="Duration (min)" value={wForm.duration}
-                      onChange={e=>setWForm(p=>({...p,duration:e.target.value}))}
-                      style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-                  </div>
-                  <input type="date" value={wForm.date} onChange={e=>setWForm(p=>({...p,date:e.target.value}))}
-                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-                  <input placeholder="Notes (e.g. PRs hit, how you felt)" value={wForm.notes}
-                    onChange={e=>setWForm(p=>({...p,notes:e.target.value}))}
-                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-                  <button className="primary-btn" onClick={()=>{
-                    if(!wForm.duration) return
-                    saveWLogs([{...wForm,id:Date.now()},...wLogs])
-                    setWForm({type:'Strength',duration:'',notes:'',date:TODAY})
-                  }}>+ Log Workout</button>
-                </div>
-
-                {/* Recent logs */}
-                {wLogs.slice(0,15).map((log,i)=>(
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:'.88rem'}}>{log.type}</div>
-                      <div className="muted" style={{fontSize:'.75rem'}}>{log.date} · {log.duration} min{log.notes?' · '+log.notes:''}</div>
-                    </div>
-                    <button onClick={()=>saveWLogs(wLogs.filter((_,j)=>j!==i))}
-                      style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-                  </div>
-                ))}
-              </div>
-            )
-          })()}
-        </section>
-      )}
-
-      {tab === 'period' && (
-        <section className="card">
-          <p className="eyebrow">Period Tracker</p>
-          <h3 style={{margin:'4px 0 8px'}}>Cycle Awareness</h3>
-          {(() => {
-            const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
-            const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
-            const [cycles, setCycles] = React.useState(()=>lsG('cycles',[]))
-            const [cycleLen, setCycleLen] = React.useState(()=>lsG('cycleLen',28))
-            const [periodLen, setPeriodLen] = React.useState(()=>lsG('periodLen',5))
-            const [lastStart, setLastStart] = React.useState(()=>lsG('lastPeriodStart',''))
-            const [symptoms, setSymptoms] = React.useState(()=>lsG('symptoms',{}))
-            const [logDate, setLogDate] = React.useState(TODAY)
-            const saveCycles = (v) => { setCycles(v); lsS('cycles',v) }
-
-            // Predictions
-            const nextStart = lastStart ? (() => {
-              const d = new Date(lastStart)
-              d.setDate(d.getDate() + cycleLen)
-              return d.toISOString().slice(0,10)
-            })() : null
-            const ovulationDay = lastStart ? (() => {
-              const d = new Date(lastStart)
-              d.setDate(d.getDate() + cycleLen - 14)
-              return d.toISOString().slice(0,10)
-            })() : null
-            const daysUntilNext = nextStart ? Math.ceil((new Date(nextStart) - new Date(TODAY)) / 86400000) : null
-            const currentPhase = lastStart ? (() => {
-              const daysSince = Math.ceil((new Date(TODAY) - new Date(lastStart)) / 86400000)
-              if (daysSince <= periodLen) return {phase:'Menstrual',color:'#E85555',desc:'Rest, hydrate, use heat therapy. Iron-rich foods help.'}
-              if (daysSince <= 13) return {phase:'Follicular',color:'#FF9800',desc:'Energy rising. Great time for new projects and harder workouts.'}
-              if (daysSince <= 16) return {phase:'Ovulatory',color:'#4CAF50',desc:'Peak energy and confidence. Best time for big decisions and social events.'}
-              return {phase:'Luteal',color:'#9C27B0',desc:'Wind down. Prioritize sleep, reduce stress, gentler exercise.'}
-            })() : null
-
-            const SYMPTOM_OPTIONS = ['Cramps','Bloating','Headache','Fatigue','Mood swings','Acne','Back pain','Cravings','Tender breasts','Nausea']
-
-            return (
-              <div>
-                {/* Settings */}
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
-                  <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
-                    <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Cycle Length (days)</p>
-                    <input type="number" value={cycleLen} onChange={e=>{setCycleLen(Number(e.target.value));lsS('cycleLen',Number(e.target.value))}}
-                      style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700}} />
-                  </div>
-                  <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
-                    <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Period Length (days)</p>
-                    <input type="number" value={periodLen} onChange={e=>{setPeriodLen(Number(e.target.value));lsS('periodLen',Number(e.target.value))}}
-                      style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700}} />
-                  </div>
-                </div>
-
-                {/* Last period start */}
-                <div style={{marginBottom:16}}>
-                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Last Period Start Date</p>
-                  <div style={{display:'flex',gap:8}}>
-                    <input type="date" value={lastStart} onChange={e=>{setLastStart(e.target.value);lsS('lastPeriodStart',e.target.value)}}
-                      style={{flex:1,padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-                  </div>
-                </div>
-
-                {/* Current phase */}
-                {currentPhase && (
-                  <div style={{background:currentPhase.color+'18',border:`1.5px solid ${currentPhase.color}44`,borderRadius:12,padding:'14px',marginBottom:16}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                      <strong style={{color:currentPhase.color,fontSize:'1rem'}}>{currentPhase.phase} Phase</strong>
-                      {daysUntilNext !== null && (
-                        <span className="muted" style={{fontSize:'.78rem'}}>
-                          {daysUntilNext > 0 ? `Next in ${daysUntilNext}d` : daysUntilNext === 0 ? 'Due today' : `${Math.abs(daysUntilNext)}d late`}
-                        </span>
-                      )}
-                    </div>
-                    <p style={{fontSize:'.82rem',color:'var(--ink2)',margin:0,lineHeight:1.5}}>{currentPhase.desc}</p>
-                  </div>
-                )}
-
-                {/* Predictions */}
-                {nextStart && (
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
-                    {[
-                      ['Next Period', nextStart, '#E85555'],
-                      ['Ovulation Est.', ovulationDay, '#4CAF50'],
-                    ].map(([label, date, col]) => (
-                      <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px',textAlign:'center'}}>
-                        <p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>{label}</p>
-                        <strong style={{color:col,fontSize:'.9rem'}}>{date}</strong>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Symptom log */}
-                <div style={{marginBottom:16}}>
-                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Log Symptoms for {logDate}</p>
-                  <input type="date" value={logDate} onChange={e=>setLogDate(e.target.value)}
-                    style={{width:'100%',padding:'8px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:10,boxSizing:'border-box'}} />
-                  <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                    {SYMPTOM_OPTIONS.map(s => {
-                      const daySymptoms = symptoms[logDate] || []
-                      const active = daySymptoms.includes(s)
-                      return (
-                        <button key={s} onClick={()=>{
-                          const cur = symptoms[logDate]||[]
-                          const next = active ? cur.filter(x=>x!==s) : [...cur,s]
-                          const updated = {...symptoms,[logDate]:next}
-                          setSymptoms(updated); lsS('symptoms',updated)
-                        }} style={{
-                          padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',fontWeight:500,
-                          background: active ? '#E85555' : 'var(--stone)',
-                          color: active ? 'white' : 'var(--ink2)',
-                          border: active ? 'none' : '1.5px solid var(--border2)'
-                        }}>{s}</button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* Log period dates */}
-                <div>
-                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Period History</p>
-                  {cycles.length === 0 && <p className="muted" style={{fontSize:'.82rem'}}>No cycles logged yet.</p>}
-                  {cycles.slice(0,6).map((c,i)=>(
-                    <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'.85rem'}}>
-                      <span>{c.start} → {c.end}</span>
-                      <button onClick={()=>saveCycles(cycles.filter((_,j)=>j!==i))}
-                        style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-                    </div>
-                  ))}
-                  <div style={{display:'flex',gap:8,marginTop:10}}>
-                    <input type="date" id="cycleStart" placeholder="Start"
-                      style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
-                    <input type="date" id="cycleEnd" placeholder="End"
-                      style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
-                    <button className="primary-btn" style={{padding:'8px 14px',fontSize:'.82rem'}} onClick={()=>{
-                      const s = document.getElementById('cycleStart').value
-                      const e = document.getElementById('cycleEnd').value
-                      if(!s||!e) return
-                      saveCycles([{start:s,end:e,id:Date.now()},...cycles])
-                      document.getElementById('cycleStart').value=''
-                      document.getElementById('cycleEnd').value=''
-                    }}>+ Log</button>
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
-        </section>
-      )}
-
+      {tab === 'period' && <PeriodTrackerTab />}
 
       {tab === 'passwords' && (
         <section className="card">
