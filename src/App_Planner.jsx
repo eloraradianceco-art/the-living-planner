@@ -3804,7 +3804,7 @@ function LifestylePage() {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('braindump')
+  const [tab, setTab] = useState('groceries')
   const [trips, setTrips] = useState(() => { try { const v = localStorage.getItem('planner.l.trips'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', notes: '', packing: '' })
   const [birthdays, setBirthdays] = useState(() => { try { const v = localStorage.getItem('planner.l.birthdays'); return v ? JSON.parse(v) : [] } catch { return [] } })
@@ -3820,9 +3820,11 @@ function LifestylePage() {
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
 
   const TABS = [
-    { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'groceries', label: '🛒 Groceries' },
+    { id: 'groceries', label: '🛒 Groceries' },
     { id: 'trips', label: '✈ Trips' }, { id: 'birthdays', label: '🎂 Birthdays' },
-    { id: 'contacts', label: '👥 Contacts' }, { id: 'passwords', label: '🔑 Passwords' },
+    { id: 'contacts', label: '👥 Contacts' },
+    { id: 'workout', label: '💪 Workout' }, { id: 'period', label: '🌸 Period' },
+    { id: 'passwords', label: '🔑 Passwords' },
   ]
 
   const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
@@ -3847,16 +3849,6 @@ function LifestylePage() {
         ))}
       </div>
 
-      {tab === 'braindump' && (
-        <section className="card">
-          <p className="eyebrow">Brain Dump</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Clear Your Head</h3>
-          <textarea value={brainDump} onChange={e => save('brainDump', setBrainDump, e.target.value)}
-            placeholder="Dump everything here — ideas, worries, random thoughts, lists, anything on your mind..."
-            style={{ width: '100%', minHeight: 280, padding: 14, border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.9rem', lineHeight: 1.7, resize: 'vertical', color: 'var(--text)', background: 'var(--surface)' }} />
-          <p style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 6 }}>Saved automatically as you type.</p>
-        </section>
-      )}
 
       {tab === 'groceries' && (
         <section className="card">
