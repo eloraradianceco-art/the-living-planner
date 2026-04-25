@@ -2033,221 +2033,554 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
 
 
 function FinancePage({ expenses, budget, setBudget }) {
-  const LS_KEY = (k) => 'planner.' + k
-  const lsGet = (k, d) => { try { const v = localStorage.getItem(LS_KEY(k)); return v ? JSON.parse(v) : d } catch { return d } }
-  const lsSet = (k, v) => { try { localStorage.setItem(LS_KEY(k), JSON.stringify(v)) } catch {} }
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useState('overview')
-  const [debts, setDebts] = useState(() => { try { const v = localStorage.getItem('planner.f.debts'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [period, setPeriod] = useState('monthly')
+
+  // ── Existing state ─────────────────────────────────────────────────────
+  const [debts, setDebts] = useState(() => lsGet('debts', []))
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
+  const [budgetLines, setBudgetLines] = useState(() => lsGet('budgetlines', []))
   const [newBudgetLine, setNewBudgetLine] = useState({ category: '', budgeted: '', actual: '' })
-  const [budgetLines, setBudgetLines] = useState(() => { try { const v = localStorage.getItem('planner.f.budgetlines'); return v ? JSON.parse(v) : [] } catch { return [] } })
-  const saveDebts = (d) => { setDebts(d); try { localStorage.setItem('planner.f.debts', JSON.stringify(d)) } catch {} }
-  const saveBudgetLines = (b) => { setBudgetLines(b); try { localStorage.setItem('planner.f.budgetlines', JSON.stringify(b)) } catch {} }
-  const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const [monthlyBudget, setMonthlyBudget] = useState(() => lsGet('monthlyBudget', { income: 0, bills: [], subscriptions: [] }))
+  const [newBill, setNewBill] = useState({ label: '', amount: '' })
+  const [newSub, setNewSub] = useState({ label: '', amount: '', cycle: 'monthly' })
+
+  // ── New: Income entries ────────────────────────────────────────────────
+  const [incomes, setIncomes] = useState(() => lsGet('incomes', []))
+  const [newIncome, setNewIncome] = useState({ label: '', amount: '', category: 'Primary', period: 'monthly' })
+  const saveIncomes = (v) => { setIncomes(v); lsSet('incomes', v) }
+
+  // ── New: Savings goals ─────────────────────────────────────────────────
+  const [savingsGoals, setSavingsGoals] = useState(() => lsGet('savingsGoals', [
+    { id: 1, label: 'Emergency Fund', goal: 10000, current: 0, color: 'var(--teal)' },
+  ]))
+  const [newSavings, setNewSavings] = useState({ label: '', goal: '', current: '', color: 'var(--brass)' })
+  const saveSavingsGoals = (v) => { setSavingsGoals(v); lsSet('savingsGoals', v) }
+
+  // ── Legacy savings (keep for backward compat) ──────────────────────────
+  const [savings, setSavings] = useState(() => lsGet('savings', { goal: 1000, current: 0, label: 'Emergency Fund' }))
+  const saveSavings = (s) => { setSavings(s); lsSet('savings', s) }
+  const saveDebts = (d) => { setDebts(d); lsSet('debts', JSON.stringify(d)) }
+  const saveBudgetLines = (b) => { setBudgetLines(b); lsSet('budgetlines', JSON.stringify(b)) }
+  const saveNoSpend = (n) => { setNoSpend(n); lsSet('noSpend', n) }
+  const saveMonthly = (m) => { setMonthlyBudget(m); lsSet('monthlyBudget', m) }
+
+  // ── Computations ───────────────────────────────────────────────────────
+  const totalBills = monthlyBudget.bills.reduce((s, b) => s + Number(b.amount || 0), 0)
+  const totalSubs = monthlyBudget.subscriptions.reduce((s, b) => s + Number(b.amount || 0), 0)
+  const savingsPct = Math.min((savings.current / savings.goal) * 100, 100)
+  const noSpendFilled = noSpend.checked.length
+  const daysArray = Array.from({ length: noSpend.days }, (_, i) => i + 1)
+
   const fpWeekStart = startOfWeek(TODAY)
   const fpWeekEnd = endOfWeek(TODAY)
   const fpWeekExpenses = (expenses || []).filter(e => e.date >= fpWeekStart && e.date <= fpWeekEnd)
   const fpWeekSpend = fpWeekExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
   const fpMonthExpenses = (expenses || []).filter(e => e.date && e.date.slice(0, 7) === TODAY.slice(0, 7))
   const fpMonthSpend = fpMonthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
-  const [newBill, setNewBill] = useState({ label: '', amount: '' })
-  const [newSub, setNewSub] = useState({ label: '', amount: '', cycle: 'monthly' })
 
-  const saveSavings = (s) => { setSavings(s); lsSet('savings', s) }
-  const saveNoSpend = (n) => { setNoSpend(n); lsSet('noSpend', n) }
-  const saveMonthly = (m) => { setMonthlyBudget(m); lsSet('monthlyBudget', m) }
+  // Period multipliers for income
+  const PERIOD_MULT = { weekly: 1, monthly: 4.33, quarterly: 13, yearly: 52 }
+  const totalWeeklyIncome = incomes.reduce((s, inc) => {
+    const weeklyAmt = Number(inc.amount || 0) / (PERIOD_MULT[inc.period] || 4.33)
+    return s + weeklyAmt
+  }, 0)
+  const getIncomePeriod = (inc, p) => {
+    const weekly = Number(inc.amount || 0) / (PERIOD_MULT[inc.period] || 4.33)
+    return (weekly * (PERIOD_MULT[p] || 4.33)).toFixed(2)
+  }
+  const totalIncomeForPeriod = incomes.reduce((s, inc) => s + parseFloat(getIncomePeriod(inc, period)), 0)
+  const totalExpensesForPeriod = (() => {
+    const weeklyExp = fpWeekSpend
+    const mult = PERIOD_MULT[period] || 4.33
+    return weeklyExp * mult
+  })()
 
-  const totalBills = monthlyBudget.bills.reduce((s, b) => s + Number(b.amount || 0), 0)
-  const totalSubs = monthlyBudget.subscriptions.reduce((s, b) => s + Number(b.amount || 0), 0)
-  const monthlyExpenses = expenses.reduce((s, e) => s + Number(e.amount || 0), 0)
-  const savingsPct = Math.min((savings.current / savings.goal) * 100, 100)
-  const noSpendFilled = noSpend.checked.length
-  const daysArray = Array.from({ length: noSpend.days }, (_, i) => i + 1)
+  // 50/30/20 breakdown
+  const needs50 = totalIncomeForPeriod * 0.5
+  const wants30 = totalIncomeForPeriod * 0.3
+  const savings20 = totalIncomeForPeriod * 0.2
+
+  // $10k in 52 weeks schedule
+  const WEEK_PLAN = [150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250]
+  const currentWeekNum = Math.ceil((new Date(TODAY) - new Date(new Date(TODAY).getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
+  const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
+  const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
+  const toggleWeek = (w) => {
+    const next = checkedWeeks.includes(w) ? checkedWeeks.filter(x => x !== w) : [...checkedWeeks, w]
+    saveCheckedWeeks(next)
+  }
+  const totalSavedSoFar = checkedWeeks.reduce((s, w) => s + (WEEK_PLAN[w - 1] || 0), 0)
 
   const TABS = [
-    { id: 'overview', label: '📊 Overview' }, { id: 'debt', label: '📉 Debt Tracker' }, { id: 'budget', label: '📋 Monthly Budget' }, { id: 'nospend', label: '🌿 No-Spend' },
+    { id: 'overview', label: '📊 Overview' },
+    { id: 'income', label: '💵 Income' },
+    { id: 'expenses', label: '💳 Expenses' },
+    { id: 'savings', label: '🏦 Savings' },
+    { id: 'debt', label: '📉 Debt' },
+    { id: 'budget', label: '📋 Budget' },
+    { id: 'nospend', label: '🌿 No-Spend' },
   ]
+
+  const fmt = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   return (
     <div className="screen-stack">
-      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
-        <span style={{fontSize:"1.1rem"}}>💰</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Finance</p>
+      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
+        <span style={{fontSize:'1.1rem'}}>💰</span>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
       </div>
+
       <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {TABS.map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}
+          </button>
         ))}
       </div>
 
+      {/* ── OVERVIEW ───────────────────────────────────────────────────── */}
       {tab === 'overview' && (
-        <>
-          <section className="card">
-            <p className="eyebrow">Monthly Summary</p>
-            <h3 style={{ margin: '4px 0 14px' }}>Financial Overview</h3>
+        <section className="card">
+          <p className="eyebrow">Financial Overview</p>
+          <h3 style={{ margin: '4px 0 16px' }}>Your Money at a Glance</h3>
+
+          {/* Period selector */}
+          <div className="pill-row" style={{marginBottom:16,gap:6}}>
+            {['weekly','monthly','quarterly','yearly'].map(p => (
+              <button key={p} className={period===p?'pill active-pill':'pill'}
+                onClick={()=>setPeriod(p)} style={{fontSize:'.78rem',textTransform:'capitalize'}}>{p}</button>
+            ))}
+          </div>
+
+          {/* Stats grid */}
+          {[
+            ['Total Income', fmt(totalIncomeForPeriod), 'var(--success)'],
+            ['Total Expenses', fmt(totalExpensesForPeriod), 'var(--danger)'],
+            ['Net', fmt(totalIncomeForPeriod - totalExpensesForPeriod), totalIncomeForPeriod >= totalExpensesForPeriod ? 'var(--success)' : 'var(--danger)'],
+            ['This Week Spend', fmt(fpWeekSpend), 'var(--brass)'],
+            ['This Month Spend', fmt(fpMonthSpend), 'var(--slate)'],
+            ['Monthly Income', fmt(Number(monthlyBudget.income)), 'var(--teal)'],
+          ].map(([label, val, col]) => (
+            <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+              <span style={{fontSize:'.9rem',color:'var(--ink2)'}}>{label}</span>
+              <strong style={{color:col,fontSize:'1rem'}}>{val}</strong>
+            </div>
+          ))}
+
+          {/* 50/30/20 Guide */}
+          <div style={{marginTop:20,background:'var(--stone)',borderRadius:12,padding:'16px'}}>
+            <p className="eyebrow" style={{marginBottom:8}}>50 / 30 / 20 Rule</p>
+            <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on your {period} income of {fmt(totalIncomeForPeriod)}</p>
             {[
-              ['Monthly Income', `$${Number(monthlyBudget.income).toFixed(2)}`, 'var(--success)'],
-              ['Monthly Bills', `$${totalBills.toFixed(2)}`, 'var(--danger)'],
-              ['Subscriptions', `$${totalSubs.toFixed(2)}`, 'var(--warning)'],
-              ['Other Expenses', `$${monthlyExpenses.toFixed(2)}`, 'var(--teal)'],
-              ['This Week', `$${fpWeekSpend.toFixed(2)}`, 'var(--brass)'],
-              ['This Month', `$${fpMonthSpend.toFixed(2)}`, 'var(--slate)'],
-              ['Net', `$${(Number(monthlyBudget.income) - totalBills - totalSubs - monthlyExpenses).toFixed(2)}`, 'var(--navy)'],
-            ].map(([label, val, color]) => (
-              <div key={label} className="metric-row card-row">
-                <span style={{ color: 'var(--text2)', fontSize: '.9rem' }}>{label}</span>
-                <strong style={{ color }}>{val}</strong>
+              ['50% Needs', needs50, '#4CAF50', 'Rent, utilities, groceries, insurance, min debt payments'],
+              ['30% Wants', wants30, '#FF9800', 'Dining, shopping, subscriptions, gym, travel'],
+              ['20% Savings & Debt', savings20, '#9C27B0', 'Emergency fund, investments, extra debt payments'],
+            ].map(([label, amt, col, desc]) => (
+              <div key={label} style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <strong style={{fontSize:'.85rem',color:'var(--ink)'}}>{label}</strong>
+                  <strong style={{color:col,fontSize:'.85rem'}}>{fmt(amt)}</strong>
+                </div>
+                <div style={{height:8,borderRadius:999,background:'var(--border)',marginBottom:4}}>
+                  <div style={{height:'100%',borderRadius:999,background:col,width:totalIncomeForPeriod>0?'33.3%':'0%'}} />
+                </div>
+                <p className="muted" style={{fontSize:'.72rem',margin:0}}>{desc}</p>
               </div>
             ))}
-          </section>
-          <section className="card">
-            <p className="eyebrow">Weekly Budget</p>
-            <h3 style={{ margin: '4px 0 10px' }}>Weekly Spending Target</h3>
-            <p className="muted" style={{ fontSize: '.82rem', marginBottom: 10 }}>This target tracks discretionary spending only — not bills or subscriptions. Your life score won't penalize bill payments.</p>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <input type="number" value={budget.weeklyTarget}
-                onChange={e => setBudget({ weeklyTarget: Number(e.target.value) })}
-                style={{ flex: 1, padding: '10px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '1rem' }} />
-              <span style={{ color: 'var(--muted)', fontSize: '.85rem' }}>/ week</span>
-            </div>
-          </section>
-        </>
+          </div>
+
+          {/* 4 Tips */}
+          <div style={{marginTop:20}}>
+            <p className="eyebrow" style={{marginBottom:12}}>4 Tips to Improve Your Finances</p>
+            {[
+              ['Know Your Numbers Exactly', 'Income, expenses, debt, savings balance. You cannot improve what you refuse to measure. Start with total financial honesty.', '#e8d5f5'],
+              ['Spend Intentionally, Not Emotionally', 'Every purchase is a choice. Pause before non-essential spending and ask if it aligns with where you want to be financially.', '#fde8e8'],
+              ['Automate Every Good Financial Habit', 'Savings, investments, bill payments. Remove the decision entirely. Automated money habits work even on your worst days.', '#d5eaf5'],
+              ['Focus on Progress, Not Perfection', 'Small consistent improvements compound into massive change over time.', '#d5f5e3'],
+            ].map(([title, desc, bg]) => (
+              <div key={title} style={{background:bg,borderRadius:10,padding:'14px',marginBottom:10}}>
+                <strong style={{fontSize:'.85rem',display:'block',marginBottom:6}}>{title}</strong>
+                <p className="muted" style={{fontSize:'.8rem',margin:0,lineHeight:1.5}}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
+      {/* ── INCOME ─────────────────────────────────────────────────────── */}
+      {tab === 'income' && (
+        <section className="card">
+          <p className="eyebrow">Income Tracker</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Your Income Sources</h3>
 
+          {/* Period filter */}
+          <div className="pill-row" style={{marginBottom:14,gap:6}}>
+            {['weekly','monthly','quarterly','yearly'].map(p => (
+              <button key={p} className={period===p?'pill active-pill':'pill'}
+                onClick={()=>setPeriod(p)} style={{fontSize:'.78rem',textTransform:'capitalize'}}>{p}</button>
+            ))}
+          </div>
+
+          {/* Summary */}
+          <div style={{background:'var(--stone)',borderRadius:10,padding:'14px',marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>Total {period} income</p>
+              <strong style={{fontSize:'1.4rem',color:'var(--success)'}}>{fmt(totalIncomeForPeriod)}</strong>
+            </div>
+            <div style={{textAlign:'right'}}>
+              <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>Weekly average</p>
+              <strong style={{fontSize:'1rem',color:'var(--ink)'}}>{fmt(totalWeeklyIncome)}</strong>
+            </div>
+          </div>
+
+          {/* Income list */}
+          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}>No income sources yet. Add one below.</p>}
+          {incomes.map((inc, i) => (
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'.9rem'}}>{inc.label}</div>
+                <div className="muted" style={{fontSize:'.75rem'}}>{inc.category} · {inc.period}</div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontWeight:700,color:'var(--success)'}}>{fmt(getIncomePeriod(inc, period))}</div>
+                <div className="muted" style={{fontSize:'.72rem'}}>{fmt(inc.amount)} / {inc.period}</div>
+              </div>
+              <button onClick={() => saveIncomes(incomes.filter((_,j)=>j!==i))}
+                style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',marginLeft:8}}>✕</button>
+            </div>
+          ))}
+
+          {/* Add income */}
+          <div style={{marginTop:16,display:'grid',gap:8}}>
+            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add Income Source</p>
+            <input placeholder="Label (e.g. Salary, Freelance)" value={newIncome.label}
+              onChange={e=>setNewIncome(p=>({...p,label:e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <input placeholder="Amount ($)" type="number" value={newIncome.amount}
+                onChange={e=>setNewIncome(p=>({...p,amount:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+              <select value={newIncome.period} onChange={e=>setNewIncome(p=>({...p,period:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+            <select value={newIncome.category} onChange={e=>setNewIncome(p=>({...p,category:e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+              {['Primary','Side Hustle','Passive','Investment','Business','Other'].map(c=><option key={c}>{c}</option>)}
+            </select>
+            <button className="primary-btn" onClick={() => {
+              if (!newIncome.label || !newIncome.amount) return
+              saveIncomes([...incomes, { ...newIncome, id: Date.now() }])
+              setNewIncome({ label: '', amount: '', category: 'Primary', period: 'monthly' })
+            }}>+ Add Income</button>
+          </div>
+        </section>
+      )}
+
+      {/* ── EXPENSES ───────────────────────────────────────────────────── */}
+      {tab === 'expenses' && (
+        <section className="card">
+          <p className="eyebrow">Expense Tracker</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Your Spending</h3>
+
+          {/* Period filter */}
+          <div className="pill-row" style={{marginBottom:14,gap:6}}>
+            {['weekly','monthly','quarterly','yearly'].map(p => (
+              <button key={p} className={period===p?'pill active-pill':'pill'}
+                onClick={()=>setPeriod(p)} style={{fontSize:'.78rem',textTransform:'capitalize'}}>{p}</button>
+            ))}
+          </div>
+
+          {/* Spend summary */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+            {[
+              ['This Week', fmt(fpWeekSpend)],
+              ['This Month', fmt(fpMonthSpend)],
+              ['Quarterly Est.', fmt(fpWeekSpend * 13)],
+              ['Yearly Est.', fmt(fpWeekSpend * 52)],
+            ].map(([label, val]) => (
+              <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px',textAlign:'center'}}>
+                <p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>{label}</p>
+                <strong style={{fontSize:'1.1rem',color:'var(--danger)'}}>{val}</strong>
+              </div>
+            ))}
+          </div>
+
+          {/* Expense list */}
+          {(expenses||[]).length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}>No expenses logged yet.</p>}
+          {(expenses||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20).map((exp, i) => (
+            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+              <div>
+                <div style={{fontWeight:600,fontSize:'.88rem'}}>{exp.description || exp.category}</div>
+                <div className="muted" style={{fontSize:'.75rem'}}>{exp.category} · {exp.date}</div>
+              </div>
+              <strong style={{color:'var(--danger)'}}>{fmt(exp.amount)}</strong>
+            </div>
+          ))}
+
+          {/* Category breakdown */}
+          {(expenses||[]).length > 0 && (() => {
+            const cats = {}
+            expenses.forEach(e => { cats[e.category] = (cats[e.category]||0) + Number(e.amount||0) })
+            const total = Object.values(cats).reduce((s,v)=>s+v,0)
+            return (
+              <div style={{marginTop:16}}>
+                <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>By Category</p>
+                {Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => (
+                  <div key={cat} style={{marginBottom:8}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                      <span style={{fontSize:'.82rem'}}>{cat}</span>
+                      <span style={{fontSize:'.82rem',fontWeight:600}}>{fmt(amt)}</span>
+                    </div>
+                    <div style={{height:6,borderRadius:999,background:'var(--border)'}}>
+                      <div style={{height:'100%',borderRadius:999,background:'var(--brass)',width:`${(amt/total)*100}%`}} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </section>
+      )}
+
+      {/* ── SAVINGS ────────────────────────────────────────────────────── */}
+      {tab === 'savings' && (
+        <div>
+          {/* $10k in 52 Weeks Tracker */}
+          <section className="card">
+            <p className="eyebrow">52-Week Challenge</p>
+            <h3 style={{ margin: '4px 0 6px' }}>Save $10,000 in 52 Weeks</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Color in each week as you save. Current week: <strong>Week {currentWeekNum}</strong></p>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:14,background:'var(--stone)',borderRadius:10,padding:'12px 16px'}}>
+              <div>
+                <p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Saved so far</p>
+                <strong style={{color:'var(--success)',fontSize:'1.2rem'}}>{fmt(totalSavedSoFar)}</strong>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Remaining</p>
+                <strong style={{color:'var(--danger)',fontSize:'1.2rem'}}>{fmt(10000 - totalSavedSoFar)}</strong>
+              </div>
+            </div>
+            {/* Progress bar */}
+            <div style={{height:10,borderRadius:999,background:'var(--border)',marginBottom:16}}>
+              <div style={{height:'100%',borderRadius:999,background:'var(--success)',width:`${(totalSavedSoFar/10000)*100}%`,transition:'width .3s'}} />
+            </div>
+            {/* Week grid */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
+              {WEEK_PLAN.map((amt, i) => {
+                const week = i + 1
+                const done = checkedWeeks.includes(week)
+                const isCurrent = week === currentWeekNum
+                return (
+                  <button key={week} onClick={() => toggleWeek(week)} style={{
+                    padding:'8px 4px',borderRadius:8,border: isCurrent ? '2px solid var(--brass)' : '1px solid var(--border)',
+                    background: done ? 'var(--success)' : 'var(--stone)',
+                    color: done ? 'white' : 'var(--ink)',cursor:'pointer',
+                    fontSize:'.72rem',fontWeight:600,lineHeight:1.2,
+                    boxShadow: isCurrent ? '0 0 0 2px var(--brass)33' : 'none'
+                  }}>
+                    <div style={{fontSize:'.65rem',opacity:0.7}}>Wk {week}</div>
+                    <div>${amt}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* Savings Goals */}
+          <section className="card">
+            <p className="eyebrow">Savings Goals</p>
+            <h3 style={{ margin: '4px 0 14px' }}>What you're building toward</h3>
+            {savingsGoals.map((sg, i) => {
+              const pct = Math.min((sg.current / sg.goal) * 100, 100)
+              return (
+                <div key={sg.id} style={{marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                    <strong style={{fontSize:'.9rem'}}>{sg.label}</strong>
+                    <button onClick={() => saveSavingsGoals(savingsGoals.filter((_,j)=>j!==i))}
+                      style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1rem'}}>✕</button>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                    <span className="muted" style={{fontSize:'.8rem'}}>Saved: <strong style={{color:sg.color||'var(--brass)'}}>{fmt(sg.current)}</strong></span>
+                    <span className="muted" style={{fontSize:'.8rem'}}>Goal: <strong>{fmt(sg.goal)}</strong></span>
+                  </div>
+                  <div style={{height:10,borderRadius:999,background:'var(--border)',marginBottom:6}}>
+                    <div style={{height:'100%',borderRadius:999,background:sg.color||'var(--brass)',width:`${pct}%`,transition:'width .3s'}} />
+                  </div>
+                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                    <span className="muted" style={{fontSize:'.75rem'}}>{pct.toFixed(0)}% complete</span>
+                    <div style={{flex:1}} />
+                    <input type="number" placeholder="Update saved $"
+                      style={{width:120,padding:'5px 8px',border:'1px solid var(--border2)',borderRadius:6,fontSize:'.8rem'}}
+                      onBlur={e => {
+                        if (!e.target.value) return
+                        const next = savingsGoals.map((g,j) => j===i ? {...g, current: Number(e.target.value)} : g)
+                        saveSavingsGoals(next)
+                        e.target.value = ''
+                      }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+            {/* Add savings goal */}
+            <div style={{marginTop:8,display:'grid',gap:8}}>
+              <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>New Savings Goal</p>
+              <input placeholder="Goal name (e.g. House Down Payment)" value={newSavings.label}
+                onChange={e=>setNewSavings(p=>({...p,label:e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <input type="number" placeholder="Goal amount ($)" value={newSavings.goal}
+                  onChange={e=>setNewSavings(p=>({...p,goal:e.target.value}))}
+                  style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+                <input type="number" placeholder="Currently saved ($)" value={newSavings.current}
+                  onChange={e=>setNewSavings(p=>({...p,current:e.target.value}))}
+                  style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+              </div>
+              <button className="primary-btn" onClick={() => {
+                if (!newSavings.label || !newSavings.goal) return
+                saveSavingsGoals([...savingsGoals, { id: Date.now(), label: newSavings.label, goal: Number(newSavings.goal), current: Number(newSavings.current||0), color: 'var(--brass)' }])
+                setNewSavings({ label: '', goal: '', current: '', color: 'var(--brass)' })
+              }}>+ Add Goal</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* ── DEBT ───────────────────────────────────────────────────────── */}
       {tab === 'debt' && (
-        <div>
-          <section className="card">
-            <p className="eyebrow">Debt Payoff Tracker</p>
-            <h3 style={{margin:'4px 0 6px'}}>Your Balances</h3>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Avalanche method: pay minimums on all, attack highest rate first.</p>
-            {debts.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No debts tracked yet.</p>}
-            {debts.map((debt,i) => {
-              const progress = Math.max(0, Math.min(100, 100 - (parseFloat(debt.balance) / parseFloat(debt.originalBalance||debt.balance)) * 100))
-              return (
-                <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid var(--stone2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:'.9rem',color:'var(--ink)'}}>{debt.name}</div>
-                      <div style={{fontSize:'.75rem',color:'var(--muted)'}}>Rate: {debt.rate}% · Min: ${debt.minPayment}/mo</div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <div style={{fontWeight:700,color:'var(--danger)',fontSize:'1rem'}}>${parseFloat(debt.balance||0).toLocaleString()}</div>
-                      <button onClick={()=>saveDebts(debts.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-                    </div>
-                  </div>
-                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${progress}%`,background:'var(--success)',borderRadius:999,transition:'width .4s'}} />
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
-                    <input type="number" placeholder="Update balance" style={{flex:1,padding:'6px 10px',border:'1px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',background:'var(--stone)',marginRight:8}}
-                      onBlur={e=>{if(!e.target.value)return;const updated=[...debts];updated[i]={...debt,balance:e.target.value};saveDebts(updated);e.target.value=''}} />
-                    <span style={{fontSize:'.72rem',color:'var(--success)',fontWeight:600,alignSelf:'center'}}>{progress.toFixed(0)}% paid</span>
-                  </div>
-                </div>
-              )
-            })}
-            <div style={{display:'grid',gap:8,marginTop:12}}>
-              <input placeholder="Debt name (e.g. Chase Card)" value={newDebt.name} onChange={e=>setNewDebt(p=>({...p,name:e.target.value}))}
-                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
-                <input placeholder="Balance $" type="number" value={newDebt.balance} onChange={e=>setNewDebt(p=>({...p,balance:e.target.value,originalBalance:e.target.value}))}
-                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
-                <input placeholder="APR %" type="number" value={newDebt.rate} onChange={e=>setNewDebt(p=>({...p,rate:e.target.value}))}
-                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
-                <input placeholder="Min $/mo" type="number" value={newDebt.minPayment} onChange={e=>setNewDebt(p=>({...p,minPayment:e.target.value}))}
-                  style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',background:'var(--stone)',color:'var(--text)'}} />
+        <section className="card">
+          <p className="eyebrow">Debt Tracker</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Debt Avalanche — Highest Rate First</h3>
+          {debts.length === 0 && <p className="muted" style={{ textAlign: 'center', padding: '20px 0' }}>No debts added yet. Add one below to start tracking.</p>}
+          {[...debts].sort((a, b) => Number(b.rate || 0) - Number(a.rate || 0)).map((debt, i) => (
+            <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <strong style={{ fontSize: '.9rem' }}>{debt.name}</strong>
+                <button onClick={() => saveDebts(debts.filter((_,j)=>j!==i))}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
               </div>
-              <button className="primary-btn" onClick={()=>{if(!newDebt.name||!newDebt.balance)return;saveDebts([...debts,{...newDebt,id:Date.now()}]);setNewDebt({name:'',balance:'',rate:'',minPayment:''})}}>Add Debt</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '.8rem' }}>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>BALANCE</p><strong>${Number(debt.balance).toLocaleString()}</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>RATE</p><strong style={{color:'var(--danger)'}}>{debt.rate}%</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>MIN PMT</p><strong>${debt.minPayment}</strong></div>
+              </div>
             </div>
-          </section>
-          {debts.length > 0 && (
-            <section className="card">
-              <p className="eyebrow">Summary</p>
-              <h3 style={{margin:'4px 0 12px'}}>Total Debt</h3>
-              <div style={{fontFamily:'var(--serif)',fontSize:'2rem',fontWeight:500,color:'var(--danger)',marginBottom:4}}>
-                ${debts.reduce((s,d)=>s+parseFloat(d.balance||0),0).toLocaleString()}
-              </div>
-              <div style={{fontSize:'.8rem',color:'var(--muted)'}}>Combined minimum payments: ${debts.reduce((s,d)=>s+parseFloat(d.minPayment||0),0).toFixed(0)}/mo</div>
-            </section>
-          )}
-        </div>
+          ))}
+          <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
+            <p style={{ fontWeight: 600, fontSize: '.85rem', margin: 0 }}>Add a Debt</p>
+            <input placeholder="Debt name (e.g. Credit Card)" value={newDebt.name}
+              onChange={e => setNewDebt(p => ({ ...p, name: e.target.value }))}
+              style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {[['Balance $', 'balance'], ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
+                <input key={key} type="number" placeholder={ph} value={newDebt[key]}
+                  onChange={e => setNewDebt(p => ({ ...p, [key]: e.target.value }))}
+                  style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              ))}
+            </div>
+            <button className="primary-btn" onClick={() => {
+              if (!newDebt.name) return
+              saveDebts([...debts, { ...newDebt, id: Date.now() }])
+              setNewDebt({ name: '', balance: '', rate: '', minPayment: '' })
+            }}>+ Add Debt</button>
+          </div>
+        </section>
       )}
 
+      {/* ── BUDGET ─────────────────────────────────────────────────────── */}
       {tab === 'budget' && (
-        <div>
-          <section className="card">
-            <p className="eyebrow">Monthly Budget</p>
-            <h3 style={{margin:'4px 0 6px'}}>Planned vs Actual</h3>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Track each spending category for the month.</p>
-            {budgetLines.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No budget lines yet.</p>}
-            {budgetLines.map((line,i) => {
-              const budgeted = parseFloat(line.budgeted||0)
-              const actual = parseFloat(line.actual||0)
-              const pct = budgeted > 0 ? Math.min(100, (actual/budgeted)*100) : 0
-              const over = actual > budgeted
-              return (
-                <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:'1px solid var(--stone2)'}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                    <div style={{fontWeight:600,fontSize:'.88rem',color:'var(--ink)'}}>{line.category}</div>
-                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <span style={{fontSize:'.8rem',color:over?'var(--danger)':'var(--muted)'}}>${actual.toFixed(0)} / ${budgeted.toFixed(0)}</span>
-                      <button onClick={()=>saveBudgetLines(budgetLines.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-                    </div>
-                  </div>
-                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
-                    <div style={{height:'100%',width:`${pct}%`,background:over?'var(--danger)':pct>80?'var(--warning)':'var(--success)',borderRadius:999}} />
-                  </div>
-                  <input type="number" placeholder="Update actual spent" style={{width:'100%',marginTop:6,padding:'6px 10px',border:'1px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',background:'var(--stone)'}}
-                    onBlur={e=>{if(!e.target.value)return;const u=[...budgetLines];u[i]={...line,actual:e.target.value};saveBudgetLines(u);e.target.value=''}} />
-                </div>
-              )
-            })}
-            <div style={{display:'grid',gap:8,marginTop:12}}>
-              <input placeholder="Category (e.g. Groceries, Gas, Dining)" value={newBudgetLine.category} onChange={e=>setNewBudgetLine(p=>({...p,category:e.target.value}))}
-                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
-              <div style={{display:'flex',gap:8}}>
-                <input placeholder="Budgeted $" type="number" value={newBudgetLine.budgeted} onChange={e=>setNewBudgetLine(p=>({...p,budgeted:e.target.value}))}
-                  style={{flex:1,padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
-                <input placeholder="Actual $" type="number" value={newBudgetLine.actual} onChange={e=>setNewBudgetLine(p=>({...p,actual:e.target.value}))}
-                  style={{flex:1,padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
-              </div>
-              <button className="primary-btn" onClick={()=>{if(!newBudgetLine.category||!newBudgetLine.budgeted)return;saveBudgetLines([...budgetLines,{...newBudgetLine,id:Date.now()}]);setNewBudgetLine({category:'',budgeted:'',actual:''})}}>Add Budget Line</button>
+        <section className="card">
+          <p className="eyebrow">Monthly Budget</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Income vs. Bills</h3>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '.9rem' }}>Monthly Income</span>
+              <input type="number" value={monthlyBudget.income}
+                onChange={e => saveMonthly({ ...monthlyBudget, income: e.target.value })}
+                style={{ width: 120, padding: '6px 10px', border: '1.5px solid var(--border2)', borderRadius: 6, fontSize: '.85rem', textAlign: 'right' }} />
             </div>
-            {budgetLines.length > 0 && (
-              <div style={{marginTop:14,padding:'12px',background:'var(--stone)',borderRadius:'var(--radius-sm)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem'}}>
-                  <span style={{fontWeight:700,color:'var(--ink)'}}>Total Budgeted</span>
-                  <span style={{fontWeight:700,color:'var(--teal)'}}>${budgetLines.reduce((s,l)=>s+parseFloat(l.budgeted||0),0).toFixed(0)}</span>
+          </div>
+          {[
+            ['Bills', monthlyBudget.bills, newBill, setNewBill, (b) => saveMonthly({ ...monthlyBudget, bills: b }), ['label', 'amount']],
+          ].map(([title, items, newItem, setNew, save, fields]) => (
+            <div key={title} style={{ marginBottom: 16 }}>
+              <p style={{ fontWeight: 600, margin: '0 0 8px' }}>{title}</p>
+              {items.map((item, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span>{item.label}</span>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <strong>${Number(item.amount).toFixed(2)}</strong>
+                    <button onClick={() => save(items.filter((_,j)=>j!==i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                  </div>
                 </div>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:'.88rem',marginTop:4}}>
-                  <span style={{fontWeight:700,color:'var(--ink)'}}>Total Spent</span>
-                  <span style={{fontWeight:700,color:'var(--danger)'}}>${budgetLines.reduce((s,l)=>s+parseFloat(l.actual||0),0).toFixed(0)}</span>
-                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input placeholder="Label" value={newItem.label} onChange={e => setNew(p => ({ ...p, label: e.target.value }))}
+                  style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 6, fontSize: '.82rem' }} />
+                <input type="number" placeholder="$" value={newItem.amount} onChange={e => setNew(p => ({ ...p, amount: e.target.value }))}
+                  style={{ width: 80, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 6, fontSize: '.82rem' }} />
+                <button className="primary-btn" style={{ padding: '8px 12px', fontSize: '.82rem' }}
+                  onClick={() => { if (!newItem.label) return; save([...items, { ...newItem }]); setNew({ label: '', amount: '' }) }}>+</button>
               </div>
-            )}
-          </section>
-        </div>
+            </div>
+          ))}
+          <div style={{ padding: '12px', background: 'var(--stone)', borderRadius: 10, marginTop: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span>Total Bills</span><strong style={{ color: 'var(--danger)' }}>${totalBills.toFixed(2)}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Net Remaining</span>
+              <strong style={{ color: Number(monthlyBudget.income) - totalBills >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                ${(Number(monthlyBudget.income) - totalBills).toFixed(2)}
+              </strong>
+            </div>
+          </div>
+        </section>
       )}
 
+      {/* ── NO-SPEND ───────────────────────────────────────────────────── */}
       {tab === 'nospend' && (
         <section className="card">
-          <p className="eyebrow">Save More</p>
-          <h3 style={{margin:'4px 0 10px'}}>35 No-Spend Weekend Ideas</h3>
-          <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Free things to do that keep money in your pocket.</p>
-          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-            {['De-clutter and sell your stuff','Attend free music or movies in the park','Have a picnic','Hike','Go to a park','Bike ride','Play board games','Host a potluck','Learn a new skill','Read a book','Make a new recipe','Play with your kids','Create art for your home','Sort and organize photos','Build a fire','DIY something','Visit a free museum','Volunteer','Camp in your backyard','Go fishing','Go to the beach','Explore your library','Take pictures','Make a budget','Re-design a room','Make lists','Write your goals','Garden','Slow down and relax','Host a clothing swap','Write','Draw or paint','Play a video game','Organize your cabinets','Sit outside with coffee or tea'].map(item => (
-              <span key={item} style={{
-                padding:'5px 10px',borderRadius:999,
-                border:'1px solid var(--border2)',
-                background:'var(--stone)',
-                fontSize:'.75rem',color:'var(--ink2)',
-                display:'inline-block'
-              }}>{item}</span>
+          <p className="eyebrow">No-Spend Challenge</p>
+          <h3 style={{ margin: '4px 0 6px' }}>Color In One Per Day</h3>
+          <p className="muted" style={{ fontSize: '.8rem', marginBottom: 14 }}>
+            {noSpendFilled} of {noSpend.days} days complete
+          </p>
+          <div style={{ height: 8, borderRadius: 999, background: 'var(--border)', marginBottom: 16 }}>
+            <div style={{ height: '100%', borderRadius: 999, background: 'var(--success)', width: `${(noSpendFilled / noSpend.days) * 100}%` }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginBottom: 16 }}>
+            {daysArray.map(day => {
+              const done = noSpend.checked.includes(day)
+              return (
+                <button key={day} onClick={() => {
+                  const next = done ? noSpend.checked.filter(d => d !== day) : [...noSpend.checked, day]
+                  saveNoSpend({ ...noSpend, checked: next })
+                }} style={{
+                  aspectRatio: '1', borderRadius: '50%', border: '1.5px solid var(--border2)',
+                  background: done ? 'var(--success)' : 'var(--stone)',
+                  color: done ? 'white' : 'var(--ink2)', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>{day}</button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ fontSize: '.85rem' }}>Challenge length:</span>
+            {[7, 14, 21, 30].map(d => (
+              <button key={d} className={noSpend.days === d ? 'pill active-pill' : 'pill'}
+                style={{ fontSize: '.78rem' }}
+                onClick={() => saveNoSpend({ days: d, checked: [] })}>{d} days</button>
             ))}
           </div>
         </section>
@@ -2255,6 +2588,8 @@ function FinancePage({ expenses, budget, setBudget }) {
     </div>
   )
 }
+
+
 
 // ── WELLNESS PAGE ─────────────────────────────────────────────────────────
 function HealthWellnessPage() {
