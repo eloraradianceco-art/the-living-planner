@@ -2362,53 +2362,144 @@ function FinancePage({ expenses, budget, setBudget }) {
       {tab === 'savings' && (
         <div>
           <section className="card">
-            <p className="eyebrow">52-Week Challenge</p>
-            <h3 style={{ margin: '4px 0 6px' }}>Save Your Goal in 52 Weeks</h3>
-            {/* Goal toggle */}
-            <div style={{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}}>
-              <span className="muted" style={{fontSize:'.8rem',alignSelf:'center'}}>Goal:</span>
-              {[1000,3000,5000,10000].map(g => (
-                <button key={g} className={challengeGoal===g?'pill active-pill':'pill'}
-                  onClick={()=>{saveChallengeGoal(g); saveCheckedWeeks([])}}
-                  style={{fontSize:'.78rem'}}>${g.toLocaleString()}</button>
-              ))}
-            </div>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:12}}>Current week: <strong>Week {currentWeekNum}</strong> · Tap a week to mark it saved</p>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:12,background:'var(--stone)',borderRadius:10,padding:'12px 16px'}}>
-              <div>
-                <p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Saved so far</p>
-                <strong style={{color:'var(--success)',fontSize:'1.2rem'}}>{fmt(totalSavedSoFar)}</strong>
-              </div>
-              <div style={{textAlign:'right'}}>
-                <p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Remaining</p>
-                <strong style={{color:'var(--danger)',fontSize:'1.2rem'}}>{fmt(challengeGoal - totalSavedSoFar)}</strong>
-              </div>
-            </div>
-            <div style={{height:10,borderRadius:999,background:'var(--border)',marginBottom:14}}>
-              <div style={{height:'100%',borderRadius:999,background:'var(--success)',width:`${Math.min((totalSavedSoFar/challengeGoal)*100,100)}%`,transition:'width .3s'}} />
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
-              {WEEK_PLAN.map((amt, i) => {
-                const week = i + 1
-                const done = checkedWeeks.includes(week)
-                const isCurrent = week === currentWeekNum
+            <p className="eyebrow">Savings Challenge</p>
+            <h3 style={{ margin: '4px 0 6px' }}>Build Your Savings — Your Way</h3>
+
+            {/* Challenge selector */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
+              {[
+                {goal:1000, label:'$1,000', timeLabel:'30 Days', type:'daily', periods:30, color:'#4CAF50'},
+                {goal:3000, label:'$3,000', timeLabel:'3 Months', type:'weekly', periods:13, color:'#2196F3'},
+                {goal:5000, label:'$5,000', timeLabel:'6 Months', type:'biweekly', periods:26, color:'#FF9800'},
+                {goal:10000, label:'$10,000', timeLabel:'52 Weeks', type:'weekly52', periods:52, color:'#9C27B0'},
+              ].map(cfg => {
+                const isActive = challengeGoal === cfg.goal
                 return (
-                  <button key={week} onClick={() => toggleWeek(week)} style={{
-                    padding:'8px 4px',borderRadius:8,
-                    border: isCurrent ? '2px solid var(--brass)' : '1px solid var(--border)',
-                    background: done ? 'var(--success)' : 'var(--stone)',
-                    color: done ? 'white' : 'var(--ink)',cursor:'pointer',
-                    fontSize:'.72rem',fontWeight:600,lineHeight:1.3,
-                    boxShadow: isCurrent ? '0 0 0 2px var(--brass)33' : 'none'
-                  }}>
-                    <div style={{fontSize:'.63rem',opacity:0.7}}>Wk {week}</div>
-                    <div>${amt}</div>
+                  <button key={cfg.goal} onClick={() => { saveChallengeGoal(cfg.goal); saveCheckedWeeks([]) }}
+                    style={{
+                      padding:'14px 10px', borderRadius:12, cursor:'pointer', textAlign:'center',
+                      border: isActive ? `2px solid ${cfg.color}` : '1.5px solid var(--border)',
+                      background: isActive ? cfg.color+'18' : 'var(--stone)',
+                      transition:'all .2s'
+                    }}>
+                    <div style={{fontSize:'1.2rem',fontWeight:800,color:isActive?cfg.color:'var(--ink)'}}>{cfg.label}</div>
+                    <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>in {cfg.timeLabel}</div>
+                    {isActive && <div style={{fontSize:'.68rem',color:cfg.color,marginTop:4,fontWeight:600}}>✓ Active</div>}
                   </button>
                 )
               })}
             </div>
+
+            {/* Dynamic challenge based on selection */}
+            {(() => {
+              const CHALLENGES = {
+                1000: {
+                  goal: 1000, label: '$1,000 in 30 Days', color: '#4CAF50', type: 'daily',
+                  desc: 'Save every day for 30 days. Tap each day as you set money aside.',
+                  unitLabel: 'Day', gridCols: 'repeat(6,1fr)',
+                  // 30 amounts averaging $33.33/day that add to exactly $1000
+                  amounts: [25,30,35,40,25,30,35,40,25,30,35,25,40,30,35,25,40,35,30,25,40,35,30,40,25,35,30,40,35,55]
+                },
+                3000: {
+                  goal: 3000, label: '$3,000 in 3 Months', color: '#2196F3', type: 'weekly',
+                  desc: 'Save each week for 13 weeks. Consistency beats intensity.',
+                  unitLabel: 'Week', gridCols: 'repeat(4,1fr)',
+                  // 13 weekly amounts totaling $3000 (~$230/wk), escalating pattern
+                  amounts: [175,200,200,225,225,225,250,250,250,250,250,250,250]
+                },
+                5000: {
+                  goal: 5000, label: '$5,000 in 6 Months', color: '#FF9800', type: 'biweekly',
+                  desc: 'Save every 2 weeks for 26 periods. Pairs perfectly with bi-weekly pay.',
+                  unitLabel: 'Period', gridCols: 'repeat(4,1fr)',
+                  // 26 bi-weekly amounts totaling $5000 (~$192/period), escalating
+                  amounts: [150,150,175,175,175,175,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200]
+                },
+                10000: {
+                  goal: 10000, label: '$10,000 in 52 Weeks', color: '#9C27B0', type: 'weekly52',
+                  desc: 'The classic 52-week challenge. Current week highlighted.',
+                  unitLabel: 'Week', gridCols: 'repeat(4,1fr)',
+                  amounts: WEEK_PLAN
+                },
+              }
+
+              const cfg = CHALLENGES[challengeGoal] || CHALLENGES[10000]
+              const totalSaved = checkedWeeks.reduce((s, w) => s + (cfg.amounts[w-1] || 0), 0)
+              const pct = Math.min((totalSaved / cfg.goal) * 100, 100)
+              const remaining = cfg.goal - totalSaved
+              const periodsLeft = cfg.amounts.length - checkedWeeks.length
+              const avgNeeded = periodsLeft > 0 ? remaining / periodsLeft : 0
+
+              return (
+                <div>
+                  <div style={{background:'var(--stone)',borderRadius:10,padding:'14px',marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+                      <div>
+                        <p style={{fontWeight:700,color:'var(--ink)',margin:'0 0 2px'}}>{cfg.label}</p>
+                        <p className="muted" style={{fontSize:'.78rem',margin:0}}>{cfg.desc}</p>
+                      </div>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                      {[
+                        ['Saved', '$'+totalSaved.toLocaleString(), cfg.color],
+                        ['Remaining', '$'+remaining.toLocaleString(), 'var(--danger)'],
+                        ['Avg/period', '$'+avgNeeded.toFixed(0), 'var(--brass)'],
+                      ].map(([l,v,c]) => (
+                        <div key={l} style={{textAlign:'center',background:'white',borderRadius:8,padding:'8px 4px'}}>
+                          <div className="muted" style={{fontSize:'.68rem',marginBottom:2}}>{l}</div>
+                          <strong style={{color:c,fontSize:'1rem'}}>{v}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{height:10,borderRadius:999,background:'var(--border)'}}>
+                      <div style={{height:'100%',borderRadius:999,background:cfg.color,width:`${pct}%`,transition:'width .3s'}} />
+                    </div>
+                    <div style={{display:'flex',justifyContent:'space-between',marginTop:4}}>
+                      <span className="muted" style={{fontSize:'.72rem'}}>{pct.toFixed(1)}% complete</span>
+                      <span className="muted" style={{fontSize:'.72rem'}}>{checkedWeeks.length} of {cfg.amounts.length} {cfg.unitLabel.toLowerCase()}s done</span>
+                    </div>
+                  </div>
+
+                  {cfg.type === 'weekly52' && (
+                    <p className="muted" style={{fontSize:'.78rem',marginBottom:8}}>
+                      Current: <strong style={{color:cfg.color}}>Week {currentWeekNum}</strong> — tap to mark saved
+                    </p>
+                  )}
+
+                  <div style={{display:'grid',gridTemplateColumns:cfg.gridCols,gap:5}}>
+                    {cfg.amounts.map((amt, i) => {
+                      const period = i + 1
+                      const done = checkedWeeks.includes(period)
+                      const isCurrent = cfg.type === 'weekly52' && period === currentWeekNum
+                      return (
+                        <button key={period} onClick={() => toggleWeek(period)} style={{
+                          padding: cfg.type==='daily' ? '6px 2px' : '8px 4px',
+                          borderRadius: cfg.type==='daily' ? '50%' : 8,
+                          border: isCurrent ? `2px solid ${cfg.color}` : '1px solid var(--border)',
+                          background: done ? cfg.color : 'var(--stone)',
+                          color: done ? 'white' : 'var(--ink)', cursor:'pointer',
+                          fontSize:'.68rem', fontWeight:600, lineHeight:1.3,
+                          aspectRatio: cfg.type==='daily' ? '1' : 'auto',
+                          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                          boxShadow: isCurrent ? `0 0 0 2px ${cfg.color}33` : 'none'
+                        }}>
+                          <div style={{fontSize:'.6rem',opacity:0.7}}>{cfg.unitLabel.charAt(0)}{period}</div>
+                          <div>${amt}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <button onClick={() => saveCheckedWeeks([])}
+                    style={{marginTop:12,background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'6px 14px',
+                    fontSize:'.78rem',color:'var(--muted)',cursor:'pointer',width:'100%'}}>
+                    Reset Challenge
+                  </button>
+                </div>
+              )
+            })()}
           </section>
 
+          {/* Savings Goals */}
           <section className="card">
             <p className="eyebrow">Savings Goals</p>
             <h3 style={{ margin: '4px 0 14px' }}>What You're Building Toward</h3>
@@ -2419,6 +2510,9 @@ function FinancePage({ expenses, budget, setBudget }) {
             {savingsGoals.map((sg, i) => {
               const pct = sg.goal > 0 ? Math.min((sg.current / sg.goal) * 100, 100) : 0
               const isEditing = editingSavings[i] !== undefined
+              const monthsLeft = sg.goal > sg.current && totalWeeklyIncome > 0
+                ? ((sg.goal - sg.current) / (totalWeeklyIncome * 4.33)).toFixed(1)
+                : null
               return (
                 <div key={sg.id} style={{marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:12}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
@@ -2430,10 +2524,14 @@ function FinancePage({ expenses, budget, setBudget }) {
                     <span className="muted" style={{fontSize:'.8rem'}}>Goal: <strong>{fmt(sg.goal)}</strong></span>
                     <span className="muted" style={{fontSize:'.8rem'}}>{pct.toFixed(0)}% complete</span>
                   </div>
-                  <div style={{height:10,borderRadius:999,background:'var(--border)',marginBottom:10}}>
+                  <div style={{height:10,borderRadius:999,background:'var(--border)',marginBottom:8}}>
                     <div style={{height:'100%',borderRadius:999,background:sg.color||'var(--brass)',width:`${pct}%`,transition:'width .3s'}} />
                   </div>
-                  {/* Editable saved amount */}
+                  {monthsLeft && (
+                    <p className="muted" style={{fontSize:'.75rem',margin:'0 0 8px'}}>
+                      💡 At your current income rate, ~<strong>{monthsLeft} months</strong> to reach this goal if you saved 20%
+                    </p>
+                  )}
                   <div style={{display:'flex',gap:8,alignItems:'center'}}>
                     <span className="muted" style={{fontSize:'.8rem'}}>Saved:</span>
                     {isEditing ? (
@@ -2483,8 +2581,6 @@ function FinancePage({ expenses, budget, setBudget }) {
           </section>
         </div>
       )}
-
-      {/* ── DEBT ─────────────────────────────────────────────────────────── */}
       {tab === 'debt' && (
         <section className="card">
           <p className="eyebrow">Debt Tracker</p>
