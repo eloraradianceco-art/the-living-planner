@@ -1045,7 +1045,7 @@ const tabs = [
 ]
 
 // Additional routes not in bottom nav
-const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects']
+const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects', '/faith']
 
 function Layout({ children, onQuickAdd, banner, profile }) {
   const location = useLocation()
@@ -1370,10 +1370,10 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     { to:'/goals',        icon:'🎯', label:'Goals',        color:'var(--brass)',  count: goals.length || null },
     { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',       count: null },
     { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',   count: null },
-    { to:'/wellness', icon:'🌿', label:'Health & Wellness', color:'#22C55E', count: null },
-    
+    { to:'/wellness',     icon:'🌿', label:'Health & Wellness', color:'#22C55E', count: null },
     { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',       count: null },
     { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--slate)',   count: null },
+    { to:'/faith',        icon:'✝',  label:'Faith',        color:'var(--brass)',   count: null },
   ]
 
   return (
@@ -4016,7 +4016,6 @@ function LifestylePage() {
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
   const [contacts, setContacts] = useState(() => lsGet('contacts', []))
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
-  const [brainDump, setBrainDump] = useState(() => lsGet('brainDump', ''))
   const [form, setForm] = useState({})
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
 
@@ -4052,34 +4051,92 @@ function LifestylePage() {
 
 
       {tab === 'groceries' && (
-        <section className="card">
-          <p className="eyebrow">Grocery List</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Shopping List</h3>
-          {groceries.map((item, i) => (
-            <div key={i} onClick={() => save('groceries', setGroceries, groceries.map((g, j) => j === i ? { ...g, done: !g.done } : g))}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--surface)', cursor: 'pointer' }}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: item.done ? 'var(--teal)' : 'var(--border2)', background: item.done ? 'var(--teal)' : 'transparent', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                {item.done && <span style={{ color: 'var(--navy)', fontWeight: 700, fontSize: '.8rem' }}>✓</span>}
+        <div>
+          {/* Custom list */}
+          <section className="card">
+            <p className="eyebrow">My List</p>
+            <h3 style={{ margin: '4px 0 12px' }}>Shopping List</h3>
+            {groceries.map((item, i) => (
+              <div key={i} onClick={() => save('groceries', setGroceries, groceries.map((g, j) => j === i ? { ...g, done: !g.done } : g))}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
+                <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: item.done ? 'var(--navy)' : 'var(--border2)', background: item.done ? 'var(--navy)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {item.done && <span style={{ color: 'white', fontWeight: 700, fontSize: '.8rem' }}>✓</span>}
+                </div>
+                <span style={{ flex: 1, textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--muted)' : 'var(--ink)', fontSize: '.9rem' }}>{item.label}</span>
+                {item.qty && <span style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.qty}</span>}
+                <button onClick={e => { e.stopPropagation(); save('groceries', setGroceries, groceries.filter((_, j) => j !== i)) }}
+                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
               </div>
-              <span style={{ flex: 1, textDecoration: item.done ? 'line-through' : 'none', color: item.done ? 'var(--muted)' : 'var(--text)', fontSize: '.9rem' }}>{item.label}</span>
-              {item.qty && <span style={{ fontSize: '.78rem', color: 'var(--teal)' }}>{item.qty}</span>}
-              <button onClick={e => { e.stopPropagation(); save('groceries', setGroceries, groceries.filter((_, j) => j !== i)) }}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+            ))}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <input placeholder="Item" value={form.grocLabel || ''} onChange={e => setForm(p => ({ ...p, grocLabel: e.target.value }))}
+                style={{ flex: 2, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <input placeholder="Qty" value={form.grocQty || ''} onChange={e => setForm(p => ({ ...p, grocQty: e.target.value }))}
+                style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+              <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
+                onClick={() => { if (!form.grocLabel) return; save('groceries', setGroceries, [...groceries, { label: form.grocLabel, qty: form.grocQty, done: false }]); setForm(p => ({ ...p, grocLabel: '', grocQty: '' })) }}>+</button>
             </div>
-          ))}
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <input placeholder="Item" value={form.grocLabel || ''} onChange={e => setForm(p => ({ ...p, grocLabel: e.target.value }))}
-              style={{ flex: 2, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <input placeholder="Qty" value={form.grocQty || ''} onChange={e => setForm(p => ({ ...p, grocQty: e.target.value }))}
-              style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
-              onClick={() => { if (!form.grocLabel) return; save('groceries', setGroceries, [...groceries, { label: form.grocLabel, qty: form.grocQty, done: false }]); setForm(p => ({ ...p, grocLabel: '', grocQty: '' })) }}>Add</button>
-          </div>
-          {groceries.some(g => g.done) && (
-            <button className="ghost-btn" style={{ marginTop: 10, fontSize: '.82rem' }}
-              onClick={() => save('groceries', setGroceries, groceries.filter(g => !g.done))}>Clear Checked</button>
-          )}
-        </section>
+            {groceries.some(g => g.done) && (
+              <button className="ghost-btn" style={{ marginTop: 10, fontSize: '.82rem' }}
+                onClick={() => save('groceries', setGroceries, groceries.filter(g => !g.done))}>Clear Checked</button>
+            )}
+          </section>
+
+          {/* Master grocery list */}
+          <section className="card">
+            <p className="eyebrow">Master Grocery List</p>
+            <h3 style={{ margin: '4px 0 6px' }}>Tap to add to your list</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Tap any item to add it to your shopping list above.</p>
+            {[
+              { cat:'🍎 Fruits', color:'#fde8e8', items:['Apples','Apricots','Avocados','Bananas','Berries','Cherries','Grapefruit','Grapes','Kiwi','Lemons','Limes','Melons','Nectarines','Oranges','Papaya','Peaches','Pears','Plums','Pomegranate','Watermelon'] },
+              { cat:'🥦 Vegetables', color:'#d5f5e3', items:['Artichokes','Asparagus','Basil','Beets','Broccoli','Cabbage','Cauliflower','Carrots','Celery','Chiles','Chives','Cilantro','Corn','Cucumbers','Eggplant','Garlic Cloves','Green Onions','Lettuce','Onions','Peppers','Potatoes','Salad Greens','Spinach','Sprouts','Squash','Tomatoes','Zucchini'] },
+              { cat:'🥩 Meat', color:'#fde8e8', items:['Bacon','Chicken','Deli Meat','Ground Beef','Ground Turkey','Ham','Hot Dogs','Pork','Sausage','Steak','Turkey'] },
+              { cat:'🐟 Seafood', color:'#d5eaf5', items:['Catfish','Cod','Crab','Halibut','Lobster','Oysters','Salmon','Shrimp','Tilapia','Tuna'] },
+              { cat:'❄ Frozen', color:'#e8d5f5', items:['Chicken Bites','Desserts','Fish Sticks','Frozen Fruit','Ice','Ice Cream','Ice Pops','Frozen Juice','Frozen Meat','Pie Shells','Pizza','Pot Pies','Frozen Potatoes','TV Dinners','Frozen Vegetables','Veggie Burger','Waffles'] },
+              { cat:'🥛 Refrigerated', color:'#fff8e1', items:['Biscuits','Butter','Cheddar Cheese','Cream','Cream Cheese','Dip','Eggs','Egg Substitute','Feta Cheese','Half & Half','Jack Cheese','Milk','Mozzarella','Processed Cheese','Salsa','Shredded Cheese','Sour Cream','Swiss Cheese','Whipped Cheese','Yogurt'] },
+              { cat:'🍞 Bakery', color:'#fde8e8', items:['Bagels','Bread','Donuts','Cake','Cookies','Croutons','Dinner Rolls','Hamburger Buns','Hot Dog Buns','Muffins','Pastries','Pie','Pita Bread','Tortillas (Corn)','Tortillas (Flour)'] },
+              { cat:'🥫 Cans & Jars', color:'#e8f5e9', items:['Applesauce','Baked Beans','Black Beans','Broth','Bullion Cubes','Canned Fruit','Canned Vegetables','Carrots','Chili','Corn','Creamed Corn','Jam/Jelly','Mushrooms','Olives (Green)','Olives (Black)','Pasta','Pasta Sauce','Peanut Butter','Pickles','Pie Filling','Soup'] },
+              { cat:'🍝 Pasta & Rice', color:'#fff3cd', items:['Brown Rice','Burger Helper','Couscous','Elbow Macaroni','Lasagna','Mac & Cheese','Noodle Mix','Rice Mix','Spaghetti','White Rice'] },
+              { cat:'🧁 Baking', color:'#fce4ec', items:['Baking Powder','Baking Soda','Bread Crumbs','Cake Decor','Cake Mix','Canned Milk','Chocolate Chips','Cocoa','Cornmeal','Cornstarch','Flour','Food Coloring','Frosting','Muffin Mix','Pie Crust','Shortening','Brown Sugar','Powdered Sugar','Sugar','Yeast'] },
+              { cat:'🍿 Snacks', color:'#e8f4f8', items:['Candy','Cookies','Crackers','Dried Fruit','Fruit Snacks','Gelatin','Graham Crackers','Granola Bars','Gum','Nuts','Popcorn','Potato Chips','Pretzels','Pudding','Raisins','Seeds','Tortilla Chips'] },
+              { cat:'🥣 Breakfast', color:'#fff8e1', items:['Cereal','Grits','Instant Breakfast Drink','Oatmeal','Pancake Mix'] },
+              { cat:'🧂 Seasoning', color:'#f3e5f5', items:['Basil','Bay Leaves','BBQ Seasoning','Cinnamon','Cloves','Cumin','Curry','Dill','Garlic Powder','Garlic Salt','Gravy Mix','Italian Seasoning','Marinade','Meat Tenderizer','Oregano','Paprika','Pepper','Poppy Seed','Red Pepper','Sage','Salt','Seasoned Salt','Soup Mix','Vanilla Extract'] },
+              { cat:'🫙 Sauces & Condiments', color:'#e8f5e9', items:['BBQ Sauce','Catsup','Cocktail Sauce','Cooking Spray','Honey','Horseradish','Hot Sauce','Lemon Juice','Mayonnaise','Mustard','Olive Oil','Relish','Salad Dressing','Salsa','Soy Sauce','Steak Sauce','Sweet & Sour','Teriyaki','Vegetable Oil','Vinegar'] },
+              { cat:'🥤 Drinks', color:'#e3f2fd', items:['Beer','Champagne','Club Soda','Coffee','Diet Soft Drinks','Energy Drinks','Juice','Liquor','Soft Drinks','Tea','Wine'] },
+              { cat:'🧻 Paper Products', color:'#fff3e0', items:['Aluminum Foil','Coffee Filters','Cups','Garbage Bags','Napkins','Paper Plates','Paper Towels','Plastic Bags','Plastic Cutlery','Plastic Wrap','Straws','Waxed Paper'] },
+              { cat:'🧹 Cleaning', color:'#e8f5e9', items:['Air Freshener','Bleach','Dish Soap','Dishwasher Detergent','Fabric Softener','Floor Cleaner','Glass Spray','Laundry Soap','Polish','Sponges','Vacuum Bags'] },
+              { cat:'🧴 Personal Care', color:'#fce4ec', items:['Bath Soap','Bug Repellant','Conditioner','Cotton Swabs','Dental Floss','Deodorant','Facial Tissue','Family Planning','Feminine Products','Hair Spray','Hand Soap','Lip Care','Lotion','Makeup','Mouthwash','Razors/Blades','Shampoo','Shaving Cream','Sunscreen','Toilet Tissue','Toothbrush','Toothpaste'] },
+              { cat:'👶 Baby', color:'#e8d5f5', items:['Baby Cereal','Baby Food','Diapers','Diaper Cream','Formula','Wipes'] },
+              { cat:'🐾 Pets', color:'#fff8e1', items:['Cat Food','Cat Sand','Dog Food','Pet Shampoo','Treats','Flea Treatment'] },
+              { cat:'⚡ Misc Items', color:'#f5f5f5', items:['Batteries','Charcoal','Greeting Cards','Light Bulbs'] },
+            ].map(({ cat, color, items }) => (
+              <div key={cat} style={{marginBottom:16}}>
+                <div style={{background:color,borderRadius:8,padding:'8px 12px',marginBottom:8}}>
+                  <strong style={{fontSize:'.82rem'}}>{cat}</strong>
+                </div>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  {items.map(item => {
+                    const alreadyAdded = groceries.some(g => g.label.toLowerCase() === item.toLowerCase())
+                    return (
+                      <button key={item} onClick={() => {
+                        if (alreadyAdded) return
+                        save('groceries', setGroceries, [...groceries, { label: item, qty: '', done: false }])
+                      }} style={{
+                        padding:'5px 10px', borderRadius:999, fontSize:'.78rem', cursor: alreadyAdded ? 'default' : 'pointer',
+                        border: alreadyAdded ? '1.5px solid var(--success)' : '1.5px solid var(--border2)',
+                        background: alreadyAdded ? 'var(--success)' : 'var(--stone)',
+                        color: alreadyAdded ? 'white' : 'var(--ink2)',
+                        fontWeight: 500
+                      }}>
+                        {alreadyAdded ? '✓ ' : '+ '}{item}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </section>
+        </div>
       )}
 
       {tab === 'contacts' && (
@@ -4950,6 +5007,7 @@ function PlannerApp() {
           <Route path="/wellness" element={<HealthWellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
+          <Route path="/faith" element={<FaithPage />} />
           <Route path="/health" element={<HealthWellnessPage />} />
           <Route path="/more" element={<MorePage profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
@@ -5000,6 +5058,410 @@ class AppErrorBoundary extends React.Component {
     return this.props.children
   }
 }
+
+// ── FAITH PAGE ───────────────────────────────────────────────────────────────
+function FaithPage() {
+  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
+
+  const [tab, setTab] = useState('devotional')
+
+  // Prayer journal state
+  const [prayers, setPrayers] = useState(() => lsGet('prayers', []))
+  const [newPrayer, setNewPrayer] = useState({ text: '', type: 'Request', answered: false })
+  const savePrayers = (v) => { setPrayers(v); lsSet('prayers', v) }
+
+  // Scripture journal state
+  const [scriptures, setScriptures] = useState(() => lsGet('scriptures', []))
+  const [newScripture, setNewScripture] = useState({ reference: '', text: '', reflection: '' })
+  const saveScriptures = (v) => { setScriptures(v); lsSet('scriptures', v) }
+
+  // Gratitude state
+  const [gratitude, setGratitude] = useState(() => lsGet('gratitude', []))
+  const [newGratitude, setNewGratitude] = useState('')
+  const saveGratitude = (v) => { setGratitude(v); lsSet('gratitude', v) }
+
+  // Devotional journal
+  const [devotional, setDevotional] = useState(() => lsGet('devotional', { text: '', date: '' }))
+  const saveDevotional = (v) => { setDevotional(v); lsSet('devotional', v) }
+
+  // Fasting tracker
+  const [fasting, setFasting] = useState(() => lsGet('fasting', { active: false, startDate: '', endDate: '', intention: '', log: [] }))
+  const saveFasting = (v) => { setFasting(v); lsSet('fasting', v) }
+
+  // Faith goals
+  const [faithGoals, setFaithGoals] = useState(() => lsGet('faithGoals', []))
+  const [newFaithGoal, setNewFaithGoal] = useState({ text: '', category: 'Spiritual Growth', done: false })
+  const saveFaithGoals = (v) => { setFaithGoals(v); lsSet('faithGoals', v) }
+
+  // Sermon notes
+  const [sermons, setSermons] = useState(() => lsGet('sermons', []))
+  const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
+  const saveSermons = (v) => { setSermons(v); lsSet('sermons', v) }
+
+  const TODAY = new Date().toISOString().slice(0,10)
+  const todayGratitude = gratitude.filter(g => g.date === TODAY)
+  const answeredPrayers = prayers.filter(p => p.answered).length
+
+  const TABS = [
+    { id: 'devotional', label: '📖 Devotional' },
+    { id: 'prayer', label: '🙏 Prayer' },
+    { id: 'scripture', label: '📜 Scripture' },
+    { id: 'gratitude', label: '🌸 Gratitude' },
+    { id: 'fasting', label: '⚡ Fasting' },
+    { id: 'sermons', label: '🎙 Sermons' },
+    { id: 'goals', label: '🎯 Faith Goals' },
+  ]
+
+  return (
+    <div className="screen-stack">
+      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
+        <span style={{fontSize:'1.1rem'}}>✝</span>
+        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Faith</p>
+      </div>
+
+      {/* Stats strip */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+        {[
+          ['🙏', prayers.filter(p=>!p.answered).length+' Active', 'Prayers'],
+          ['✅', answeredPrayers+' Answered', 'Prayers'],
+          ['🌸', todayGratitude.length+' Today', 'Gratitude'],
+        ].map(([icon,val,label]) => (
+          <div key={label+val} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
+            <div style={{fontSize:'1.1rem',marginBottom:2}}>{icon}</div>
+            <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--brass)'}}>{val}</div>
+            <div className="muted" style={{fontSize:'.7rem'}}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+        {TABS.map(t => (
+          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
+            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
+      {tab === 'devotional' && (
+        <section className="card">
+          <p className="eyebrow">Daily Devotional</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Time with God</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Use this space for your daily quiet time — reading, reflection, what God is speaking to you.</p>
+
+          {/* Daily verse prompt */}
+          <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
+            <p className="eyebrow" style={{color:'var(--brass)',marginBottom:6}}>Today's Anchor</p>
+            {[
+              '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
+              '"I can do all things through Christ who strengthens me." — Philippians 4:13',
+              '"Be still and know that I am God." — Psalm 46:10',
+              '"For I know the plans I have for you, declares the Lord, plans to prosper you." — Jeremiah 29:11',
+              '"The Lord is my shepherd; I shall not want." — Psalm 23:1',
+              '"Let your light shine before others, that they may see your good deeds." — Matthew 5:16',
+              '"And we know that in all things God works for the good of those who love him." — Romans 8:28',
+            ][new Date().getDay() % 7].split('—').map((part, i) => (
+              i === 0
+                ? <p key={i} style={{color:'white',fontSize:'.95rem',fontFamily:'var(--serif)',lineHeight:1.7,fontStyle:'italic',margin:'0 0 6px'}}>"{part.trim()}"</p>
+                : <p key={i} style={{color:'var(--brass)',fontSize:'.78rem',fontWeight:600,margin:0}}>— {part.trim()}</p>
+            ))}
+          </div>
+
+          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Today's Reflection — {TODAY}</p>
+          <textarea value={devotional.date === TODAY ? devotional.text : ''}
+            onChange={e => saveDevotional({ text: e.target.value, date: TODAY })}
+            placeholder="What is God speaking to you today? What did you read? What are you sensing?"
+            style={{width:'100%',minHeight:200,padding:'12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+            fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
+          <p className="muted" style={{fontSize:'.75rem',marginTop:6}}>Saved automatically.</p>
+        </section>
+      )}
+
+      {/* ── PRAYER ─────────────────────────────────────────────────────────── */}
+      {tab === 'prayer' && (
+        <section className="card">
+          <p className="eyebrow">Prayer Journal</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Your Prayer Life</h3>
+
+          {/* Active prayers */}
+          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Active Requests</p>
+          {prayers.filter(p => !p.answered).length === 0 && (
+            <p className="muted" style={{fontSize:'.82rem',marginBottom:12,fontStyle:'italic'}}>No active prayer requests. Add one below.</p>
+          )}
+          {prayers.filter(p => !p.answered).map((prayer, i) => (
+            <div key={prayer.id} style={{padding:'12px',background:'var(--stone)',borderRadius:10,marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'.78rem',color:'var(--brass)',fontWeight:600,marginBottom:4}}>{prayer.type} · {prayer.date}</div>
+                  <div style={{fontSize:'.9rem',color:'var(--ink)',lineHeight:1.5}}>{prayer.text}</div>
+                </div>
+                <div style={{display:'flex',gap:6,flexShrink:0}}>
+                  <button onClick={() => savePrayers(prayers.map(p => p.id===prayer.id ? {...p, answered:true, answeredDate:TODAY} : p))}
+                    style={{background:'var(--success)',color:'white',border:'none',borderRadius:6,padding:'4px 8px',fontSize:'.72rem',cursor:'pointer',fontWeight:600}}>✓ Answered</button>
+                  <button onClick={() => savePrayers(prayers.filter(p => p.id !== prayer.id))}
+                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Answered prayers */}
+          {prayers.filter(p => p.answered).length > 0 && (
+            <div style={{marginBottom:16}}>
+              <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8,color:'var(--success)'}}>✓ Answered Prayers ({answeredPrayers})</p>
+              {prayers.filter(p => p.answered).slice(0,5).map(prayer => (
+                <div key={prayer.id} style={{padding:'10px 12px',background:'var(--success)18',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between',gap:8}}>
+                  <div>
+                    <div style={{fontSize:'.72rem',color:'var(--success)',fontWeight:600,marginBottom:2}}>Answered {prayer.answeredDate || ''}</div>
+                    <div style={{fontSize:'.85rem',color:'var(--ink2)'}}>{prayer.text}</div>
+                  </div>
+                  <button onClick={() => savePrayers(prayers.filter(p => p.id !== prayer.id))}
+                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add prayer */}
+          <div style={{marginTop:8,padding:'14px',background:'var(--stone)',borderRadius:10,display:'grid',gap:8}}>
+            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add Prayer Request</p>
+            <select value={newPrayer.type} onChange={e => setNewPrayer(p => ({...p, type: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+              {['Request','Intercession','Praise','Thanksgiving','Confession'].map(t => <option key={t}>{t}</option>)}
+            </select>
+            <textarea value={newPrayer.text} onChange={e => setNewPrayer(p => ({...p, text: e.target.value}))}
+              placeholder="What are you bringing before God?"
+              style={{width:'100%',minHeight:90,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+              fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',boxSizing:'border-box'}} />
+            <button className="primary-btn" onClick={() => {
+              if (!newPrayer.text.trim()) return
+              savePrayers([{...newPrayer, id: Date.now(), date: TODAY}, ...prayers])
+              setNewPrayer({ text: '', type: 'Request', answered: false })
+            }}>+ Add Prayer</button>
+          </div>
+        </section>
+      )}
+
+      {/* ── SCRIPTURE ──────────────────────────────────────────────────────── */}
+      {tab === 'scripture' && (
+        <section className="card">
+          <p className="eyebrow">Scripture Journal</p>
+          <h3 style={{ margin: '4px 0 14px' }}>God's Word in Your Life</h3>
+          {scriptures.length === 0 && <p className="muted" style={{marginBottom:16,fontStyle:'italic'}}>No scriptures saved yet. Add one below.</p>}
+          {scriptures.map((s, i) => (
+            <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                <strong style={{color:'var(--brass)',fontSize:'.85rem'}}>{s.reference}</strong>
+                <button onClick={() => saveScriptures(scriptures.filter((_,j)=>j!==i))}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+              </div>
+              <p style={{fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,margin:'0 0 8px',fontStyle:'italic',color:'var(--ink)'}}>{s.text}</p>
+              {s.reflection && <p style={{fontSize:'.82rem',color:'var(--ink2)',lineHeight:1.5,margin:0}}>💭 {s.reflection}</p>}
+              <p className="muted" style={{fontSize:'.72rem',margin:'6px 0 0'}}>{s.date}</p>
+            </div>
+          ))}
+          <div style={{marginTop:8,padding:'14px',background:'var(--stone)',borderRadius:10,display:'grid',gap:8}}>
+            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Save a Scripture</p>
+            <input placeholder="Reference (e.g. John 3:16)" value={newScripture.reference}
+              onChange={e => setNewScripture(p => ({...p, reference: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+            <textarea placeholder="Verse text..." value={newScripture.text}
+              onChange={e => setNewScripture(p => ({...p, text: e.target.value}))}
+              style={{width:'100%',minHeight:80,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+              fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',boxSizing:'border-box'}} />
+            <textarea placeholder="Personal reflection on this verse..." value={newScripture.reflection}
+              onChange={e => setNewScripture(p => ({...p, reflection: e.target.value}))}
+              style={{width:'100%',minHeight:70,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+              fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',boxSizing:'border-box'}} />
+            <button className="primary-btn" onClick={() => {
+              if (!newScripture.reference || !newScripture.text) return
+              saveScriptures([{...newScripture, id: Date.now(), date: TODAY}, ...scriptures])
+              setNewScripture({ reference: '', text: '', reflection: '' })
+            }}>+ Save Scripture</button>
+          </div>
+        </section>
+      )}
+
+      {/* ── GRATITUDE ──────────────────────────────────────────────────────── */}
+      {tab === 'gratitude' && (
+        <section className="card">
+          <p className="eyebrow">Gratitude Journal</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Count Your Blessings</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>A grateful heart is a powerful heart. Log at least 3 things daily.</p>
+          <div style={{background:'var(--stone)',borderRadius:10,padding:'12px',marginBottom:14,display:'flex',justifyContent:'space-between'}}>
+            <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Today</p><strong style={{color:'var(--brass)'}}>{todayGratitude.length} entries</strong></div>
+            <div style={{textAlign:'right'}}><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>All time</p><strong>{gratitude.length} blessings</strong></div>
+          </div>
+          <div style={{display:'flex',gap:8,marginBottom:16}}>
+            <input placeholder="What are you grateful for today?" value={newGratitude}
+              onChange={e => setNewGratitude(e.target.value)}
+              style={{flex:1,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem'}}
+              onKeyDown={e => { if (e.key==='Enter' && newGratitude.trim()) { saveGratitude([{text:newGratitude.trim(),date:TODAY,id:Date.now()}, ...gratitude]); setNewGratitude('') }}} />
+            <button className="primary-btn" onClick={() => {
+              if (!newGratitude.trim()) return
+              saveGratitude([{text:newGratitude.trim(),date:TODAY,id:Date.now()}, ...gratitude])
+              setNewGratitude('')
+            }}>+ Add</button>
+          </div>
+          {gratitude.slice(0, 30).reduce((groups, item) => {
+            const g = groups.find(g => g.date === item.date)
+            if (g) g.items.push(item)
+            else groups.push({ date: item.date, items: [item] })
+            return groups
+          }, []).map(group => (
+            <div key={group.date} style={{marginBottom:14}}>
+              <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6}}>
+                {group.date === TODAY ? 'Today' : group.date}
+              </p>
+              {group.items.map(item => (
+                <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                  <span style={{fontSize:'.88rem',color:'var(--ink)'}}>{item.text}</span>
+                  <button onClick={() => saveGratitude(gratitude.filter(g => g.id !== item.id))}
+                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',marginLeft:8}}>✕</button>
+                </div>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* ── FASTING ────────────────────────────────────────────────────────── */}
+      {tab === 'fasting' && (
+        <section className="card">
+          <p className="eyebrow">Fasting Tracker</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Discipline & Consecration</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:16}}>Fasting is a powerful spiritual discipline. Track your intentions and stay accountable.</p>
+          {fasting.active ? (
+            <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
+              <p style={{color:'var(--brass)',fontWeight:700,fontSize:'.85rem',marginBottom:4}}>Active Fast</p>
+              <p style={{color:'white',fontSize:'1rem',fontWeight:600,marginBottom:4}}>{fasting.intention || 'No intention set'}</p>
+              <p style={{color:'rgba(255,255,255,.6)',fontSize:'.8rem'}}>{fasting.startDate} → {fasting.endDate || 'Open'}</p>
+              <button onClick={() => saveFasting({...fasting, active:false, log:[...fasting.log, {start:fasting.startDate,end:TODAY,intention:fasting.intention}]})}
+                style={{marginTop:12,background:'var(--danger)',color:'white',border:'none',borderRadius:8,padding:'8px 16px',cursor:'pointer',fontWeight:600,fontSize:'.85rem'}}>
+                End Fast
+              </button>
+            </div>
+          ) : (
+            <div style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:16,display:'grid',gap:8}}>
+              <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Begin a Fast</p>
+              <input placeholder="Intention / Purpose" value={fasting.intention || ''}
+                onChange={e => saveFasting({...fasting, intention: e.target.value})}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>Start Date</p>
+                  <input type="date" value={fasting.startDate||TODAY} onChange={e => saveFasting({...fasting, startDate: e.target.value})}
+                    style={{width:'100%',padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.85rem',boxSizing:'border-box'}} />
+                </div>
+                <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>End Date (optional)</p>
+                  <input type="date" value={fasting.endDate||''} onChange={e => saveFasting({...fasting, endDate: e.target.value})}
+                    style={{width:'100%',padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.85rem',boxSizing:'border-box'}} />
+                </div>
+              </div>
+              <button className="primary-btn" onClick={() => saveFasting({...fasting, active:true, startDate: fasting.startDate||TODAY})}>Begin Fast</button>
+            </div>
+          )}
+          {fasting.log.length > 0 && (
+            <div>
+              <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Fast History</p>
+              {fasting.log.map((entry, i) => (
+                <div key={i} style={{padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{fontWeight:600,fontSize:'.88rem'}}>{entry.intention || 'Fast'}</div>
+                  <div className="muted" style={{fontSize:'.75rem'}}>{entry.start} → {entry.end}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── SERMONS ────────────────────────────────────────────────────────── */}
+      {tab === 'sermons' && (
+        <section className="card">
+          <p className="eyebrow">Sermon Notes</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Capture What God Says</h3>
+          {sermons.map((s, i) => (
+            <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+                <div>
+                  <strong style={{fontSize:'.9rem'}}>{s.title || 'Untitled'}</strong>
+                  <div className="muted" style={{fontSize:'.75rem'}}>{s.speaker} · {s.date}</div>
+                </div>
+                <button onClick={() => saveSermons(sermons.filter((_,j)=>j!==i))}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+              </div>
+              {s.notes && <p style={{fontSize:'.85rem',lineHeight:1.6,margin:'8px 0 6px',color:'var(--ink2)'}}>{s.notes}</p>}
+              {s.application && <p style={{fontSize:'.82rem',color:'var(--teal)',margin:0}}>🎯 {s.application}</p>}
+            </div>
+          ))}
+          <div style={{padding:'14px',background:'var(--stone)',borderRadius:10,display:'grid',gap:8}}>
+            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>New Sermon Notes</p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <input placeholder="Speaker" value={newSermon.speaker} onChange={e => setNewSermon(p => ({...p, speaker: e.target.value}))}
+                style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+              <input type="date" value={newSermon.date} onChange={e => setNewSermon(p => ({...p, date: e.target.value}))}
+                style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+            </div>
+            <input placeholder="Sermon title" value={newSermon.title} onChange={e => setNewSermon(p => ({...p, title: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+            <textarea placeholder="Key points, quotes, insights..." value={newSermon.notes} onChange={e => setNewSermon(p => ({...p, notes: e.target.value}))}
+              style={{width:'100%',minHeight:100,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+              fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',boxSizing:'border-box'}} />
+            <textarea placeholder="How will I apply this?" value={newSermon.application} onChange={e => setNewSermon(p => ({...p, application: e.target.value}))}
+              style={{width:'100%',minHeight:70,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
+              fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',boxSizing:'border-box'}} />
+            <button className="primary-btn" onClick={() => {
+              if (!newSermon.title && !newSermon.notes) return
+              saveSermons([{...newSermon, id: Date.now()}, ...sermons])
+              setNewSermon({ date: TODAY, speaker: '', title: '', notes: '', application: '' })
+            }}>+ Save Notes</button>
+          </div>
+        </section>
+      )}
+
+      {/* ── FAITH GOALS ─────────────────────────────────────────────────────── */}
+      {tab === 'goals' && (
+        <section className="card">
+          <p className="eyebrow">Faith Goals</p>
+          <h3 style={{ margin: '4px 0 14px' }}>Growing in the Spirit</h3>
+          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16,fontStyle:'italic'}}>No faith goals yet. What is God calling you to grow in?</p>}
+          {faithGoals.map((goal, i) => (
+            <div key={goal.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
+              <div onClick={() => saveFaithGoals(faithGoals.map((g,j) => j===i ? {...g, done:!g.done} : g))}
+                style={{width:22,height:22,borderRadius:6,border:'2px solid',borderColor:goal.done?'var(--success)':'var(--brass)',
+                background:goal.done?'var(--success)':'transparent',flexShrink:0,cursor:'pointer',
+                display:'flex',alignItems:'center',justifyContent:'center'}}>
+                {goal.done && <span style={{color:'white',fontSize:'.8rem',fontWeight:700}}>✓</span>}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontWeight:600,fontSize:'.88rem',textDecoration:goal.done?'line-through':'none',color:goal.done?'var(--muted)':'var(--ink)'}}>{goal.text}</div>
+                <div className="muted" style={{fontSize:'.72rem'}}>{goal.category}</div>
+              </div>
+              <button onClick={() => saveFaithGoals(faithGoals.filter((_,j)=>j!==i))}
+                style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+            </div>
+          ))}
+          <div style={{marginTop:16,display:'grid',gap:8}}>
+            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add a Faith Goal</p>
+            <input placeholder="e.g. Read the Bible in a year" value={newFaithGoal.text}
+              onChange={e => setNewFaithGoal(p => ({...p, text: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
+            <select value={newFaithGoal.category} onChange={e => setNewFaithGoal(p => ({...p, category: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+              {['Spiritual Growth','Prayer Life','Scripture Study','Community/Church','Service','Fasting','Evangelism','Discipleship'].map(c => <option key={c}>{c}</option>)}
+            </select>
+            <button className="primary-btn" onClick={() => {
+              if (!newFaithGoal.text.trim()) return
+              saveFaithGoals([{...newFaithGoal, id: Date.now(), done: false}, ...faithGoals])
+              setNewFaithGoal({ text: '', category: 'Spiritual Growth', done: false })
+            }}>+ Add Goal</button>
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
 
 function App() {
   return (
