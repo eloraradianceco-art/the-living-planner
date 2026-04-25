@@ -3423,15 +3423,36 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
   const weekLogs = habitLogs.filter(l => l.date >= weekStart && l.date <= weekEnd)
 
   const SUGGESTED = [
-    ['Wake up earlier','Health'],['Meditate daily','Wellness'],['Drink more water','Health'],
-    ['Stay active','Health'],['Practice gratitude','Wellness'],['Eat mindfully','Health'],
-    ['Cook your own meals','Health'],['Do hardest tasks first','Productivity'],
-    ['Hold yourself accountable','Productivity'],['Track your goals','Productivity'],
-    ['Invest in yourself','Productivity'],['Deepen your relationships','Lifestyle'],
-    ['Spend more time in nature','Lifestyle'],['Stay inspired','Wellness'],
-    ['Have mental reset days','Wellness'],['Know yourself better','Wellness'],
-    ['Be OK with saying no','Wellness'],['Diversify your income streams','Finances'],
-    ['Shop smarter','Finances'],['Test your limits','Health'],
+    // ── Health ────────────────────────────────────────────────────────────
+    ['Wake up earlier','Health'],['Drink more water','Health'],['Stay active','Health'],
+    ['Eat mindfully','Health'],['Cook your own meals','Health'],['Test your limits','Health'],
+    ['Get 7-8 hours of sleep','Health'],['Take a daily walk','Health'],
+    ['Stretch every morning','Health'],['Cut out processed sugar','Health'],
+    ['Take your vitamins','Health'],['Do cardio 3x per week','Health'],
+    // ── Wellness ──────────────────────────────────────────────────────────
+    ['Meditate daily','Wellness'],['Practice gratitude','Wellness'],
+    ['Stay inspired','Wellness'],['Have mental reset days','Wellness'],
+    ['Know yourself better','Wellness'],['Be OK with saying no','Wellness'],
+    ['Journal daily','Wellness'],['Practice deep breathing','Wellness'],
+    ['Limit social media use','Wellness'],['Read before bed','Wellness'],
+    // ── Productivity ──────────────────────────────────────────────────────
+    ['Do hardest tasks first','Productivity'],['Hold yourself accountable','Productivity'],
+    ['Track your goals','Productivity'],['Invest in yourself','Productivity'],
+    ['Plan your week on Sunday','Productivity'],['Do a daily brain dump','Productivity'],
+    ['Limit distractions during work','Productivity'],['Review your to-do list nightly','Productivity'],
+    // ── Lifestyle ─────────────────────────────────────────────────────────
+    ['Deepen your relationships','Lifestyle'],['Spend more time in nature','Lifestyle'],
+    ['Call a friend or family member','Lifestyle'],['Practice a hobby weekly','Lifestyle'],
+    ['Unplug after 9pm','Lifestyle'],['Declutter one area weekly','Lifestyle'],
+    // ── Finances ──────────────────────────────────────────────────────────
+    ['Diversify your income streams','Finances'],['Shop smarter','Finances'],
+    ['Track your spending daily','Finances'],['Save 10 percent of income','Finances'],
+    ['Review subscriptions monthly','Finances'],['Build your emergency fund','Finances'],
+    ['Invest consistently','Finances'],['Read one financial book monthly','Finances'],
+    // ── Faith & Character ─────────────────────────────────────────────────
+    ['Pray or reflect daily','Wellness'],['Practice patience intentionally','Wellness'],
+    ['Serve someone selflessly','Lifestyle'],['Write a daily affirmation','Wellness'],
+    ['Express gratitude to someone','Lifestyle'],['Rest without guilt','Wellness'],
   ]
 
   const CAT_COLOR = {Health:'#E85555',Wellness:'#22C55E',Productivity:'var(--teal)',Lifestyle:'var(--brass)',Finances:'#6366F1',Faith:'#A855F7'}
