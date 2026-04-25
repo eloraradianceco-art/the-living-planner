@@ -5467,8 +5467,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         </div>
       </section>
 
-      {/* ── Push Notifications ──────────────────────────────────────── */}
-      <NotificationSettings settings={settings} updateSettings={updateSettings} />
+      {/* ── Push Notifications (coming soon) ──────────────────────────── */}
 
       {/* ── Support & Contact ──────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
@@ -5526,7 +5525,6 @@ function PlannerApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error])
 
-  if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 
   // Check notification schedule on load
   useEffect(() => {
@@ -5536,6 +5534,8 @@ function PlannerApp() {
       }, 2000)
     }
   }, [tasks?.length, habits?.length])
+
+  if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 
 
   return (
