@@ -39,7 +39,7 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray
 }
 
-const PushManager = {
+const PlannerPush = {
   async isSupported() {
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
   },
@@ -5276,22 +5276,22 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
 }
 
 function NotificationSettings({ settings, updateSettings }) {
-  const [permission, setPermission] = useState(Notification?.permission || 'default')
+  const [permission, setPermission] = useState(() => { try { return (typeof Notification !== 'undefined' ? Notification.permission : 'default') } catch { return 'default' } })
   const [supported, setSupported] = useState(false)
   const [loading, setLoading] = useState(false)
   const notifSettings = settings?.notifications || {}
 
   useEffect(() => {
-    PushManager.isSupported().then(setSupported)
+    PlannerPush.isSupported().then(setSupported)
     if ('Notification' in window) setPermission(Notification.permission)
   }, [])
 
   const enable = async () => {
     setLoading(true)
-    const perm = await PushManager.requestPermission()
+    const perm = await PlannerPush.requestPermission()
     setPermission(perm)
     if (perm === 'granted') {
-      await PushManager.subscribe()
+      await PlannerPush.subscribe()
       // Enable all notifications by default
       updateSettings({ ...settings, notifications: {
         tasks: true, habits: true, goals: true, faith: true,
@@ -5375,7 +5375,7 @@ function NotificationSettings({ settings, updateSettings }) {
             </div>
           ))}
 
-          <button onClick={async()=>{ await PushManager.unsubscribe(); setPermission('default'); updateSettings({...settings,notifications:{}})}}
+          <button onClick={async()=>{ await PlannerPush.unsubscribe(); setPermission('default'); updateSettings({...settings,notifications:{}})}}
             style={{marginTop:14,background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'8px 14px',fontSize:'.78rem',color:'var(--muted)',cursor:'pointer',width:'100%'}}>
             Disable All Notifications
           </button>
@@ -5532,7 +5532,7 @@ function PlannerApp() {
   useEffect(() => {
     if (tasks?.length || habits?.length) {
       setTimeout(() => {
-        PushManager.scheduleCheck(tasks || [], habits || [], goals || [], settings || {})
+        PlannerPush.scheduleCheck(tasks || [], habits || [], goals || [], settings || {})
       }, 2000)
     }
   }, [tasks?.length, habits?.length])
