@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import React from 'react'
 
-export class AppErrorBoundary extends React.Component {
+class AppErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null } }
   static getDerivedStateFromError(error) { return { hasError: true, error } }
   componentDidCatch(error, info) { console.error('APP CRASH:', error.message, info?.componentStack) }
@@ -24,5 +24,5 @@ export class AppErrorBoundary extends React.Component {
   }
 }
 
-// ── FAITH PAGE ───────────────────────────────────────────────────────────────
-function FaithPage() {
+export { AppErrorBoundary }
+export default AppErrorBoundary
