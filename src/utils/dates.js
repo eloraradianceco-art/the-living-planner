@@ -1,6 +1,6 @@
 // ── Date Utilities ─────────────────────────────────────────────────────
 
-export function getTodayString() {
+function getTodayString() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: APP_TIME_ZONE,
     year: 'numeric',
@@ -14,29 +14,29 @@ export function getTodayString() {
 
 // ── Push Notification System ─────────────────────────────────────────────────
 
-export function addDays(dateString, days) {
+function addDays(dateString, days) {
   const date = new Date(`${dateString}T12:00:00`)
   date.setDate(date.getDate() + days)
   return date.toISOString().slice(0, 10)
 }
 
-export function startOfWeek(dateString = TODAY) {
+function startOfWeek(dateString = TODAY) {
   const date = new Date(`${dateString}T12:00:00`)
   const day = date.getDay()
   date.setDate(date.getDate() - day)
   return date.toISOString().slice(0, 10)
 }
 
-export function endOfWeek(dateString = TODAY) {
+function endOfWeek(dateString = TODAY) {
   return addDays(startOfWeek(dateString), 6)
 }
 
-export function getWeekDays(dateString = TODAY) {
+function getWeekDays(dateString = TODAY) {
   const start = startOfWeek(dateString)
   return Array.from({ length: 7 }, (_, index) => addDays(start, index))
 }
 
-export function getMonthDays(dateString = TODAY) {
+function getMonthDays(dateString = TODAY) {
   const date = new Date(`${dateString}T12:00:00`)
   const first = new Date(date.getFullYear(), date.getMonth(), 1, 12)
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12)
@@ -47,26 +47,27 @@ export function getMonthDays(dateString = TODAY) {
   return days
 }
 
-export function formatDateLabel(dateString, options = { weekday: 'short', month: 'short', day: 'numeric' }) {
+function formatDateLabel(dateString, options = { weekday: 'short', month: 'short', day: 'numeric' }) {
   return new Date(`${dateString}T12:00:00`).toLocaleDateString('en-US', options)
 }
 
-export function isToday(date) {
+function isToday(date) {
   return date === TODAY
 }
 
-export function isOverdue(date) {
+function isOverdue(date) {
   return Boolean(date) && date < TODAY
 }
 
-export function isThisWeek(date) {
+function isThisWeek(date) {
   if (!date) return false
   return date >= startOfWeek(TODAY) && date <= endOfWeek(TODAY)
 }
 
-export function sortByTime(a, b) {
+function sortByTime(a, b) {
   return (a.time || a.startTime || '99:99').localeCompare(b.time || b.startTime || '99:99')
 }
 
 
 // ── Scoring ───────────────────────────────────────────────────────────────
+export { getTodayString, addDays, startOfWeek, endOfWeek, getWeekDays, getMonthDays, formatDateLabel, isToday, isOverdue, isThisWeek }
