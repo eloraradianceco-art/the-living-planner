@@ -2,7 +2,7 @@ import React, { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/PlannerContext.jsx'
 import { AppErrorBoundary } from './components/AppErrorBoundary.jsx'
-import AuthGate from './pages/AuthPage.jsx'
+import AuthPage, { AuthGate } from './pages/AuthPage.jsx'
 import Layout from './components/Layout.jsx'
 
 // Lazy load all pages for code splitting
@@ -63,7 +63,7 @@ export default function App() {
     <AppErrorBoundary>
       <BrowserRouter>
         <AuthProvider>
-          <AuthGate>
+          <AuthGate fallback={<AuthPage />}>
             <AppRoutes />
           </AuthGate>
         </AuthProvider>
