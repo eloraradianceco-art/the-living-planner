@@ -1,6 +1,6 @@
 // ── Scoring & Progress Utilities ───────────────────────────────────────
 
-export function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
+function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
   const taskByCategory = {}
   for (const task of tasks) {
     if (!taskByCategory[task.category]) taskByCategory[task.category] = { total: 0, completed: 0 }
@@ -36,7 +36,7 @@ export function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
   }
 }
 
-export function getGoalProgress(goalId, tasks, projects) {
+function getGoalProgress(goalId, tasks, projects) {
   const relatedTasks = tasks.filter((task) => task.linkedGoalId === goalId)
   const relatedProjects = projects.filter((project) => project.goalId === goalId)
   const totalItems = relatedTasks.length + relatedProjects.length
@@ -46,7 +46,7 @@ export function getGoalProgress(goalId, tasks, projects) {
   return Math.round(((completedTasks + completedProjects) / totalItems) * 100)
 }
 
-export function getProjectProgress(projectId, tasks) {
+function getProjectProgress(projectId, tasks) {
   const relatedTasks = tasks.filter((task) => task.linkedProjectId === projectId)
   if (relatedTasks.length === 0) return 0
   const completed = relatedTasks.filter((task) => task.completed).length
@@ -56,7 +56,7 @@ export function getProjectProgress(projectId, tasks) {
 
 // ── Charts ────────────────────────────────────────────────────────────────
 
-export function getWeekCompletionSeries(tasks) {
+function getWeekCompletionSeries(tasks) {
   const days = getWeekDays(TODAY)
   return days.map((date) => {
     const dayTasks = tasks.filter((task) => task.date === date)
@@ -71,7 +71,7 @@ export function getWeekCompletionSeries(tasks) {
   })
 }
 
-export function getBudgetSeries(expenses) {
+function getBudgetSeries(expenses) {
   const days = getWeekDays(TODAY)
   return days.map((date) => ({
     date,
@@ -80,7 +80,7 @@ export function getBudgetSeries(expenses) {
   }))
 }
 
-export function getScoreTrend(scoresHistory = []) {
+function getScoreTrend(scoresHistory = []) {
   if (scoresHistory.length) return scoresHistory
   return Array.from({ length: 7 }, (_, index) => ({
     label: addDays(startOfWeek(TODAY), index).slice(5),
@@ -91,7 +91,7 @@ export function getScoreTrend(scoresHistory = []) {
 
 // ── Insights ──────────────────────────────────────────────────────────────
 
-export function getHomeInsights({ tasks, expenses, budget, projects, goals, events, habits, habitLogs }) {
+function getHomeInsights({ tasks, expenses, budget, projects, goals, events, habits, habitLogs }) {
   const openTasks = tasks.filter((task) => !task.completed)
   const completedToday = tasks.filter((task) => task.completed && isToday(task.date)).length
   const overdueCount = openTasks.filter((task) => isOverdue(task.date)).length
@@ -139,3 +139,5 @@ export function getHomeInsights({ tasks, expenses, budget, projects, goals, even
     currentHabitStreak,
   }
 }
+
+export { computeScores, getGoalProgress, getProjectProgress, getWeekCompletionSeries, getBudgetSeries, getScoreTrend }
