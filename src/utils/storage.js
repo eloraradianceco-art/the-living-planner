@@ -1,6 +1,55 @@
-// ── Local Storage Utilities ────────────────────────────────────────────
+// ── Storage Utilities ──────────────────────────────────────────────────────
 
-export function readLocal(key, fallback) {
+const defaultData = {
+  tasks: [],
+  goals: [],
+  projects: [],
+  expenses: [],
+  notes: [],
+  events: [],
+  habits: [],
+  habitLogs: [],
+  budget: { weeklyTarget: 200 },
+  profile: {
+    displayName: '',
+    timezone: 'America/Chicago',
+    plannerMode: 'Balanced',
+  },
+  settings: {
+    onboardingComplete: false,
+    showCompletedTasks: false,
+    compactCalendar: false,
+  },
+}
+
+
+// ── Planner Service ───────────────────────────────────────────────────────
+
+const localKeys = {
+  tasks: 'planner.tasks',
+  goals: 'planner.goals',
+  projects: 'planner.projects',
+  expenses: 'planner.expenses',
+  notes: 'planner.notes',
+  events: 'planner.events',
+  habits: 'planner.habits',
+  habitLogs: 'planner.habitLogs',
+  budget: 'planner.budget',
+  profile: 'planner.profile',
+  settings: 'planner.settings',
+}
+
+const tableMap = {
+  task: { table: 'tasks', collection: 'tasks' },
+  goal: { table: 'goals', collection: 'goals' },
+  project: { table: 'projects', collection: 'projects' },
+  expense: { table: 'expenses', collection: 'expenses' },
+  note: { table: 'notes', collection: 'notes' },
+  event: { table: 'events', collection: 'events' },
+  habit: { table: 'habits', collection: 'habits' },
+}
+
+function readLocal(key, fallback) {
   const raw = window.localStorage.getItem(key)
   if (!raw) {
     window.localStorage.setItem(key, JSON.stringify(fallback))
@@ -13,11 +62,11 @@ export function readLocal(key, fallback) {
   }
 }
 
-export function writeLocal(key, value) {
+function writeLocal(key, value) {
   window.localStorage.setItem(key, JSON.stringify(value))
 }
 
-export function normalizePayload(type, payload, userId) {
+function normalizePayload(type, payload, userId) {
   const raw = { ...payload, user_id: userId }
 
   // ── Translate JS field names → Supabase column names ─────────────────
@@ -74,7 +123,7 @@ export function normalizePayload(type, payload, userId) {
   return raw
 }
 
-export function stripUserId(payload) {
+function stripUserId(payload) {
   const { user_id, ...rest } = payload
   return rest
 }
@@ -147,4 +196,18 @@ async function loadSupabaseAll(userId) {
     profile: profileRows?.[0] ? { displayName: profileRows[0].display_name, timezone: profileRows[0].timezone, plannerMode: profileRows[0].planner_mode } : defaultData.profile,
     settings: settingsRows?.[0] ? { onboardingComplete: settingsRows[0].onboarding_complete, showCompletedTasks: settingsRows[0].show_completed_tasks, compactCalendar: settingsRows[0].compact_calendar } : defaultData.settings,
   }
+}
+
+function nextRecurringDate(date, recurrence) {
+
+export {
+  defaultData,
+  localKeys,
+  tableMap,
+  readLocal,
+  writeLocal,
+  normalizePayload,
+  stripUserId,
+  loadSupabaseAll,
+  loadLocalAll,
 }
