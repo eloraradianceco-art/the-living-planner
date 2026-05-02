@@ -200,4 +200,5 @@ const tabs = [
 const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects', '/faith']
 
 
+export { AuthGate }
 export default AuthPage
