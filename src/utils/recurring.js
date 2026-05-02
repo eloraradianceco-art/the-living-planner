@@ -1,6 +1,6 @@
 // ── Recurring Date Logic ───────────────────────────────────────────────
 
-export function nextRecurringDate(date, recurrence) {
+function nextRecurringDate(date, recurrence) {
   if (recurrence === 'daily') return addDays(date, 1)
   if (recurrence === 'weekly') return addDays(date, 7)
   if (recurrence === 'monthly') return addDays(date, 30)
@@ -154,3 +154,5 @@ const plannerService = {
 
 
 // ── Responsive hook ───────────────────────────────────────────────────────
+
+export { nextRecurringDate }
