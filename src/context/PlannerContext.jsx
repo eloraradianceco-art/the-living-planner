@@ -11,7 +11,6 @@ const TODAY = getTodayString()
 // ── Auth ──────────────────────────────────────────────────────────────────
 const AuthContext = createContext(null)
 const MOCK_EMAIL = ''
-const MOCK_EMAIL = ''
 
 
 function AuthProvider({ children }) {
