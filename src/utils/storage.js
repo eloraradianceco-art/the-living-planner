@@ -1,4 +1,5 @@
-// ── Storage Utilities ──────────────────────────────────────────────────────
+// ── Storage & Data Layer ───────────────────────────────────────────────────
+import { supabase } from '../services/supabase.js'
 
 const defaultData = {
   tasks: [],
@@ -21,9 +22,6 @@ const defaultData = {
     compactCalendar: false,
   },
 }
-
-
-// ── Planner Service ───────────────────────────────────────────────────────
 
 const localKeys = {
   tasks: 'planner.tasks',
@@ -198,8 +196,6 @@ async function loadSupabaseAll(userId) {
   }
 }
 
-function nextRecurringDate(date, recurrence) {
-
 export {
   defaultData,
   localKeys,
@@ -208,6 +204,6 @@ export {
   writeLocal,
   normalizePayload,
   stripUserId,
-  loadSupabaseAll,
   loadLocalAll,
+  loadSupabaseAll,
 }
