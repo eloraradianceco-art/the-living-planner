@@ -3944,10 +3944,6 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
               </div>
               <div style={{fontSize:'3rem',fontWeight:700,color:'white',fontFamily:'var(--sans)',lineHeight:1}}>{focusDisplay}</div>
               <div style={{fontSize:'.72rem',color:'rgba(255,255,255,.5)',marginTop:4}}>{focusSessions} sessions done</div>
-              {/* Progress arc */}
-              <div style={{position:'absolute',inset:0,borderRadius:'50%',
-                background:`conic-gradient(${focusMode==='work'?'var(--brass)':'var(--success)'} ${focusProgress}%, transparent 0)`,
-                opacity:.3,pointerEvents:'none'}}/>
             </div>
 
             {/* Controls */}
@@ -3957,14 +3953,14 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
                 background: focusRunning ? 'var(--danger)' : 'var(--ink)',
                 color:'white',border:'none'
               }}>{focusRunning ? '⏸ Pause' : '▶ Start'}</button>
-              <button onClick={focusReset}
+              <button onClick={()=>{setFocusRunning(false);setFocusMinutes(focusMode==='work'?25:5);setFocusSecondsState(0)}}
                 style={{padding:'12px 20px',borderRadius:999,fontSize:'1rem',cursor:'pointer',background:'var(--stone)',border:'1.5px solid var(--border)',color:'var(--ink)',fontWeight:600}}>↺ Reset</button>
             </div>
 
             {/* Mode presets */}
             <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
               {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
-                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusTimeLeft(focusCustomMins * 60)}}
+                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusSecondsState(0)}}
                   style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
                   border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>{label} · {mins}m</button>
               ))}
