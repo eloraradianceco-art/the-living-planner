@@ -3799,27 +3799,28 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
   const [cleaningFreq, setCleaningFreq] = useState('daily')
   const [brainDump, setBrainDump] = useState(() => { try { return localStorage.getItem('planner.p.braindump')||'' } catch { return '' } })
   const saveBrainDump = (v) => { setBrainDump(v); try { localStorage.setItem('planner.p.braindump', v) } catch {} }
-  const [focusMinutes, setFocusMinutes] = useState(25)
-  const [focusSeconds, setFocusSecondsState] = useState(0)
+  const WORK_MINS = 25
+  const BREAK_MINS = 5
+  const [focusCustomMins, setFocusCustomMins] = useState(25)
+  const [focusTimeLeft, setFocusTimeLeft] = useState(25 * 60)
   const [focusRunning, setFocusRunning] = useState(false)
-  const [focusMode, setFocusMode] = useState('work') // work | break
+  const [focusMode, setFocusMode] = useState('work')
   const [focusSessions, setFocusSessions] = useState(0)
   const focusRef = React.useRef(null)
   React.useEffect(() => {
     if (focusRunning) {
       focusRef.current = setInterval(() => {
-        setFocusSecondsState(prev => {
-          if (prev > 0) return prev - 1
+        setFocusTimeLeft(prev => {
+          if (prev > 1) return prev - 1
+          clearInterval(focusRef.current)
           setFocusRunning(false)
           if (focusMode === 'work') {
             setFocusSessions(s => s + 1)
             setFocusMode('break')
-            setFocusMinutes(5)
-            return 0
+            return BREAK_MINS * 60
           } else {
             setFocusMode('work')
-            setFocusMinutes(25)
-            return 0
+            return focusCustomMins * 60
           }
         })
       }, 1000)
@@ -3827,9 +3828,13 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
       clearInterval(focusRef.current)
     }
     return () => clearInterval(focusRef.current)
-  }, [focusRunning, focusMode])
-  const focusTotal = focusMinutes * 60 + focusSeconds
+  }, [focusRunning, focusMode, focusCustomMins])
+  const focusMinutes = Math.floor(focusTimeLeft / 60)
+  const focusSeconds = focusTimeLeft % 60
+  const focusTotal = focusMode === 'work' ? focusCustomMins * 60 : BREAK_MINS * 60
   const focusDisplay = `${String(focusMinutes).padStart(2,'0')}:${String(focusSeconds).padStart(2,'0')}`
+  const focusProgress = Math.round(((focusTotal - focusTimeLeft) / focusTotal) * 100)
+  const focusReset = () => { clearInterval(focusRef.current); setFocusRunning(false); setFocusTimeLeft(focusCustomMins * 60); setFocusMode('work') }
 
   const CLEANING_SCHEDULE = {
     daily: [
@@ -3944,6 +3949,10 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
               </div>
               <div style={{fontSize:'3rem',fontWeight:700,color:'white',fontFamily:'var(--sans)',lineHeight:1}}>{focusDisplay}</div>
               <div style={{fontSize:'.72rem',color:'rgba(255,255,255,.5)',marginTop:4}}>{focusSessions} sessions done</div>
+              {/* Progress arc */}
+              <div style={{position:'absolute',inset:0,borderRadius:'50%',
+                background:`conic-gradient(${focusMode==='work'?'var(--brass)':'var(--success)'} ${focusProgress}%, transparent 0)`,
+                opacity:.3,pointerEvents:'none'}}/>
             </div>
 
             {/* Controls */}
@@ -3953,14 +3962,14 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
                 background: focusRunning ? 'var(--danger)' : 'var(--ink)',
                 color:'white',border:'none'
               }}>{focusRunning ? '⏸ Pause' : '▶ Start'}</button>
-              <button onClick={()=>{setFocusRunning(false);setFocusMinutes(focusMode==='work'?25:5);setFocusSecondsState(0)}}
+              <button onClick={focusReset}
                 style={{padding:'12px 20px',borderRadius:999,fontSize:'1rem',cursor:'pointer',background:'var(--stone)',border:'1.5px solid var(--border)',color:'var(--ink)',fontWeight:600}}>↺ Reset</button>
             </div>
 
             {/* Mode presets */}
             <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
               {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
-                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusSecondsState(0)}}
+                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusTimeLeft(focusCustomMins * 60)}}
                   style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
                   border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>{label} · {mins}m</button>
               ))}
@@ -4122,10 +4131,8 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
               const title = prompt('Note title:')
               if(!title) return
               const content = prompt('Note content:')
-              const newNote = {id:Date.now(),title,content:content||'',date:TODAY}
-              const updated = [newNote, ...notes]
-              setNotes(updated)
-              try{localStorage.setItem('planner.notes',JSON.stringify(updated))}catch{}
+              const newNote = {id:Date.now(),title,content:content||'',category:'General',date:TODAY}
+              saveItem('note', newNote, 'create')
             }}>+ Note</button>
           </div>
           <input placeholder="Search notes..." value={noteQuery} onChange={e=>setNoteQuery(e.target.value)}
