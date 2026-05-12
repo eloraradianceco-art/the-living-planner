@@ -2132,7 +2132,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
       {filtered.length === 0 && (
         <section className="card" style={{textAlign:'center', padding:'32px 20px'}}>
           <div style={{fontSize:'2rem', marginBottom:12}}>📁</div>
-          <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)', marginBottom:6}}>No projects yet</div>
+          <EmptyState icon="📁" title="No projects yet" message="Break your goals into projects and get things moving." action="+ Add Project" onAction={onQuickCreate} />
           <p className="muted" style={{fontSize:'.85rem', marginBottom:16}}>Projects connect your tasks and goals into focused workstreams.</p>
           <button className="primary-btn" onClick={() => onQuickCreate('project')}>Create your first project</button>
         </section>
@@ -2279,6 +2279,162 @@ function PageNav() {
             color: 'white', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
           }}>{next.label} →</button>
         : <div />}
+    </div>
+  )
+}
+
+
+// ── Empty State Component ─────────────────────────────────────────────────
+function EmptyState({ icon, title, message, action, onAction }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '40px 24px', textAlign: 'center',
+    }}>
+      <div style={{
+        fontSize: '2.8rem', marginBottom: 16, opacity: .7,
+        filter: 'grayscale(20%)',
+      }}>{icon}</div>
+      <div style={{
+        fontWeight: 700, fontSize: '1rem', color: 'var(--ink)',
+        marginBottom: 8,
+      }}>{title}</div>
+      <p style={{
+        fontSize: '.85rem', color: 'var(--ink2)', lineHeight: 1.6,
+        maxWidth: 260, marginBottom: action ? 20 : 0,
+      }}>{message}</p>
+      {action && (
+        <button onClick={onAction} style={{
+          padding: '10px 22px', borderRadius: 999,
+          background: 'var(--teal)', color: 'white',
+          border: 'none', fontSize: '.88rem', fontWeight: 600,
+          cursor: 'pointer', transition: 'opacity .15s',
+        }}
+          onMouseEnter={e => e.target.style.opacity = '.85'}
+          onMouseLeave={e => e.target.style.opacity = '1'}
+        >{action}</button>
+      )}
+    </div>
+  )
+}
+
+// ── Onboarding Walkthrough ────────────────────────────────────────────────
+const ONBOARDING_STEPS = [
+  {
+    icon: '👋',
+    title: 'Welcome to The Living Planner',
+    message: 'A complete life planning system built around faith, discipline, and intentional growth. Let's take a quick tour.',
+    cta: 'Get Started',
+  },
+  {
+    icon: '✝',
+    title: 'Faith First',
+    message: 'Start each day in the Faith section — devotionals, prayer journal, scripture, and gratitude all in one place.',
+    cta: 'Next →',
+  },
+  {
+    icon: '✓',
+    title: 'Daily Tasks & Habits',
+    message: 'Plan your day with tasks, track powerful habits, and build streaks that last. Small disciplines compound into big results.',
+    cta: 'Next →',
+  },
+  {
+    icon: '🎯',
+    title: 'Goals & Growth',
+    message: 'Set 90-day and yearly goals, track your life score across 9 dimensions, and do a weekly review every Sunday.',
+    cta: 'Next →',
+  },
+  {
+    icon: '💰',
+    title: 'Financial Clarity',
+    message: 'Budget your week, track expenses, plan savings goals, and stay on top of bills — all in the Finance section.',
+    cta: 'Next →',
+  },
+  {
+    icon: '🌿',
+    title: 'Whole-Life Wellness',
+    message: 'Track sleep, mood, workouts, meals, and more. The Living Planner covers every dimension of your life.',
+    cta: 'Start Planning',
+  },
+]
+
+function OnboardingWalkthrough({ onComplete }) {
+  const [step, setStep] = React.useState(0)
+  const current = ONBOARDING_STEPS[step]
+  const isLast = step === ONBOARDING_STEPS.length - 1
+
+  const next = () => {
+    if (isLast) {
+      try { localStorage.setItem('planner_onboarded', '1') } catch {}
+      onComplete()
+    } else {
+      setStep(s => s + 1)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(10,18,30,.92)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24,
+    }}>
+      <div style={{
+        background: 'var(--warm-white, white)',
+        borderRadius: 24, padding: '44px 32px',
+        maxWidth: 380, width: '100%', textAlign: 'center',
+        boxShadow: '0 32px 80px rgba(0,0,0,.4)',
+      }}>
+        {/* Progress dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
+          {ONBOARDING_STEPS.map((_, i) => (
+            <div key={i} style={{
+              width: i === step ? 20 : 7, height: 7, borderRadius: 999,
+              background: i === step ? 'var(--teal, #2A9D8F)' : 'var(--border2, #E5E7EB)',
+              transition: 'all .3s ease',
+            }} />
+          ))}
+        </div>
+
+        {/* Icon */}
+        <div style={{ fontSize: '3.5rem', marginBottom: 20 }}>{current.icon}</div>
+
+        {/* Title */}
+        <h2 style={{
+          fontSize: '1.25rem', fontWeight: 700,
+          color: 'var(--ink, #1A2332)', marginBottom: 12, lineHeight: 1.3,
+        }}>{current.title}</h2>
+
+        {/* Message */}
+        <p style={{
+          fontSize: '.9rem', color: 'var(--ink2, #4B5563)',
+          lineHeight: 1.7, marginBottom: 32,
+        }}>{current.message}</p>
+
+        {/* CTA button */}
+        <button onClick={next} style={{
+          width: '100%', padding: '13px',
+          background: 'var(--teal, #2A9D8F)', color: 'white',
+          border: 'none', borderRadius: 12,
+          fontSize: '1rem', fontWeight: 700, cursor: 'pointer',
+          transition: 'all .2s',
+        }}
+          onMouseEnter={e => e.target.style.opacity = '.88'}
+          onMouseLeave={e => e.target.style.opacity = '1'}
+        >{current.cta}</button>
+
+        {/* Skip */}
+        {!isLast && (
+          <button onClick={() => {
+            try { localStorage.setItem('planner_onboarded', '1') } catch {}
+            onComplete()
+          }} style={{
+            marginTop: 14, background: 'none', border: 'none',
+            color: 'var(--muted, #9CA3AF)', fontSize: '.82rem',
+            cursor: 'pointer',
+          }}>Skip tour</button>
+        )}
+      </div>
     </div>
   )
 }
@@ -2758,7 +2914,7 @@ function FinancePage({ expenses, budget, setBudget }) {
               <strong style={{fontSize:'1rem'}}>{fmt(totalWeeklyIncome)}</strong>
             </div>
           </div>
-          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}>No income sources yet.</p>}
+          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}><EmptyState icon="💵" title="No income sources" message="Add your income to track your budget accurately." /></p>}
           {incomes.map((inc, i) => (
             <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
               <div>
@@ -2811,7 +2967,7 @@ function FinancePage({ expenses, budget, setBudget }) {
               <strong style={{fontSize:'.85rem'}}>Total Monthly Bills</strong>
               <strong style={{color:'var(--danger)',fontSize:'1rem'}}>{fmt(totalBillsMonthly)}</strong>
             </div>
-            {bills.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0',fontSize:'.85rem'}}>No bills added yet.</p>}
+            {bills.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0',fontSize:'.85rem'}}><EmptyState icon="🧾" title="No bills added" message="Track recurring bills to stay on top of your finances." /></p>}
             {bills.map((b, i) => (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <div>
@@ -2865,7 +3021,7 @@ function FinancePage({ expenses, budget, setBudget }) {
                 </div>
               ))}
             </div>
-            {(expenses||[]).length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}>No expenses logged yet. Add them from Quick Add.</p>}
+            {(expenses||[]).length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}><EmptyState icon="💳" title="No expenses yet" message="Log your first expense to start tracking spending." /></p>}
             {(expenses||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20).map((exp, i) => (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <div>
@@ -3134,7 +3290,7 @@ function FinancePage({ expenses, budget, setBudget }) {
               <strong style={{color:'var(--danger)'}}>{fmt(totalDebtPayments)}/mo</strong>
             </div>
           )}
-          {debts.length === 0 && <p className="muted" style={{ textAlign: 'center', padding: '20px 0' }}>No debts added yet.</p>}
+          {debts.length === 0 && <p className="muted" style={{textAlign:'center',padding:'20px 0'}}><EmptyState icon="📉" title="No debts added" message="Track what you owe and build a payoff plan." /></p>}
           {[...debts].sort((a, b) => Number(b.rate || 0) - Number(a.rate || 0)).map((debt, i) => (
             <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -3608,7 +3764,7 @@ function HealthWellnessPage() {
               </div>
             </div>
           ))}
-          {books.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No books yet. Add your first.</p>}
+          {books.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="📚" title="No books yet" message="Add what you're reading or want to read." /></p>}
           <div style={{display:'grid',gap:8,marginTop:12}}>
             <input placeholder="Book title" value={newBook.title} onChange={e=>setNewBook(p=>({...p,title:e.target.value}))}
               style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
@@ -3652,7 +3808,7 @@ function HealthWellnessPage() {
                 </div>
               )
             })}
-            {meds.length === 0 && <p className="muted" style={{ fontSize: '.85rem' }}>No medications added yet.</p>}
+            {meds.length === 0 && <p className="muted" style={{fontSize:'.85rem'}}><EmptyState icon="💊" title="No medications added" message="Track supplements or medications you take daily." /></p>}
           </section>
           <section className="card">
             <p className="eyebrow">Medication Summary</p>
@@ -4331,7 +4487,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
 
           {/* Notes list */}
           {notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
-            ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet. Write your first one above.</p>
+            ? <EmptyState icon="📝" title="No notes yet" message="Capture your thoughts, ideas, and reflections." />
             : notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase()))
               .map(note => (
                 <div key={note.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
@@ -4455,7 +4611,7 @@ function WorkoutTrackerTab() {
         }}>+ Log Workout</button>
       </div>
 
-      {wLogs.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}>No workouts logged yet.</p>}
+      {wLogs.length === 0 && <EmptyState icon="💪" title="No workouts logged" message="Log your first workout and start building your fitness history." />}
       {wLogs.slice(0,15).map((log,i)=>(
         <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
           <div>
@@ -4577,7 +4733,7 @@ function PeriodTrackerTab() {
 
       <div>
         <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Period History</p>
-        {cycles.length === 0 && <p className="muted" style={{fontSize:'.82rem',marginBottom:10}}>No cycles logged yet.</p>}
+        {cycles.length === 0 && <EmptyState icon="🌸" title="No cycles logged" message="Start tracking to understand your body's patterns." />}
         {cycles.slice(0,8).map((c,i)=>(
           <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'.85rem'}}>
             <span>{c.start} → {c.end}</span>
@@ -4777,7 +4933,7 @@ function LifestylePage() {
           <section className="card">
             <p className="eyebrow">Trip Planner</p>
             <h3 style={{margin:'4px 0 12px'}}>Upcoming & Past Trips</h3>
-            {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No trips planned yet.</p>}
+            {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="✈️" title="No trips planned" message="Add a trip you're looking forward to." /></p>}
             {trips.map((trip, i) => (
               <div key={i} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -4824,7 +4980,7 @@ function LifestylePage() {
           <section className="card">
             <p className="eyebrow">Birthday Reminders</p>
             <h3 style={{margin:'4px 0 12px'}}>Never miss one</h3>
-            {birthdays.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>No birthdays added yet.</p>}
+            {birthdays.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="🎂" title="No birthdays yet" message="Add the people you want to celebrate." /></p>}
             {[...birthdays].sort((a,b)=>{
               const today = new Date()
               const toNext = (dateStr) => {
@@ -4943,7 +5099,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
         </div>
 
         {habits.length === 0 && (
-          <p className="muted" style={{fontSize:'.85rem',marginBottom:8}}>No habits yet. Add one or tap a suggestion below.</p>
+          <p className="muted" style={{fontSize:'.85rem',marginBottom:8}}><EmptyState icon="🔁" title="No habits yet" message="Pick from the suggestions below or create your own." /></p>
         )}
 
         {habits.map(habit => {
@@ -5116,7 +5272,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
       {filtered.length === 0 && (
         <section className="card" style={{textAlign:'center',padding:'28px 20px'}}>
           <div style={{fontSize:'2rem',marginBottom:10}}>🎯</div>
-          <div style={{fontWeight:700,color:'var(--ink)',marginBottom:6}}>No goals yet</div>
+          <EmptyState icon="🎯" title="No goals yet" message="Set your first goal and give your days direction." action="+ Add Goal" onAction={onQuickCreate} />
           <p className="muted" style={{fontSize:'.85rem',marginBottom:14}}>Use the SMART framework above to set your first goal.</p>
           <button className="primary-btn" onClick={() => onQuickCreate('goal')}>Set Your First Goal</button>
         </section>
@@ -6007,7 +6163,7 @@ function FaithPage() {
         <section className="card">
           <p className="eyebrow">Scripture Journal</p>
           <h3 style={{ margin: '4px 0 14px' }}>God's Word in Your Life</h3>
-          {scriptures.length === 0 && <p className="muted" style={{marginBottom:16,fontStyle:'italic'}}>No scriptures saved yet. Add one below.</p>}
+          {scriptures.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="📖" title="No scriptures saved" message="Save a verse that speaks to you today." /></p>}
           {scriptures.map((s, i) => (
             <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
@@ -6185,7 +6341,7 @@ function FaithPage() {
         <section className="card">
           <p className="eyebrow">Faith Goals</p>
           <h3 style={{ margin: '4px 0 14px' }}>Growing in the Spirit</h3>
-          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16,fontStyle:'italic'}}>No faith goals yet. What is God calling you to grow in?</p>}
+          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="✝" title="No faith goals yet" message="What is God calling you to grow in?" /></p>}
           {faithGoals.map((goal, i) => (
             <div key={goal.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
               <div onClick={() => saveFaithGoals(faithGoals.map((g,j) => j===i ? {...g, done:!g.done} : g))}
