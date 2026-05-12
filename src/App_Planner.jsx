@@ -1003,7 +1003,7 @@ function usePlannerData() {
     const existingLog = collections.habitLogs.find(l => l.habitId === habitId && l.date === date)
     const optimisticLogs = existingLog
       ? collections.habitLogs.filter(l => !(l.habitId === habitId && l.date === date))
-      : [...collections.habitLogs, { id: Date.now(), habitId, date, completedAt: new Date().toISOString() }]
+      : [...collections.habitLogs, { id: 'optimistic_' + Date.now(), habitId, date, completed: true, completedAt: new Date().toISOString() }]
     setCollections(prev => ({ ...prev, habitLogs: optimisticLogs }))
     setSyncing(true); setError('')
     try {
@@ -6065,6 +6065,7 @@ class AppErrorBoundary extends React.Component {
 
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
 function FaithPage() {
+  const { user } = useAuth()
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
 
