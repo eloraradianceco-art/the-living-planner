@@ -2364,13 +2364,7 @@ function FinancePage({ expenses, budget, setBudget }) {
         <span style={{fontSize:'1.1rem'}}>💰</span>
         <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
       </div>
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {TABS.map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}
-          </button>
-        ))}
-      </div>
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && (
@@ -3292,13 +3286,7 @@ function HealthWellnessPage() {
         <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
       </div>
 
-      <div className="pill-row" style={{overflowX:'auto',flexWrap:'nowrap',paddingBottom:4}}>
-        {TABS.map(t => (
-          <button key={t.id} className={tab===t.id?'pill active-pill':'pill'}
-            onClick={() => setTab(t.id)} style={{whiteSpace:'nowrap',fontSize:'.82rem'}}>{t.label}
-          </button>
-        ))}
-      </div>
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
       {tab === 'mood' && (
@@ -3887,7 +3875,15 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         <span style={{fontSize:"1.1rem"}}>⚡</span>
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
       </div>
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
+      <QuickAccessGrid tabs={[
+        { id: 'tasks', label: '✓ Tasks' },
+        { id: 'braindump', label: '🧠 Brain Dump' },
+        { id: 'notes', label: '📝 Notes' },
+        { id: 'checklists', label: '📋 Checklists' },
+        { id: 'focus', label: '⏱ Focus Timer' },
+        { id: 'cleaning', label: '🧹 Cleaning' },
+        { id: 'tips', label: '💡 Tips' },
+      ]} activeTab={tab} onSelect={setTab} /><div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
         {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'notes', label: '📝 Notes' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'focus', label: '⏱ Focus Timer' }, { id: 'cleaning', label: '🧹 Cleaning' }, { id: 'tips', label: '💡 Time Tips' }].map(t => (
           <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
             onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
@@ -4450,12 +4446,7 @@ function LifestylePage() {
         <span style={{fontSize:"1.1rem"}}>🌍</span>
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Lifestyle</p>
       </div>
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {TABS.map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.8rem' }}>{t.label}</button>
-        ))}
-      </div>
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
 
 
       {tab === 'groceries' && (
@@ -5612,6 +5603,48 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+// ── Quick Access Grid — shown at top of each page ─────────────────────────
+function QuickAccessGrid({ tabs, activeTab, onSelect }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+      gap: 8,
+      marginBottom: 16,
+    }}>
+      {tabs.map(t => {
+        const active = activeTab === t.id
+        // Split emoji from label
+        const parts = t.label.match(/^(\S+)\s(.+)$/)
+        const icon = parts ? parts[1] : t.label[0]
+        const name = parts ? parts[2] : t.label
+        return (
+          <button key={t.id} onClick={() => onSelect(t.id)} style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 4,
+            padding: '10px 4px',
+            borderRadius: 12,
+            border: active ? '2px solid var(--teal)' : '1.5px solid var(--border2)',
+            background: active ? 'var(--teal)' : 'var(--stone)',
+            cursor: 'pointer',
+            transition: 'all .15s ease',
+            minHeight: 68,
+          }}>
+            <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{icon}</span>
+            <span style={{
+              fontSize: '.68rem', fontWeight: 600,
+              color: active ? 'white' : 'var(--ink2)',
+              textAlign: 'center', lineHeight: 1.2,
+              letterSpacing: '.02em',
+            }}>{name}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
 function FaithPage() {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
@@ -5688,13 +5721,7 @@ function FaithPage() {
         ))}
       </div>
 
-      <div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {TABS.map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}
-          </button>
-        ))}
-      </div>
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
 
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
       {tab === 'devotional' && (
