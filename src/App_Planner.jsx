@@ -2323,7 +2323,7 @@ const ONBOARDING_STEPS = [
   {
     icon: '👋',
     title: 'Welcome to The Living Planner',
-    message: 'A complete life planning system built around faith, discipline, and intentional growth. Let's take a quick tour.',
+    message: "A complete life planning system built around faith, discipline, and intentional growth. Let's take a quick tour.",
     cta: 'Get Started',
   },
   {
