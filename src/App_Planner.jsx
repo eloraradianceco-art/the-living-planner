@@ -5816,6 +5816,24 @@ function FaithPage() {
   // Prayer journal state
   const [prayers, setPrayers] = useState(() => lsGet('prayers', []))
   const [newPrayer, setNewPrayer] = useState({ text: '', type: 'Request', answered: false })
+
+  // Load faith data from Supabase on mount
+  useEffect(() => {
+    if (!supabase || !user?.id) return
+    supabase.from('faith_data').select('*').eq('user_id', user.id).limit(1)
+      .then(({ data, error }) => {
+        if (error || !data?.[0]) return
+        const row = data[0]
+        const sj = (k, fb) => { try { return row[k] ? JSON.parse(row[k]) : fb } catch { return fb } }
+        if (row.prayers) setPrayers(sj('prayers', []))
+        if (row.scriptures) setScriptures(sj('scriptures', []))
+        if (row.gratitude) setGratitude(sj('gratitude', []))
+        if (row.devotional) setDevotional(sj('devotional', {}))
+        if (row.fasting) setFasting(sj('fasting', {}))
+        if (row.faith_goals) setFaithGoals(sj('faith_goals', []))
+        if (row.sermons) setSermons(sj('sermons', []))
+      })
+  }, [user?.id])
   const savePrayers = (v) => { setPrayers(v); lsSet('prayers', v) }
 
   // Scripture journal state
