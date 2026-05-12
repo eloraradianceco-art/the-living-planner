@@ -3157,6 +3157,7 @@ function FinancePage({ expenses, budget, setBudget }) {
           </div>
         </section>
       )}
+      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
@@ -3765,6 +3766,7 @@ function HealthWellnessPage() {
         </div>
       )}
 
+      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
@@ -3811,7 +3813,16 @@ function NoteComposer({ onSave }) {
 }
 
 
-function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
+function ProductivityPage({
+  const TABS = [
+    { id: 'tasks', label: '✓ Tasks' },
+    { id: 'braindump', label: '🧠 Brain Dump' },
+    { id: 'notes', label: '📝 Notes' },
+    { id: 'checklists', label: '📋 Checklists' },
+    { id: 'focus', label: '⏱ Focus Timer' },
+    { id: 'cleaning', label: '🧹 Cleaning' },
+    { id: 'tips', label: '💡 Tips' },
+  ] tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
 
@@ -4237,6 +4248,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         </section>
       )}
 
+      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
@@ -4722,6 +4734,7 @@ function LifestylePage() {
           </section>
         </div>
       )}
+      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
@@ -5641,6 +5654,51 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
+// ── Tab Navigator — prev/next pills ──────────────────────────────────────
+function TabNav({ tabs, activeTab, onSelect }) {
+  const idx = tabs.findIndex(t => t.id === activeTab)
+  const prev = idx > 0 ? tabs[idx - 1] : null
+  const next = idx < tabs.length - 1 ? tabs[idx + 1] : null
+  if (!prev && !next) return null
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)',
+      gap: 8,
+    }}>
+      {prev ? (
+        <button onClick={() => onSelect(prev.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '9px 16px', borderRadius: 999,
+          border: '1.5px solid var(--border2)', background: 'var(--stone)',
+          color: 'var(--ink2)', fontSize: '.82rem', fontWeight: 600,
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--teal)'; e.currentTarget.style.color = 'var(--teal)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--ink2)' }}
+        >
+          ← {prev.label}
+        </button>
+      ) : <div />}
+      {next ? (
+        <button onClick={() => onSelect(next.id)} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '9px 16px', borderRadius: 999,
+          border: '1.5px solid var(--teal)', background: 'var(--teal)',
+          color: 'white', fontSize: '.82rem', fontWeight: 600,
+          cursor: 'pointer', transition: 'all .15s',
+        }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = '.85' }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+        >
+          {next.label} →
+        </button>
+      ) : <div />}
+    </div>
+  )
+}
+
+
 // ── Quick Access Grid — shown at top of each page ─────────────────────────
 function QuickAccessGrid({ tabs, activeTab, onSelect }) {
   return (
@@ -6078,6 +6136,7 @@ function FaithPage() {
           </div>
         </section>
       )}
+      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
