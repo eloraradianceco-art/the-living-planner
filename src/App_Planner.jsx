@@ -4003,7 +4003,10 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
             {/* Mode presets */}
             <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
               {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
-                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusCustomMins(mins);setFocusTimeLeft(mins*60);}}el} · {mins}m</button>
+                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusCustomMins(mins);setFocusTimeLeft(mins*60);}}
+                    style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
+                    border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>
+                    {label} · {mins}m</button>
               ))}
             </div>
           </div>
