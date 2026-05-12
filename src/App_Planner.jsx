@@ -3773,6 +3773,44 @@ function HealthWellnessPage() {
 
 
 
+function NoteComposer({ onSave }) {
+  const [title, setTitle] = React.useState('')
+  const [body, setBody] = React.useState('')
+  const [category, setCategory] = React.useState('General')
+  const [open, setOpen] = React.useState(false)
+
+  const save = () => {
+    if (!title.trim()) return
+    onSave({ id: Date.now(), title: title.trim(), content: body.trim(), category, date: new Date().toISOString().slice(0,10) })
+    setTitle(''); setBody(''); setOpen(false)
+  }
+
+  if (!open) return (
+    <button className="primary-btn" style={{width:'100%',marginBottom:12,fontSize:'.9rem'}}
+      onClick={() => setOpen(true)}>+ New Note</button>
+  )
+
+  return (
+    <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
+      <input placeholder="Title" value={title} onChange={e=>setTitle(e.target.value)} autoFocus
+        style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',fontWeight:600}} />
+      <textarea placeholder="Write your note..." value={body} onChange={e=>setBody(e.target.value)}
+        style={{width:'100%',minHeight:100,padding:'10px 12px',border:'1.5px solid var(--border2)',
+        borderRadius:'var(--radius-sm)',fontSize:'.88rem',lineHeight:1.6,resize:'vertical',
+        fontFamily:'var(--serif)',boxSizing:'border-box'}} />
+      <select value={category} onChange={e=>setCategory(e.target.value)}
+        style={{padding:'8px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
+        {['General','Work','Personal','Faith','Health','Finance','Ideas'].map(c=><option key={c}>{c}</option>)}
+      </select>
+      <div style={{display:'flex',gap:8}}>
+        <button className="primary-btn" style={{flex:1}} onClick={save}>Save Note</button>
+        <button className="ghost-btn" style={{flex:1}} onClick={()=>setOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+
 function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
@@ -3965,9 +4003,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
             {/* Mode presets */}
             <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
               {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
-                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusMinutes(mins);setFocusTimeLeft(focusCustomMins * 60)}}
-                  style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
-                  border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>{label} · {mins}m</button>
+                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusCustomMins(mins);setFocusTimeLeft(mins*60);}}el} · {mins}m</button>
               ))}
             </div>
           </div>
@@ -4119,38 +4155,37 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         </div>
       )}
 
-      {tab === 'notes' && (
+            {tab === 'notes' && (
         <section className="card">
-          <div className="section-title-row">
-            <div><p className="eyebrow">Notes</p><h3>Quick Capture</h3></div>
-            <button className="primary-btn" style={{fontSize:'.8rem',padding:'6px 12px'}} onClick={() => {
-              const title = prompt('Note title:')
-              if(!title) return
-              const content = prompt('Note content:')
-              const newNote = {id:Date.now(),title,content:content||'',category:'General',date:TODAY}
-              saveItem('note', newNote, 'create')
-            }}>+ Note</button>
-          </div>
+          <p className="eyebrow">Notes</p>
+          <h3 style={{margin:'4px 0 14px'}}>My Notes</h3>
+
+          {/* Add note form */}
+          <NoteComposer onSave={(note) => saveItem('note', note, 'create')} />
+
+          {/* Search */}
           <input placeholder="Search notes..." value={noteQuery} onChange={e=>setNoteQuery(e.target.value)}
-            style={{width:'100%',padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:12,background:'var(--stone)',color:'var(--text)'}} />
-          {notes.filter(n => !noteQuery || n.title.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
-            ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet. Capture your first thought.</p>
-            : notes.filter(n => !noteQuery || n.title.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).map(note => (
-            <div key={note.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-                <strong style={{fontSize:'.9rem',color:'var(--ink)'}}>{note.title}</strong>
-                <div style={{display:'flex',gap:6,flexShrink:0}}>
-                  <span style={{fontSize:'.72rem',color:'var(--muted)'}}>{note.date}</span>
-                  <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.9rem'}} onClick={()=>{
-                    const updated = notes.filter(n=>n.id!==note.id)
-                    setNotes(updated)
-                    try{localStorage.setItem('planner.notes',JSON.stringify(updated))}catch{}
-                  }}>✕</button>
+            style={{width:'100%',padding:'9px 12px',border:'1.5px solid var(--border2)',
+            borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:12,boxSizing:'border-box'}} />
+
+          {/* Notes list */}
+          {notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
+            ? <p className="muted" style={{fontSize:'.85rem'}}>No notes yet. Write your first one above.</p>
+            : notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase()))
+              .map(note => (
+                <div key={note.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:'.9rem',marginBottom:4}}>{note.title}</div>
+                      {note.content && <div style={{fontSize:'.85rem',color:'var(--ink2)',lineHeight:1.6,whiteSpace:'pre-wrap'}}>{note.content}</div>}
+                      <div className="muted" style={{fontSize:'.72rem',marginTop:4}}>{note.category||'General'} · {note.date}</div>
+                    </div>
+                    <button onClick={() => deleteItem('note', note.id)}
+                      style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>✕</button>
+                  </div>
                 </div>
-              </div>
-              <p style={{fontSize:'.82rem',color:'var(--text2)',lineHeight:1.5}}>{note.content}</p>
-            </div>
-          ))}
+              ))
+          }
         </section>
       )}
 
