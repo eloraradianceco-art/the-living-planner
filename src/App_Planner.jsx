@@ -757,8 +757,13 @@ const plannerService = {
     if (!task.completed && task.recurrence && task.recurrence !== 'none') {
       const futureDate = nextRecurringDate(task.date, task.recurrence)
       if (futureDate) {
-        const clonePayload = { ...task, completed: false, date: futureDate, user_id: userId }
+        let clonePayload = { ...task, completed: false, date: futureDate, user_id: userId }
         delete clonePayload.id
+        // Normalize camelCase -> snake_case before inserting
+        if ('linkedGoalId' in clonePayload) { clonePayload.goal_id = clonePayload.linkedGoalId || null; delete clonePayload.linkedGoalId }
+        if ('linkedProjectId' in clonePayload) { clonePayload.project_id = clonePayload.linkedProjectId || null; delete clonePayload.linkedProjectId }
+        if ('linkedType' in clonePayload) delete clonePayload.linkedType
+        if ('linkedId' in clonePayload) delete clonePayload.linkedId
         const { data: inserted, error: insertError } = await supabase.from('tasks').insert(clonePayload).select().single()
         if (insertError) throw insertError
         extraTask = inserted
