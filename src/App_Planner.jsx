@@ -1722,9 +1722,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <MiniBarChart data={completionSeries} dataKey="completed" maxKey="total" />
       </section>
 
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
@@ -1853,9 +1853,9 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
           </section>
         )
       })}
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
@@ -2076,9 +2076,9 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
           </table>
         </section>
       )}
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
@@ -2224,9 +2224,9 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
           </section>
         )
       })}
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 // ── Page Navigator — consistent bottom nav across all pages ──────────────
@@ -5029,9 +5029,9 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
           ))}
         </div>
       </section>
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) {
@@ -5184,9 +5184,9 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
         </div>
       </section>
 
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
@@ -5441,9 +5441,9 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
           <span className="muted" style={{fontSize:'.85rem'}}>/week</span>
         </div>
       </section>
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
@@ -5688,9 +5688,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         </div>
       </section>
 
+      <PageNav />
     </div>
   )
-      <PageNav />
 }
 
 
