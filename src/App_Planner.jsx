@@ -999,6 +999,12 @@ function usePlannerData() {
 
   const toggleHabit = async (habitId, date = TODAY) => {
     if (!user) return
+    // Optimistic update — immediately flip the UI before Supabase responds
+    const existingLog = collections.habitLogs.find(l => l.habitId === habitId && l.date === date)
+    const optimisticLogs = existingLog
+      ? collections.habitLogs.filter(l => !(l.habitId === habitId && l.date === date))
+      : [...collections.habitLogs, { id: Date.now(), habitId, date, completedAt: new Date().toISOString() }]
+    setCollections(prev => ({ ...prev, habitLogs: optimisticLogs }))
     setSyncing(true); setError('')
     try {
       const nextLog = await plannerService.toggleHabitLog(habitId, date, user.id, collections.habitLogs)
@@ -3007,6 +3013,45 @@ function FinancePage({ expenses, budget, setBudget }) {
           <section className="card">
             <p className="eyebrow">Variable Expenses</p>
             <h3 style={{ margin: '4px 0 10px' }}>Tracked Spending</h3>
+            {/* Quick add variable expense */}
+            {!addingExpense ? (
+              <button onClick={() => setAddingExpense(true)} style={{
+                width:'100%', padding:'9px', borderRadius:10, marginBottom:12,
+                border:'1.5px dashed var(--border2)', background:'transparent',
+                color:'var(--teal)', fontWeight:600, fontSize:'.88rem', cursor:'pointer'
+              }}>+ Add Expense</button>
+            ) : (
+              <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <input placeholder="Description" value={newExpense.desc} onChange={e=>setNewExpense(p=>({...p,desc:e.target.value}))}
+                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+                  <input placeholder="Amount" type="number" value={newExpense.amount} onChange={e=>setNewExpense(p=>({...p,amount:e.target.value}))}
+                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <select value={newExpense.category} onChange={e=>setNewExpense(p=>({...p,category:e.target.value}))}
+                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}}>
+                    {['Food','Transport','Shopping','Entertainment','Health','Personal','Home','Other'].map(c=><option key={c}>{c}</option>)}
+                  </select>
+                  <input type="date" value={newExpense.date} onChange={e=>setNewExpense(p=>({...p,date:e.target.value}))}
+                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+                </div>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={()=>{
+                    if(!newExpense.desc||!newExpense.amount) return
+                    saveItem('expense',{description:newExpense.desc,amount:Number(newExpense.amount),
+                      category:newExpense.category,date:newExpense.date||TODAY},'create')
+                    setNewExpense({desc:'',amount:'',category:'Food',date:TODAY})
+                    setAddingExpense(false)
+                  }} style={{flex:1,padding:'10px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+                    Save
+                  </button>
+                  <button onClick={()=>setAddingExpense(false)} style={{flex:1,padding:'10px',background:'var(--stone)',border:'1px solid var(--border2)',borderRadius:8,cursor:'pointer'}}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
             <PeriodPills />
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
               {[
@@ -3536,6 +3581,10 @@ function HealthWellnessPage() {
   const saveMetrics = (m) => { setMetricsLog(m); try { localStorage.setItem('planner.h.metrics', JSON.stringify(m)) } catch {} }
   const [meds, setMeds] = useState(() => lsGet('meds', []))
   const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
+  const [copingUsed, setCopingUsed] = useState(() => lsGet('copingUsed', {}))
+  const saveCopingUsed = (v) => { setCopingUsed(v); lsSet('copingUsed', v) }
+  const todayCopingKey = TODAY
+  const todayCopingUsed = copingUsed[todayCopingKey] || []
   const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
   const [migraines, setMigraines] = useState(() => lsGet('migraines', []))
   const [sleep, setSleep] = useState(() => lsGet('sleep', []))
@@ -3791,20 +3840,29 @@ function HealthWellnessPage() {
             <p className="eyebrow">Today's Medications</p>
             <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {TODAY}</h3>
             {meds.map((med, i) => {
-              const taken = todayMeds.includes(med.name)
+              // Use unique key per med instance (index-based) not just name
+              const medKey = `${med.name}_${i}`
+              const taken = todayMeds.includes(medKey)
+              // Check if scheduled for today based on frequency
+              const todayDay = new Date().toLocaleDateString('en-US',{weekday:'long'})
+              const isScheduled = !med.days || med.days.length === 0 || med.days.includes(todayDay)
               return (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--surface)' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '.9rem', color: taken ? 'var(--muted)' : 'var(--text)', textDecoration: taken ? 'line-through' : 'none' }}>{med.name}</div>
                     <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{med.dose} · {med.time} · {med.type}</div>
                   </div>
-                  <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== med.name) : [...todayMeds, med.name] })}
+                  {isScheduled ? (
+                  <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== medKey) : [...todayMeds, medKey] })}
                     style={{ padding: '6px 14px', borderRadius: 999, border: '1.5px solid', cursor: 'pointer', fontSize: '.82rem', fontWeight: 700, fontFamily: 'inherit',
                       borderColor: taken ? 'var(--success)' : 'var(--teal)',
                       background: taken ? 'rgba(34,197,94,.1)' : 'var(--teal)',
                       color: taken ? 'var(--success)' : 'var(--navy)' }}>
                     {taken ? '✓ Taken' : 'Take'}
                   </button>
+                  ) : (
+                  <span style={{fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic'}}>Not scheduled today</span>
+                  )}
                 </div>
               )
             })}
@@ -3818,9 +3876,29 @@ function HealthWellnessPage() {
                 <input key={key} type={type} placeholder={`${lbl} — ${ph}`} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                   style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
               ))}
+              {/* Days of week selector */}
+              <div>
+                <p style={{fontSize:'.78rem',color:'var(--ink2)',marginBottom:6,fontWeight:600}}>Scheduled Days (leave blank for daily)</p>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(day => {
+                    const sel = (form.medDays||[]).includes(day)
+                    return (
+                      <button key={day} type="button" onClick={() => setForm(p => ({
+                        ...p, medDays: sel ? (p.medDays||[]).filter(d=>d!==day) : [...(p.medDays||[]), day]
+                      }))} style={{
+                        padding:'5px 10px', borderRadius:999, fontSize:'.75rem', fontWeight:600,
+                        border:'1.5px solid', cursor:'pointer',
+                        borderColor: sel ? 'var(--teal)' : 'var(--border2)',
+                        background: sel ? 'var(--teal)' : 'transparent',
+                        color: sel ? 'white' : 'var(--ink2)',
+                      }}>{day}</button>
+                    )
+                  })}
+                </div>
+              </div>
               <button className="primary-btn" onClick={() => {
                 if(!form.medName) return
-                saveMeds([...meds, {name:form.medName, dose:form.medDose||'', time:form.medTime||'', notes:form.medNotes||''}])
+                saveMeds([...meds, {name:form.medName, dose:form.medDose||'', time:form.medTime||'', days:form.medDays||[], notes:form.medNotes||''}])
                 setForm(p => ({...p, medName:'', medDose:'', medTime:'', medNotes:''}))
               }}>Add Medication</button>
             </div>
@@ -3993,21 +4071,49 @@ function HealthWellnessPage() {
             <div key={category} style={{marginBottom:18}}>
               <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:8}}>{category}</div>
               <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
-                {skills.map(skill => (
-                  <span key={skill} style={{
-                    padding:'6px 12px', borderRadius:999,
-                    border:'1.5px solid var(--border2)',
-                    background:'var(--stone)', color:'var(--ink2)',
-                    fontSize:'.78rem', fontWeight:500,
-                    display:'inline-block'
-                  }}>{skill}</span>
-                ))}
+                {skills.map(skill => {
+                  const used = todayCopingUsed.includes(skill)
+                  return (
+                    <button key={skill} onClick={() => {
+                      const next = used
+                        ? todayCopingUsed.filter(s => s !== skill)
+                        : [...todayCopingUsed, skill]
+                      saveCopingUsed({...copingUsed, [todayCopingKey]: next})
+                    }} style={{
+                      padding:'6px 12px', borderRadius:999, cursor:'pointer',
+                      border: used ? '1.5px solid var(--teal)' : '1.5px solid var(--border2)',
+                      background: used ? 'var(--teal)' : 'var(--stone)',
+                      color: used ? 'white' : 'var(--ink2)',
+                      fontSize:'.78rem', fontWeight:500,
+                      transition:'all .15s',
+                    }}>{used ? '✓ ' : ''}{skill}</button>
+                  )
+                })}
               </div>
             </div>
           ))}
           <div style={{marginTop:8, padding:'10px 12px', background:'var(--teal-dim)', borderRadius:'var(--radius-sm)', fontSize:'.78rem', color:'var(--text2)', lineHeight:1.6}}>
             💡 These are tools — use what works for you in the moment.
           </div>
+          {todayCopingUsed.length > 0 && (
+            <div style={{marginTop:10,padding:'10px 12px',background:'var(--stone)',borderRadius:'var(--radius-sm)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:'.82rem',color:'var(--ink2)'}}>✓ Used {todayCopingUsed.length} skill{todayCopingUsed.length > 1 ? 's' : ''} today</span>
+              <button onClick={() => {
+                todayCopingUsed.forEach(skill => {
+                  saveItem('task', {
+                    title: `Coping: ${skill}`,
+                    category: 'Wellness',
+                    date: TODAY,
+                    completed: true,
+                    completedAt: new Date().toISOString(),
+                  }, 'create')
+                })
+              }} style={{
+                padding:'6px 14px', borderRadius:999, fontSize:'.78rem', fontWeight:600,
+                background:'var(--teal)', color:'white', border:'none', cursor:'pointer',
+              }}>Log as Tasks</button>
+            </div>
+          )}
         </section>
       )}
 
@@ -4116,7 +4222,7 @@ function NoteComposer({ onSave }) {
 }
 
 
-function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, settings }) {
+function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, onEdit, onDelete, saveItem, settings }) {
   const TABS = [
     { id: 'tasks', label: '✓ Tasks' },
     { id: 'braindump', label: '🧠 Brain Dump' },
@@ -4131,8 +4237,8 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
 
   const [tab, setTab] = useState('tasks')
   const [noteQuery, setNoteQuery] = useState('')
-  const [notes, setNotes] = useState(() => { try { const v = localStorage.getItem('planner.notes'); return v ? JSON.parse(v) : [] } catch { return [] } })
-  const saveNotes = (n) => { setNotes(n); try { localStorage.setItem('planner.notes', JSON.stringify(n)) } catch {} }
+  const notes = propNotes || []
+  // notes now come from Supabase via props - use saveItem
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
   const [cleaningLog, saveCleaningLogDirect] = useState(() => lsGet('cleaning_log_v2', {}))
   const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); lsSet('cleaning_log_v2', updated) }
@@ -4235,12 +4341,7 @@ function ProductivityPage({ tasks, onQuickCreate, onToggle, onEdit, onDelete, se
         { id: 'focus', label: '⏱ Focus Timer' },
         { id: 'cleaning', label: '🧹 Cleaning' },
         { id: 'tips', label: '💡 Tips' },
-      ]} activeTab={tab} onSelect={setTab} /><div className="pill-row" style={{ overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 4 }}>
-        {[{ id: 'tasks', label: '✓ Tasks' }, { id: 'braindump', label: '🧠 Brain Dump' }, { id: 'notes', label: '📝 Notes' }, { id: 'checklists', label: '📋 Checklists' }, { id: 'focus', label: '⏱ Focus Timer' }, { id: 'cleaning', label: '🧹 Cleaning' }, { id: 'tips', label: '💡 Time Tips' }].map(t => (
-          <button key={t.id} className={tab === t.id ? 'pill active-pill' : 'pill'}
-            onClick={() => setTab(t.id)} style={{ whiteSpace: 'nowrap', fontSize: '.82rem' }}>{t.label}</button>
-        ))}
-      </div>
+      ]} activeTab={tab} onSelect={setTab} />
 
       {tab === 'tasks' && (
         <section className="card">
@@ -5907,7 +6008,7 @@ function PlannerApp() {
             <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} />} />
           <Route path="/wellness" element={<HealthWellnessPage />} />
-          <Route path="/productivity" element={<ProductivityPage tasks={tasks} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
           <Route path="/faith" element={<FaithPage />} />
           <Route path="/health" element={<HealthWellnessPage />} />
