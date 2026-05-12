@@ -2230,7 +2230,7 @@ function QuickAccessGrid({ tabs, activeTab, onSelect }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))',
       gap: 8,
       marginBottom: 16,
     }}>
@@ -2275,7 +2275,8 @@ function TabNav({ tabs, activeTab, onSelect }) {
   return (
     <div style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)',
+      marginTop: 24, paddingTop: 16, paddingBottom: 80,
+      borderTop: '1px solid var(--border)',
       gap: 8,
     }}>
       {prev ? (
