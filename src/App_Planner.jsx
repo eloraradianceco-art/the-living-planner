@@ -2299,10 +2299,21 @@ const FREE_LIMITS = {
 }
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
+// Owner emails that automatically get Pro access
+const OWNER_EMAILS = ['aja2012@gmail.com']
+
 function useSubscription(user) {
   const [tier, setTier] = React.useState(() => {
     try { return localStorage.getItem('planner_tier') || 'free' } catch { return 'free' }
   })
+
+  // Auto-pro for owner emails
+  React.useEffect(() => {
+    if (user?.email && OWNER_EMAILS.includes(user.email.toLowerCase())) {
+      setTier('pro')
+      try { localStorage.setItem('planner_tier', 'pro') } catch {}
+    }
+  }, [user?.email])
   const [trialEndsAt, setTrialEndsAt] = React.useState(() => {
     try { return localStorage.getItem('planner_trial_ends') } catch { return null }
   })
@@ -6202,8 +6213,9 @@ const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
 
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  const { user } = useAuth()
   // Subscription
-  const subscription = useSubscription()
+  const subscription = useSubscription(user)
   const [showWelcomePro, setShowWelcomePro] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search)
