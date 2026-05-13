@@ -1620,7 +1620,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             ? `Today: ${focusCopy.join(' · ')}`
             : overdueTasks.length > 0
             ? `You have ${overdueTasks.length} overdue item${overdueTasks.length > 1 ? 's' : ''} waiting.`
-            : 'Your day is clear. Add something to move toward.'}
+            : 'A clear day. What will you make of it?'}
         </p>
         <div className="hero-focus-actions" style={{marginTop:14}}>
           <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 16px'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
@@ -1683,7 +1683,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   <div style={{fontSize:'1.5rem', opacity:.5}}>✓</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
-                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>No tasks yet — add your first</div>
+                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>A blank page awaits — add your first</div>
                   </div>
                 </Link>
               )}
@@ -2302,7 +2302,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
       {filtered.length === 0 && (
         <section className="card" style={{textAlign:'center', padding:'32px 20px'}}>
           <div style={{fontSize:'2rem', marginBottom:12}}>📁</div>
-          <EmptyState icon="📁" title="No projects yet" message="Break your goals into projects and get things moving." action="+ Add Project" onAction={onQuickCreate} />
+          <EmptyState icon="📁" title="Build something meaningful" message="Goals become real when broken into projects with clear next steps." action="+ Add Project" onAction={onQuickCreate} />
           <p className="muted" style={{fontSize:'.85rem', marginBottom:16}}>Projects connect your tasks and goals into focused workstreams.</p>
           <button className="primary-btn" onClick={() => onQuickCreate('project')}>Create your first project</button>
         </section>
@@ -2692,31 +2692,31 @@ const ONBOARDING_STEPS = [
   {
     icon: '✝',
     title: 'Faith First',
-    message: 'Start each day in the Faith section — devotionals, prayer journal, scripture, and gratitude all in one place.',
+    message: 'Begin each morning in stillness. Devotional, prayer, scripture, and gratitude — woven into your day.',
     cta: 'Next →',
   },
   {
     icon: '✓',
     title: 'Daily Tasks & Habits',
-    message: 'Plan your day with tasks, track powerful habits, and build streaks that last. Small disciplines compound into big results.',
+    message: 'Small disciplines, repeated daily, become a different life. Plan your tasks, track your habits.',
     cta: 'Next →',
   },
   {
     icon: '🎯',
     title: 'Goals & Growth',
-    message: 'Set 90-day and yearly goals, track your life score across 9 dimensions, and do a weekly review every Sunday.',
+    message: 'Aim higher. Set goals across nine dimensions of life. Reflect each Sunday. Watch yourself grow.',
     cta: 'Next →',
   },
   {
     icon: '💰',
     title: 'Financial Clarity',
-    message: 'Budget your week, track expenses, plan savings goals, and stay on top of bills — all in the Finance section.',
+    message: 'Stewardship begins with clarity. Budget weekly. Track honestly. Build wealth slowly.',
     cta: 'Next →',
   },
   {
     icon: '🌿',
     title: 'Whole-Life Wellness',
-    message: 'Track sleep, mood, workouts, meals, and more. The Living Planner covers every dimension of your life.',
+    message: 'You are body, mind, and spirit. The Living Planner honors all three.',
     cta: 'Start Planning',
   },
 ]
@@ -3303,7 +3303,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               <strong style={{fontSize:'1rem'}}>{fmt(totalWeeklyIncome)}</strong>
             </div>
           </div>
-          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}><EmptyState icon="💵" title="No income sources" message="Add your income to track your budget accurately." /></p>}
+          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}><EmptyState icon="💵" title="Track every blessing" message="Every dollar has a name. Begin by naming where they come from." /></p>}
           {incomes.map((inc, i) => (
             <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
               <div>
@@ -3357,7 +3357,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               <strong style={{fontSize:'.85rem'}}>Total Monthly Bills</strong>
               <strong style={{color:'var(--danger)',fontSize:'1rem'}}>{fmt(totalBillsMonthly)}</strong>
             </div>
-            {bills.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0',fontSize:'.85rem'}}><EmptyState icon="🧾" title="No bills added" message="Track recurring bills to stay on top of your finances." /></p>}
+            {bills.length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0',fontSize:'.85rem'}}><EmptyState icon="🧾" title="Know what you owe" message="Awareness precedes stewardship. Add what comes due each month." /></p>}
             {bills.map((b, i) => (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
                 <div>
@@ -4998,7 +4998,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 
           {/* Notes list */}
           {notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
-            ? <EmptyState icon="📝" title="No notes yet" message="Capture your thoughts, ideas, and reflections." />
+            ? <EmptyState icon="📝" title="Thoughts deserve a home" message="Capture what comes to mind. Reflect later. Watch patterns emerge." />
             : notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase()))
               .map(note => (
                 <div key={note.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
@@ -5447,7 +5447,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
           <section className="card">
             <p className="eyebrow">Trip Planner</p>
             <h3 style={{margin:'4px 0 12px'}}>Upcoming & Past Trips</h3>
-            {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="✈️" title="No trips planned" message="Add a trip you're looking forward to." /></p>}
+            {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="✈️" title="The world is waiting" message="Add a trip you're looking forward to." /></p>}
             {trips.map((trip, i) => (
               <div key={i} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)'}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
@@ -5614,7 +5614,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
         </div>
 
         {habits.length === 0 && (
-          <p className="muted" style={{fontSize:'.85rem',marginBottom:8}}><EmptyState icon="🔁" title="No habits yet" message="Pick from the suggestions below or create your own." /></p>
+          <p className="muted" style={{fontSize:'.85rem',marginBottom:8}}><EmptyState icon="🔁" title="Habits shape destiny" message="Choose one small discipline. Begin today. Stay consistent." /></p>
         )}
 
         {habits.map(habit => {
@@ -5813,7 +5813,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
       {filtered.length === 0 && (
         <section className="card" style={{textAlign:'center',padding:'28px 20px'}}>
           <div style={{fontSize:'2rem',marginBottom:10}}>🎯</div>
-          <EmptyState icon="🎯" title="No goals yet" message="Set your first goal and give your days direction." action="+ Add Goal" onAction={onQuickCreate} />
+          <EmptyState icon="🎯" title="Aim at something" message="A life without aim drifts. Set one goal and pursue it." action="+ Add Goal" onAction={onQuickCreate} />
           <p className="muted" style={{fontSize:'.85rem',marginBottom:14}}>Use the SMART framework above to set your first goal.</p>
           <button className="primary-btn" onClick={() => onQuickCreate('goal')}>Set Your First Goal</button>
         </section>
@@ -6794,7 +6794,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         <section className="card">
           <p className="eyebrow">Scripture Journal</p>
           <h3 style={{ margin: '4px 0 14px' }}>God's Word in Your Life</h3>
-          {scriptures.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="📖" title="No scriptures saved" message="Save a verse that speaks to you today." /></p>}
+          {scriptures.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="📖" title="Hide the Word in your heart" message="Save a verse that speaks today. Return to it tomorrow." /></p>}
           {scriptures.map((s, i) => (
             <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
@@ -6975,7 +6975,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         <section className="card">
           <p className="eyebrow">Faith Goals</p>
           <h3 style={{ margin: '4px 0 14px' }}>Growing in the Spirit</h3>
-          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="✝" title="No faith goals yet" message="What is God calling you to grow in?" /></p>}
+          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="✝" title="What is God calling you to" message="Spiritual growth is intentional. What is being asked of you in this season?" /></p>}
           {faithGoals.map((goal, i) => (
             <div key={goal.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
               <div onClick={() => saveFaithGoals(faithGoals.map((g,j) => j===i ? {...g, done:!g.done} : g))}
