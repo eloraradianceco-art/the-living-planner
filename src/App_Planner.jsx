@@ -848,7 +848,7 @@ function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState(hasSupabaseEnv ? 'supabase' : 'mock')
+  const [mode, setMode] = useState('supabase')
 
   useEffect(() => {
     if (!hasSupabaseEnv) {
@@ -1198,22 +1198,9 @@ function AuthPage() {
           {isSignup ? 'Create your account to sync across devices.' : 'Sign in to pick up where you left off.'}
         </p>
 
-        <div className="pill-row auth-mode-row">
-          <button className={mode === 'mock' ? 'pill active-pill' : 'pill'} type="button" onClick={() => setMode('mock')}>
-            ⚡ Demo Mode
-          </button>
-          <button className={mode === 'supabase' ? 'pill active-pill' : 'pill'} type="button" onClick={() => setMode('supabase')}>
-            ☁ Sync Account
-          </button>
-        </div>
 
-        {mode === 'mock' && (
-          <div className="auth-demo-note">
-            Demo mode saves to this device only. Your data stays here — no account needed. Start immediately.
-          </div>
-        )}
 
-        <form className="auth-form" onSubmit={submit}>
+<form className="auth-form" onSubmit={submit}>
           <label>
             Email
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -1227,7 +1214,7 @@ function AuthPage() {
           {error ? <p className="error-text">{error}</p> : null}
           {message ? <p className="success-text">{message}</p> : null}
           <button className="primary-btn" style={{marginTop:4}} disabled={loading}>
-            {loading ? 'Working…' : mode === 'mock' ? 'Start Planning' : isSignup ? 'Create Account' : 'Sign In'}
+            {loading ? 'Working…' : isSignup ? 'Create Account' : 'Sign In'}
           </button>
           {mode === 'supabase' && (
             <button type="button" className="ghost-btn" onClick={() => setIsSignup(c => !c)}>
