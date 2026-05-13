@@ -5618,8 +5618,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
 
       {filtered.map(goal => {
         const progress = getGoalProgress(goal.id, tasks, projects)
-        const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
-        const completedLinked = linkedTasks.filter(t => t.completed).length
+        const completedLinked = tasks.filter(t => t.linkedGoalId === goal.id && t.completed).length
         const linkedProjects = projects.filter(p => p.goalId === goal.id)
         const completedLinkedProjects = linkedProjects.filter(p => p.status === 'Completed').length
         const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
