@@ -2573,6 +2573,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
   const currentWeekNum = Math.ceil((new Date(TODAY) - new Date(new Date(TODAY).getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
   const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
   const [challengeGoal, setChallengeGoal] = useState(() => lsGet('challengeGoal', 10000))
+  const [addingExpense, setAddingExpense] = useState(false)
+  const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',date:TODAY})
   const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
   const saveChallengeGoal = (v) => { setChallengeGoal(v); lsSet('challengeGoal', v) }
   const toggleWeek = (w) => saveCheckedWeeks(checkedWeeks.includes(w) ? checkedWeeks.filter(x => x !== w) : [...checkedWeeks, w])
