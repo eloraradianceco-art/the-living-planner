@@ -5484,15 +5484,40 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
           const logs = habitLogs.filter(l => l.habitId === habit.id)
           const todayLog = logs.find(l => isToday(l.date))
           const weekComplete = weekLogs.filter(l => l.habitId === habit.id && l.completed).length
-          const streak = (() => {
-            let s = 0
+          const { current: streak, longest: longestStreak } = (() => {
+            // Build a sorted list of completed dates
+            const completedDates = logs.filter(l => l.completed).map(l => l.date).sort()
+            if (completedDates.length === 0) return { current: 0, longest: 0 }
+            
+            // Calculate current streak (from today backwards)
+            let current = 0
             let d = new Date()
-            while(true) {
-              const ds = d.toISOString().slice(0,10)
-              if(logs.find(l=>l.date===ds&&l.completed)) { s++; d.setDate(d.getDate()-1) }
-              else break
+            const todayStr = d.toISOString().slice(0,10)
+            // Allow today OR yesterday as the start (gives forgiveness on first day)
+            if (!completedDates.includes(todayStr)) {
+              d.setDate(d.getDate() - 1)
+              if (!completedDates.includes(d.toISOString().slice(0,10))) {
+                return { current: 0, longest: calculateLongest(completedDates) }
+              }
             }
-            return s
+            while (completedDates.includes(d.toISOString().slice(0,10))) {
+              current++
+              d.setDate(d.getDate() - 1)
+            }
+            return { current, longest: Math.max(current, calculateLongest(completedDates)) }
+            
+            function calculateLongest(dates) {
+              if (dates.length === 0) return 0
+              let max = 1, cur = 1
+              for (let i = 1; i < dates.length; i++) {
+                const prev = new Date(dates[i-1])
+                const curr = new Date(dates[i])
+                const diff = (curr - prev) / 86400000
+                if (diff === 1) { cur++; max = Math.max(max, cur) }
+                else cur = 1
+              }
+              return max
+            }
           })()
           return (
             <div key={habit.id} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)',display:'flex',alignItems:'center',gap:10}}>
@@ -5509,7 +5534,8 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
                 <div style={{display:'flex',gap:10,marginTop:2,fontSize:'.72rem',color:'var(--muted)'}}>
                   <span style={{color:CAT_COLOR[habit.category]||'var(--brass)',fontWeight:600}}>{habit.category}</span>
                   <span>{weekComplete + '/7 this week'}</span>
-                  {streak > 1 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
+                  {streak > 0 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
+                  {longestStreak > streak && longestStreak > 2 && <span style={{color:'var(--muted)',fontSize:'.7rem'}}>· best {longestStreak}d</span>}
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
