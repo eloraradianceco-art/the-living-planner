@@ -6554,16 +6554,16 @@ function PlannerApp() {
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+          <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+            <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
-          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, period tracking, and passwords.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
-          <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+          <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
           isOpen={modalState.open}
@@ -6617,6 +6617,58 @@ class AppErrorBoundary extends React.Component {
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
 function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
+
+  // Faith data sync helper — saves to Supabase + localStorage backup
+  const syncFaith = React.useCallback(async (key, value) => {
+    try { localStorage.setItem('planner.faith.' + key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('faith_data').upsert({
+        user_id: user.id, data_key: key, data_value: value, updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,data_key' })
+    } catch (e) { console.error('Faith sync error:', e) }
+  }, [user?.id])
+
+  // Load faith data from Supabase on mount
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('faith_data')
+      .select('data_key, data_value')
+      .eq('user_id', user.id)
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'prayers') setPrayers(row.data_value || [])
+          if (row.data_key === 'scriptures') setScriptures(row.data_value || [])
+          if (row.data_key === 'gratitude') setGratitude(row.data_value || [])
+          if (row.data_key === 'devotional') setDevotional(row.data_value || { text: '', date: '' })
+          if (row.data_key === 'fasting') setFasting(row.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
+          if (row.data_key === 'faithGoals') setFaithGoals(row.data_value || [])
+          if (row.data_key === 'sermons') setSermons(row.data_value || [])
+        })
+      })
+
+    // Realtime subscription for faith data
+    const channel = supabase
+      .channel('faith_realtime_' + user.id)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'faith_data',
+        filter: `user_id=eq.${user.id}`,
+      }, payload => {
+        const row = payload.new
+        if (!row) return
+        if (row.data_key === 'prayers') setPrayers(row.data_value || [])
+        if (row.data_key === 'scriptures') setScriptures(row.data_value || [])
+        if (row.data_key === 'gratitude') setGratitude(row.data_value || [])
+        if (row.data_key === 'devotional') setDevotional(row.data_value || { text: '', date: '' })
+        if (row.data_key === 'fasting') setFasting(row.data_value || {})
+        if (row.data_key === 'faithGoals') setFaithGoals(row.data_value || [])
+        if (row.data_key === 'sermons') setSermons(row.data_value || [])
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id])
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
 
@@ -6643,35 +6695,35 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         if (row.sermons) setSermons(sj('sermons', []))
       })
   }, [user?.id])
-  const savePrayers = (v) => { setPrayers(v); lsSet('prayers', v) }
+  const savePrayers = (v) => { setPrayers(v); syncFaith('prayers', v) }
 
   // Scripture journal state
   const [scriptures, setScriptures] = useState(() => lsGet('scriptures', []))
   const [newScripture, setNewScripture] = useState({ reference: '', text: '', reflection: '' })
-  const saveScriptures = (v) => { setScriptures(v); lsSet('scriptures', v) }
+  const saveScriptures = (v) => { setScriptures(v); syncFaith('scriptures', v) }
 
   // Gratitude state
   const [gratitude, setGratitude] = useState(() => lsGet('gratitude', []))
   const [newGratitude, setNewGratitude] = useState('')
-  const saveGratitude = (v) => { setGratitude(v); lsSet('gratitude', v) }
+  const saveGratitude = (v) => { setGratitude(v); syncFaith('gratitude', v) }
 
   // Devotional journal
   const [devotional, setDevotional] = useState(() => lsGet('devotional', { text: '', date: '' }))
-  const saveDevotional = (v) => { setDevotional(v); lsSet('devotional', v) }
+  const saveDevotional = (v) => { setDevotional(v); syncFaith('devotional', v) }
 
   // Fasting tracker
   const [fasting, setFasting] = useState(() => lsGet('fasting', { active: false, startDate: '', endDate: '', intention: '', log: [] }))
-  const saveFasting = (v) => { setFasting(v); lsSet('fasting', v) }
+  const saveFasting = (v) => { setFasting(v); syncFaith('fasting', v) }
 
   // Faith goals
   const [faithGoals, setFaithGoals] = useState(() => lsGet('faithGoals', []))
   const [newFaithGoal, setNewFaithGoal] = useState({ text: '', category: 'Spiritual Growth', done: false })
-  const saveFaithGoals = (v) => { setFaithGoals(v); lsSet('faithGoals', v) }
+  const saveFaithGoals = (v) => { setFaithGoals(v); syncFaith('faithGoals', v) }
 
   // Sermon notes
   const [sermons, setSermons] = useState(() => lsGet('sermons', []))
   const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
-  const saveSermons = (v) => { setSermons(v); lsSet('sermons', v) }
+  const saveSermons = (v) => { setSermons(v); syncFaith('sermons', v) }
 
   const TODAY = new Date().toISOString().slice(0,10)
   const todayGratitude = gratitude.filter(g => g.date === TODAY)
