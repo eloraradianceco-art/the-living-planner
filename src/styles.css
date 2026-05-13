@@ -942,3 +942,284 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 .mobile-frame .content {
   padding: 12px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PREMIUM POLISH LAYER — Editorial refinement
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── Refined Shadow Stack (layered, light-mimicking) ─────────────── */
+:root {
+  --shadow-xs: 0 1px 2px rgba(28,28,30,.04), 0 1px 3px rgba(28,28,30,.05);
+  --shadow:    0 1px 2px rgba(28,28,30,.04), 0 4px 12px rgba(28,28,30,.06), 0 12px 24px rgba(28,28,30,.04);
+  --shadow-md: 0 2px 4px rgba(28,28,30,.05), 0 8px 24px rgba(28,28,30,.08), 0 20px 40px rgba(28,28,30,.06);
+  --shadow-lg: 0 4px 8px rgba(28,28,30,.06), 0 16px 32px rgba(28,28,30,.10), 0 32px 64px rgba(28,28,30,.08);
+  --shadow-brass: 0 2px 8px rgba(184,150,90,.20), 0 8px 24px rgba(184,150,90,.12);
+  --shadow-teal: 0 2px 8px rgba(42,157,143,.18), 0 8px 24px rgba(42,157,143,.10);
+
+  /* Refined easing curves */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Refined Card Elevation ──────────────────────────────────────── */
+.card {
+  box-shadow: var(--shadow);
+  transition: box-shadow .25s var(--ease-out), transform .25s var(--ease-out);
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Premium-card variant for hero items */
+.card.premium-card {
+  background: linear-gradient(180deg, var(--warm-white) 0%, #FBF7F1 100%);
+  border: 1px solid var(--stone3);
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+.card.premium-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  border-radius: var(--radius) var(--radius) 0 0;
+  opacity: .6;
+}
+
+/* ── Button Refinements ──────────────────────────────────────────── */
+.primary-btn, .secondary-btn, .ghost-btn {
+  transition: all .2s var(--ease-out);
+  letter-spacing: .01em;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+.primary-btn {
+  background: var(--ink);
+  color: var(--warm-white);
+  box-shadow: var(--shadow-xs);
+}
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  background: #2C2C2E;
+}
+.primary-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Brass accent button — for premium CTAs */
+.brass-btn {
+  background: linear-gradient(180deg, var(--brass) 0%, var(--brass2) 100%);
+  color: var(--warm-white);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  box-shadow: var(--shadow-brass);
+  cursor: pointer;
+  transition: all .2s var(--ease-out);
+}
+.brass-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(184,150,90,.30), 0 12px 32px rgba(184,150,90,.18);
+}
+.brass-btn:active { transform: translateY(0); }
+
+/* ── Refined Typography ──────────────────────────────────────────── */
+h1, h2 {
+  letter-spacing: -.015em;
+  font-weight: 500;
+}
+h3 {
+  letter-spacing: -.008em;
+  font-weight: 600;
+}
+.eyebrow {
+  font-family: var(--sans);
+  text-transform: uppercase;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  color: var(--brass);
+  margin-bottom: 6px;
+}
+
+/* Display heading for hero moments */
+.display-heading {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 2.2rem;
+  line-height: 1.1;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.display-heading em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--brass);
+}
+
+/* ── Animations ──────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes checkmarkDraw {
+  0% { stroke-dashoffset: 22; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes celebrate {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+/* Apply animations to common elements */
+.card { animation: fadeIn .4s var(--ease-out); }
+.hero-focus-card { animation: scaleIn .5s var(--ease-out); }
+
+/* Task completion celebration */
+.task-complete-burst {
+  animation: celebrate .4s var(--ease-spring);
+}
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--stone) 0%, var(--stone2) 50%, var(--stone) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Habit Circle Refinement ─────────────────────────────────────── */
+button[style*="borderRadius:'50%'"] {
+  transition: all .2s var(--ease-spring) !important;
+}
+button[style*="borderRadius:'50%'"]:hover {
+  transform: scale(1.08);
+}
+button[style*="borderRadius:'50%'"]:active {
+  transform: scale(.92);
+}
+
+/* ── Bottom Nav Refinement ───────────────────────────────────────── */
+.bottom-nav {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(28,28,30,.92);
+  box-shadow: 0 -1px 0 rgba(184,150,90,.15), 0 -8px 32px rgba(0,0,0,.20);
+}
+
+/* ── Form Inputs ─────────────────────────────────────────────────── */
+input, select, textarea {
+  transition: border-color .15s var(--ease-out), box-shadow .15s var(--ease-out);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none !important;
+  border-color: var(--brass) !important;
+  box-shadow: 0 0 0 3px var(--brass-dim) !important;
+}
+
+/* ── Hero Focus Card (the daily greeting) ────────────────────────── */
+.hero-focus-card {
+  background: linear-gradient(135deg, var(--warm-white) 0%, #FDF8EE 100%);
+  border: 1px solid var(--stone3);
+  border-radius: var(--radius-lg);
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.hero-focus-card::before {
+  content: '';
+  position: absolute;
+  top: -40%; right: -10%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, var(--brass-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-focus-card h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  letter-spacing: -.015em;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Pill / QuickAccessGrid refinement ───────────────────────────── */
+button[style*="borderRadius: 12"] {
+  transition: all .2s var(--ease-out);
+}
+button[style*="borderRadius: 12"]:active {
+  transform: scale(.95);
+}
+
+/* ── Page transition ─────────────────────────────────────────────── */
+main {
+  animation: fadeIn .35s var(--ease-out);
+}
+
+/* ── Refined Borders ─────────────────────────────────────────────── */
+.card {
+  border: 1px solid rgba(28,28,30,.06);
+}
+
+/* ── Subtle texture (very subtle paper feel) ─────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(at 20% 30%, rgba(184,150,90,.03) 0%, transparent 50%),
+    radial-gradient(at 80% 70%, rgba(42,157,143,.025) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Toast Refinement ────────────────────────────────────────────── */
+.toast {
+  animation: slideDown .3s var(--ease-spring);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ── Score badges with subtle gradient ───────────────────────────── */
+.metric-tile strong {
+  background: linear-gradient(180deg, var(--ink) 0%, var(--ink2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Smooth scrolling ────────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+/* ── Selection color ─────────────────────────────────────────────── */
+::selection {
+  background: var(--brass-glow);
+  color: var(--ink);
+}
+
+/* ── Focus visible (accessibility) ───────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
