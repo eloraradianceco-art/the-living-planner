@@ -5619,6 +5619,10 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
       {filtered.map(goal => {
         const progress = getGoalProgress(goal.id, tasks, projects)
         const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
+        const completedLinked = linkedTasks.filter(t => t.completed).length
+        const linkedProjects = projects.filter(p => p.goalId === goal.id)
+        const completedLinkedProjects = linkedProjects.filter(p => p.status === 'Completed').length
+        const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
         const tf = TIMEFRAMES.find(t => t.id === goal.timeframe)
         return (
           <section key={goal.id} className="card">
@@ -5634,12 +5638,18 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
                 <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{goal.category} · Due {goal.targetDate}</div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0,marginLeft:8}}>
+                <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px',color:'var(--teal)',borderColor:'var(--teal)'}}
+                  onClick={() => onQuickCreate('task', { linkedGoalId: goal.id, category: goal.category || 'Productivity' })}>+ Task</button>
                 <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px'}} onClick={() => onEdit('goal',goal)}>Edit</button>
                 <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}} onClick={() => onDelete('goal',goal.id)}>✕</button>
               </div>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
-              <span style={{color:'var(--muted)'}}>{linkedTasks.length} linked task{linkedTasks.length!==1?'s':''}</span>
+              <span style={{color:'var(--muted)'}}>
+                {linkedTasks.length === 0 && linkedProjects.length === 0 
+                  ? 'No linked tasks yet' 
+                  : `${completedLinked + completedLinkedProjects}/${linkedTasks.length + linkedProjects.length} completed`}
+              </span>
               <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
       
       
