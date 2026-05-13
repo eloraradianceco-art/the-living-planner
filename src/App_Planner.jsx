@@ -1630,7 +1630,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       </div>
 
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
-      <section className="card" style={{background:'linear-gradient(135deg, var(--ink) 0%, var(--navy) 100%)', color:'white', border:'none'}}>
+      <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
         <h3 style={{margin:'4px 0 14px', color:'white', fontSize:'1rem'}}>Three things that matter today</h3>
 
