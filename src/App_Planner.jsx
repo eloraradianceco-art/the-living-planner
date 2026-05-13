@@ -2363,6 +2363,36 @@ function WelcomeProBanner({ onDismiss }) {
   )
 }
 
+// ── Pro-only Tab Configuration ────────────────────────────────────────────
+const PRO_TABS = {
+  faith: ['fasting', 'sermons', 'goals'],
+  finance: ['bank', 'income', 'expenses', 'savings', 'debt', 'nospend'],
+}
+
+function ProTabGate({ isPro, onUpgrade, children }) {
+  if (isPro) return children
+  return (
+    <div style={{
+      position: 'relative', padding: '40px 24px', textAlign: 'center',
+      background: 'var(--stone)', borderRadius: 14, margin: '0 0 16px',
+    }}>
+      <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>🔒</div>
+      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--ink)', marginBottom: 8 }}>
+        Pro Feature
+      </div>
+      <p style={{ fontSize: '.88rem', color: 'var(--ink2)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto 20px' }}>
+        This section is available on the Pro plan. Upgrade to unlock everything.
+      </p>
+      <button onClick={onUpgrade} style={{
+        padding: '12px 28px', borderRadius: 999,
+        background: 'var(--teal)', color: 'white', border: 'none',
+        fontSize: '.92rem', fontWeight: 700, cursor: 'pointer',
+      }}>Upgrade to Pro</button>
+    </div>
+  )
+}
+
+
 // ── Upgrade Card ──────────────────────────────────────────────────────────
 function UpgradeCard({ title, message, onClose }) {
   return (
@@ -2596,7 +2626,7 @@ function OnboardingWalkthrough({ onComplete }) {
 
 
 // ── Quick Access Grid — shown at top of each page ─────────────────────────
-function QuickAccessGrid({ tabs, activeTab, onSelect }) {
+function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = false }) {
   return (
     <div style={{
       display: 'grid',
@@ -2606,9 +2636,10 @@ function QuickAccessGrid({ tabs, activeTab, onSelect }) {
     }}>
       {tabs.map(t => {
         const active = activeTab === t.id
+        const isLocked = !isPro && proTabs.includes(t.id)
         // Split emoji from label
         const parts = t.label.match(/^(\S+)\s(.+)$/)
-        const icon = parts ? parts[1] : t.label[0]
+        const icon = isLocked ? '🔒' : (parts ? parts[1] : t.label[0])
         const name = parts ? parts[2] : t.label
         return (
           <button key={t.id} onClick={() => onSelect(t.id)} style={{
@@ -2684,7 +2715,7 @@ function TabNav({ tabs, activeTab, onSelect }) {
 
 
 
-function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals }) {
+function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals, isPro = false, onUpgrade = () => {} }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
@@ -2845,7 +2876,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
         <span style={{fontSize:'1.1rem'}}>💰</span>
         <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
       </div>
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && (
@@ -2911,6 +2942,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
 
       {/* ── INCOME ───────────────────────────────────────────────────────── */}
       {tab === 'bank' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           {/* Security banner */}
           <section className="card" style={{background:'var(--ink)',border:'none'}}>
@@ -3075,9 +3107,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             ))}
           </section>
         </div>
-      )}
+      </ProTabGate>)}
 
       {tab === 'income' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Income Tracker</p>
           <h3 style={{ margin: '4px 0 14px' }}>Your Income Sources</h3>
@@ -3132,10 +3165,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             }}>+ Add Income</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {/* ── EXPENSES & BILLS ─────────────────────────────────────────────── */}
       {tab === 'expenses' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           {/* Bills section — moved here from Budget */}
           <section className="card">
@@ -3290,10 +3324,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             })()}
           </section>
         </div>
-      )}
+      </ProTabGate>)}
 
       {/* ── SAVINGS ──────────────────────────────────────────────────────── */}
       {tab === 'savings' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
             <p className="eyebrow">Savings Challenge</p>
@@ -3514,8 +3549,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             </div>
           </section>
         </div>
-      )}
+      </ProTabGate>)}
       {tab === 'debt' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Debt Tracker</p>
           <h3 style={{ margin: '4px 0 6px' }}>Debt Avalanche — Highest Rate First</h3>
@@ -3560,7 +3596,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             }}>+ Add Debt</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {/* ── BUDGET PLAN ──────────────────────────────────────────────────── */}
       {tab === 'budget' && (
@@ -3661,6 +3697,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
 
       {/* ── NO-SPEND ─────────────────────────────────────────────────────── */}
       {tab === 'nospend' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">No-Spend Challenge</p>
           <h3 style={{ margin: '4px 0 6px' }}>Color In One Per Day</h3>
@@ -3695,7 +3732,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals 
             ))}
           </div>
         </section>
-      )}
+      </ProTabGate>)}
       <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
@@ -6230,11 +6267,11 @@ function PlannerApp() {
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
-          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} />} />
+          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
-          <Route path="/faith" element={<FaithPage />} />
+          <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
@@ -6288,7 +6325,7 @@ class AppErrorBoundary extends React.Component {
 
 
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
-function FaithPage() {
+function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
@@ -6382,7 +6419,7 @@ function FaithPage() {
         ))}
       </div>
 
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} />
 
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
       {tab === 'devotional' && (
@@ -6571,6 +6608,7 @@ function FaithPage() {
 
       {/* ── FASTING ────────────────────────────────────────────────────────── */}
       {tab === 'fasting' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Fasting Tracker</p>
           <h3 style={{ margin: '4px 0 8px' }}>Discipline & Consecration</h3>
@@ -6616,10 +6654,11 @@ function FaithPage() {
             </div>
           )}
         </section>
-      )}
+      </ProTabGate>)}
 
       {/* ── SERMONS ────────────────────────────────────────────────────────── */}
       {tab === 'sermons' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Sermon Notes</p>
           <h3 style={{ margin: '4px 0 14px' }}>Capture What God Says</h3>
@@ -6660,10 +6699,11 @@ function FaithPage() {
             }}>+ Save Notes</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {/* ── FAITH GOALS ─────────────────────────────────────────────────────── */}
       {tab === 'goals' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Faith Goals</p>
           <h3 style={{ margin: '4px 0 14px' }}>Growing in the Spirit</h3>
@@ -6700,7 +6740,7 @@ function FaithPage() {
             }}>+ Add Goal</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
       <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
