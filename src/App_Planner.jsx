@@ -1629,6 +1629,143 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         </div>
       </div>
 
+      {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
+      <section className="card" style={{background:'linear-gradient(135deg, var(--ink) 0%, var(--navy) 100%)', color:'white', border:'none'}}>
+        <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
+        <h3 style={{margin:'4px 0 14px', color:'white', fontSize:'1rem'}}>Three things that matter today</h3>
+
+        {(() => {
+          // Pick top task: priority high, due today/overdue, not completed
+          const topTask = tasks
+            .filter(t => !t.completed)
+            .sort((a, b) => {
+              const aP = (a.priority === 'high' ? 3 : a.priority === 'medium' ? 2 : 1)
+              const bP = (b.priority === 'high' ? 3 : b.priority === 'medium' ? 2 : 1)
+              const aOver = isOverdue(a.date) ? 10 : isToday(a.date) ? 5 : 0
+              const bOver = isOverdue(b.date) ? 10 : isToday(b.date) ? 5 : 0
+              return (bP + bOver) - (aP + aOver)
+            })[0]
+
+          // Pick top habit: not completed today
+          const todayHabitLogs = habitLogs.filter(l => l.date === getTodayString() && l.completed)
+          const completedHabitIds = todayHabitLogs.map(l => l.habitId)
+          const topHabit = habits.find(h => !completedHabitIds.includes(h.id))
+
+          // Get today's intention from settings or first goal
+          const topGoal = goals.find(g => !g.completed)
+
+          return (
+            <div style={{display:'grid', gap:10}}>
+              {/* Focus 1: Top Task */}
+              {topTask ? (
+                <div onClick={() => onEdit('task', topTask)} style={{
+                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  cursor:'pointer', border:'1px solid rgba(255,255,255,.1)',
+                }}>
+                  <div style={{
+                    width:28, height:28, borderRadius:'50%',
+                    border:'2px solid var(--teal)', flexShrink:0,
+                  }} />
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:'.7rem', color:'var(--teal)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
+                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                      {topTask.title}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Link to="/tasks" style={{
+                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
+                }}>
+                  <div style={{fontSize:'1.5rem', opacity:.5}}>✓</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
+                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>No tasks yet — add your first</div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Focus 2: Top Habit */}
+              {topHabit ? (
+                <div style={{
+                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px solid rgba(255,255,255,.1)',
+                }}>
+                  <div style={{
+                    width:28, height:28, borderRadius:'50%',
+                    border:'2px solid var(--brass)', flexShrink:0,
+                  }} />
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:'.7rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
+                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                      {topHabit.title}
+                    </div>
+                  </div>
+                </div>
+              ) : habits.length > 0 ? (
+                <div style={{
+                  background:'rgba(34,197,94,.15)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px solid rgba(34,197,94,.3)',
+                }}>
+                  <div style={{fontSize:'1.5rem'}}>✓</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'.7rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>HABITS COMPLETE</div>
+                    <div style={{fontSize:'.85rem', marginTop:2}}>All habits checked off for today 🔥</div>
+                  </div>
+                </div>
+              ) : (
+                <Link to="/habits" style={{
+                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
+                }}>
+                  <div style={{fontSize:'1.5rem', opacity:.5}}>🔁</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
+                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Focus 3: Top Goal */}
+              {topGoal ? (
+                <Link to="/goals" style={{
+                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px solid rgba(255,255,255,.1)',
+                  textDecoration:'none', color:'white',
+                }}>
+                  <div style={{fontSize:'1.5rem'}}>🎯</div>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:'.7rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                      {topGoal.title}
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <Link to="/goals" style={{
+                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
+                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
+                }}>
+                  <div style={{fontSize:'1.5rem', opacity:.5}}>🎯</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
+                  </div>
+                </Link>
+              )}
+            </div>
+          )
+        })()}
+      </section>
+
       {/* ── 4 key metrics ─────────────────────────────────────────── */}
       <div className="home-metrics-strip">
         <MetricTile label="Open Tasks" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : 'on track'} />
