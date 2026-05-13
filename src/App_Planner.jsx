@@ -2290,6 +2290,155 @@ function PageNav() {
 }
 
 
+// ── Stripe Configuration ──────────────────────────────────────────────────
+const STRIPE_CONFIG = {
+  publishableKey: 'pk_live_51Sxe7pBr8nMXOo8tUrruWNZ7BkQ0OsKlfqtgKuksLAIcBfCHGtnPv19QP2sIrZz7nQJzDr4SH0OT6ZJ7yxubDUF3007nOd9RJE',
+  monthlyLink: 'https://buy.stripe.com/00w7sKcrG8dEe110Rl57W05',
+  annualLink: 'https://buy.stripe.com/dRm14majydxYaOP8jN57W06',
+  monthlyTrial: 7,
+  annualTrial: 14,
+  prices: {
+    monthly: 7.99,
+    annual: 59.99,
+  },
+}
+
+// Free tier limits
+const FREE_LIMITS = {
+  tasks: 20,
+  habits: 5,
+  goals: 2,
+  projects: 2,
+}
+
+// ── Subscription Hook ─────────────────────────────────────────────────────
+function useSubscription(user) {
+  const [tier, setTier] = React.useState(() => {
+    try { return localStorage.getItem('planner_tier') || 'free' } catch { return 'free' }
+  })
+  const [trialEndsAt, setTrialEndsAt] = React.useState(() => {
+    try { return localStorage.getItem('planner_trial_ends') } catch { return null }
+  })
+
+  // Check URL for welcome=pro and activate pro
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('welcome') === 'pro') {
+      setTier('pro')
+      try { localStorage.setItem('planner_tier', 'pro') } catch {}
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  const isPro = tier === 'pro' || tier === 'trial'
+  const isTrialing = tier === 'trial' && trialEndsAt && new Date(trialEndsAt) > new Date()
+  const daysLeftInTrial = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : 0
+
+  return { tier, setTier, isPro, isTrialing, daysLeftInTrial, trialEndsAt, setTrialEndsAt }
+}
+
+// ── Welcome Pro Banner ────────────────────────────────────────────────────
+function WelcomeProBanner({ onDismiss }) {
+  return (
+    <div style={{
+      position: 'fixed', top: 16, left: 16, right: 16, zIndex: 9999,
+      maxWidth: 480, margin: '0 auto',
+      background: 'linear-gradient(135deg, var(--teal) 0%, var(--navy) 100%)',
+      color: 'white', borderRadius: 16, padding: '16px 20px',
+      boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+      display: 'flex', alignItems: 'center', gap: 12,
+      animation: 'slideDown .4s ease',
+    }}>
+      <div style={{ fontSize: '2rem' }}>🎉</div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: 2 }}>Welcome to Pro!</div>
+        <div style={{ fontSize: '.78rem', opacity: .9 }}>Your free trial has started. Plan with faith, live with purpose.</div>
+      </div>
+      <button onClick={onDismiss} style={{
+        background: 'rgba(255,255,255,.2)', color: 'white', border: 'none',
+        borderRadius: 999, width: 28, height: 28, cursor: 'pointer', fontWeight: 700,
+      }}>✕</button>
+    </div>
+  )
+}
+
+// ── Upgrade Card ──────────────────────────────────────────────────────────
+function UpgradeCard({ title, message, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(10,18,30,.92)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 24,
+    }}>
+      <div style={{
+        background: 'var(--warm-white, white)', borderRadius: 24,
+        padding: '36px 28px', maxWidth: 380, width: '100%', textAlign: 'center',
+        boxShadow: '0 32px 80px rgba(0,0,0,.4)',
+      }}>
+        <div style={{ fontSize: '3rem', marginBottom: 16 }}>✨</div>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>
+          {title || 'Upgrade to Pro'}
+        </h2>
+        <p style={{ fontSize: '.88rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 24 }}>
+          {message || 'Unlock unlimited tasks, habits, goals, faith section, finance tools, and all future features.'}
+        </p>
+
+        <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+          <a href={STRIPE_CONFIG.annualLink} target="_blank" rel="noopener noreferrer" style={{
+            display: 'block', padding: '16px', borderRadius: 14,
+            background: 'var(--teal)', color: 'white', textDecoration: 'none',
+            fontWeight: 700, position: 'relative',
+          }}>
+            <div style={{ fontSize: '.95rem' }}>Annual — $59.99/year</div>
+            <div style={{ fontSize: '.75rem', opacity: .9, marginTop: 2 }}>$5/mo · 14-day free trial · Save $36</div>
+            <span style={{
+              position: 'absolute', top: -8, right: 12,
+              background: 'var(--brass, #B8965A)', color: 'white', fontSize: '.65rem',
+              padding: '3px 10px', borderRadius: 999, fontWeight: 700,
+            }}>BEST VALUE</span>
+          </a>
+          <a href={STRIPE_CONFIG.monthlyLink} target="_blank" rel="noopener noreferrer" style={{
+            display: 'block', padding: '14px', borderRadius: 14,
+            background: 'var(--stone)', color: 'var(--ink)', textDecoration: 'none',
+            fontWeight: 700, border: '1.5px solid var(--border2)',
+          }}>
+            <div style={{ fontSize: '.95rem' }}>Monthly — $7.99/month</div>
+            <div style={{ fontSize: '.75rem', color: 'var(--ink2)', marginTop: 2 }}>7-day free trial</div>
+          </a>
+        </div>
+
+        <button onClick={onClose} style={{
+          background: 'none', border: 'none', color: 'var(--muted)',
+          fontSize: '.82rem', cursor: 'pointer',
+        }}>Maybe later</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Trial Countdown Banner ────────────────────────────────────────────────
+function TrialBanner({ daysLeft, onUpgrade }) {
+  if (!daysLeft || daysLeft > 14) return null
+  return (
+    <div style={{
+      background: daysLeft <= 3 ? 'var(--warning, #F59E0B)' : 'var(--teal)',
+      color: 'white', padding: '8px 14px', borderRadius: 10,
+      margin: '0 14px 12px', display: 'flex', justifyContent: 'space-between',
+      alignItems: 'center', fontSize: '.82rem',
+    }}>
+      <span><strong>{daysLeft} day{daysLeft === 1 ? '' : 's'} left</strong> in your trial</span>
+      <button onClick={onUpgrade} style={{
+        background: 'white', color: 'var(--ink)', border: 'none',
+        padding: '4px 12px', borderRadius: 999, fontSize: '.75rem',
+        fontWeight: 700, cursor: 'pointer',
+      }}>Manage</button>
+    </div>
+  )
+}
+
+
 // ── Empty State Component ─────────────────────────────────────────────────
 function EmptyState({ icon, title, message, action, onAction }) {
   return (
@@ -5880,11 +6029,26 @@ function NotificationSettings({ settings, updateSettings }) {
         </div>
       )}
     </section>
+        <section className="card" style={{marginBottom:14}}>
+          <p className="eyebrow">Subscription</p>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>The Living Planner Pro</div>
+              <div style={{fontSize:'.82rem',color:'var(--ink2)',marginTop:2}}>Free tier · Limited features</div>
+            </div>
+            <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited everything plus exclusive features.')} style={{
+              padding:'8px 18px', borderRadius:999, background:'var(--teal)',
+              color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
+            }}>Upgrade</button>
+          </div>
+        </section>
+
+        
   )
 }
 
 
-function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate }) {
+function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut } = useAuth()
 
   return (
@@ -6054,7 +6218,7 @@ function PlannerApp() {
           <Route path="/lifestyle" element={<LifestylePage />} />
           <Route path="/faith" element={<FaithPage />} />
           <Route path="/health" element={<HealthWellnessPage />} />
-          <Route path="/more" element={<MorePage profile={profile} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+          <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
           isOpen={modalState.open}
