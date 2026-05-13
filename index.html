@@ -2,14 +2,43 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/planner-icon.png" />
-    <link rel="apple-touch-icon" href="/planner-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1C1C1E" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <title>The Living Planner</title>
+    <meta name="description" content="A faith-centered life planning system for goals, habits, finances, and daily structure." />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1A2332" />
+
+    <!-- iOS / Apple PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Living Planner" />
-    <title>The Living Planner</title>
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Apple touch icons (iOS home screen) -->
+    <link rel="apple-touch-icon" href="/planner-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/planner-icon.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/planner-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/planner-icon.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/planner-icon.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/planner-icon.png" />
+
+    <!-- Open Graph (for shared links) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Living Planner" />
+    <meta property="og:description" content="Plan with faith. Live with purpose." />
+    <meta property="og:image" content="/planner-icon.png" />
+    <meta property="og:url" content="https://the-living-planner.vercel.app" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="The Living Planner" />
+    <meta name="twitter:description" content="Plan with faith. Live with purpose." />
+    <meta name="twitter:image" content="/planner-icon.png" />
   </head>
   <body>
     <div id="root"></div>
