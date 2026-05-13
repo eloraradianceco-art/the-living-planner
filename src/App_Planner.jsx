@@ -403,7 +403,7 @@ function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitL
       body: `You are $${(weeklySpend - budget.weeklyTarget).toFixed(2)} over the weekly target. Review subscriptions or flexible spending today.`,
       tone: 'warning',
       actionLabel: 'See Finances',
-      route: '/more',
+      route: '/finance',
     })
   }
 
