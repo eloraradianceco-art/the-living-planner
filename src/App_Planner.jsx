@@ -3181,170 +3181,39 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       {tab === 'bank' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
-          {/* Security banner */}
-          <section className="card" style={{background:'var(--ink)',border:'none'}}>
-            <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
-              <div style={{fontSize:'2rem',flexShrink:0}}>🔒</div>
-              <div>
-                <p className="eyebrow" style={{color:'var(--brass)'}}>Bank-Level Security</p>
-                <h3 style={{color:'var(--warm-white)',margin:'4px 0 8px'}}>Your credentials stay private</h3>
-                <p style={{color:'rgba(255,255,255,.7)',fontSize:'.82rem',lineHeight:1.6,margin:0}}>
-                  We use <strong style={{color:'var(--brass)'}}>Plaid</strong> — the same technology trusted by Venmo, Robinhood, and 7,000+ apps. You log in directly through Plaid's secure interface. We never see your bank username or password. Ever.
-                </p>
-              </div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginTop:14}}>
+          {/* Coming Soon */}
+          <section className="card" style={{textAlign:'center',padding:'40px 24px'}}>
+            <div style={{fontSize:'3rem',marginBottom:16}}>🏦</div>
+            <p className="eyebrow" style={{color:'var(--brass)'}}>Coming Soon</p>
+            <h3 style={{margin:'4px 0 12px',color:'var(--ink)'}}>Automatic Bank Sync</h3>
+            <p className="muted" style={{fontSize:'.88rem',lineHeight:1.7,maxWidth:340,margin:'0 auto 20px'}}>
+              We're working on integration with Plaid for secure, automatic transaction sync from your bank accounts. In the meantime, manual entry gives you full control and complete privacy.
+            </p>
+            <div style={{display:'grid',gap:10,maxWidth:340,margin:'0 auto'}}>
               {[
-                ['256-bit', 'Encryption'],
-                ['SOC 2', 'Certified'],
-                ['Read-only', 'Access'],
-              ].map(([val,label]) => (
-                <div key={label} style={{textAlign:'center',padding:'10px 8px',background:'rgba(255,255,255,.06)',borderRadius:8}}>
-                  <div style={{fontWeight:700,color:'var(--brass)',fontSize:'1rem'}}>{val}</div>
-                  <div style={{fontSize:'.7rem',color:'rgba(255,255,255,.5)',marginTop:2}}>{label}</div>
+                ['📊','Manual entry is more accurate','You see every transaction. No miscategorization.'],
+                ['🔒','Manual entry is more private','Your bank credentials never leave your device.'],
+                ['💪','Manual entry builds awareness','Logging expenses by hand reinforces mindful spending.'],
+              ].map(([icon,title,desc]) => (
+                <div key={title} style={{display:'flex',gap:12,padding:14,background:'var(--stone)',borderRadius:12,textAlign:'left'}}>
+                  <div style={{fontSize:'1.5rem',flexShrink:0}}>{icon}</div>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--ink)',marginBottom:2}}>{title}</div>
+                    <div style={{fontSize:'.78rem',color:'var(--ink2)',lineHeight:1.5}}>{desc}</div>
+                  </div>
                 </div>
               ))}
             </div>
-          </section>
-
-          {/* Connected accounts */}
-          <section className="card">
-            <p className="eyebrow">Connected Accounts</p>
-            <h3 style={{margin:'4px 0 14px'}}>Your Banks</h3>
-
-            {connectedBanks.length === 0 ? (
-              <div style={{textAlign:'center',padding:'24px 0'}}>
-                <div style={{fontSize:'3rem',marginBottom:12}}>🏦</div>
-                <p style={{fontWeight:600,fontSize:'.9rem',marginBottom:6}}>No banks connected yet</p>
-                <p className="muted" style={{fontSize:'.82rem',marginBottom:20,lineHeight:1.5}}>
-                  Connect your bank to automatically import income and expenses into your planner.
-                </p>
-                <button className="primary-btn" style={{fontSize:'.9rem',padding:'12px 24px'}}
-                  onClick={async () => {
-                    setBankLoading(true)
-                    setBankError('')
-                    try {
-                      // In production: fetch Plaid link token from /api/plaid/link-token
-                      // For now show the setup instructions
-                      setBankError('SETUP_NEEDED')
-                    } catch(e) { setBankError(e.message) } finally { setBankLoading(false) }
-                  }}>
-                  {bankLoading ? 'Connecting...' : '+ Connect a Bank'}
-                </button>
-
-                {bankError === 'SETUP_NEEDED' && (
-                  <div style={{marginTop:16,padding:'14px',background:'var(--stone)',borderRadius:10,textAlign:'left'}}>
-                    <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Setup Required</p>
-                    <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:0}}>
-                      To activate bank linking, add your Plaid API keys to Vercel environment variables. See the setup guide below.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div>
-                {connectedBanks.map((bank, i) => (
-                  <div key={bank.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:'.9rem'}}>{bank.name}</div>
-                        <div className="muted" style={{fontSize:'.75rem'}}>••••{bank.last4} · {bank.type}</div>
-                      </div>
-                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                        <div style={{width:8,height:8,borderRadius:'50%',background:'var(--success)'}} />
-                        <span style={{fontSize:'.75rem',color:'var(--success)'}}>Active</span>
-                      </div>
-                    </div>
-                    <div style={{display:'flex',gap:8}}>
-                      <button onClick={() => fetchBankTransactions(bank.id)}
-                        style={{flex:1,padding:'8px',borderRadius:8,border:'1.5px solid var(--teal)',
-                        background:'none',color:'var(--teal)',cursor:'pointer',fontSize:'.82rem',fontWeight:600}}>
-                        {bankLoading ? '⟳ Syncing...' : '↻ Sync Now'}
-                      </button>
-                      <button onClick={() => saveBanks(connectedBanks.filter((_,j)=>j!==i))}
-                        style={{padding:'8px 12px',borderRadius:8,border:'1.5px solid var(--border2)',
-                        background:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.82rem'}}>
-                        Disconnect
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                <button className="primary-btn" style={{width:'100%',fontSize:'.85rem',marginTop:4}}>
-                  + Add Another Account
-                </button>
-              </div>
-            )}
-          </section>
-
-          {/* Auto-import settings */}
-          <section className="card">
-            <p className="eyebrow">Auto-Import Settings</p>
-            <h3 style={{margin:'4px 0 14px'}}>What to Import Automatically</h3>
-            {[
-              {key:'income', label:'Income & Deposits', desc:'Credits and deposits auto-added to Income tab', icon:'💵'},
-              {key:'expenses', label:'Purchases & Payments', desc:'Debits auto-added to Expenses & category breakdown', icon:'💳'},
-            ].map(item => (
-              <div key={item.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
-                <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                  <span style={{fontSize:'1.2rem'}}>{item.icon}</span>
-                  <div>
-                    <div style={{fontWeight:600,fontSize:'.88rem'}}>{item.label}</div>
-                    <div className="muted" style={{fontSize:'.72rem'}}>{item.desc}</div>
-                  </div>
-                </div>
-                <button onClick={() => saveAutoImport({...autoImport,[item.key]:!autoImport[item.key]})}
-                  style={{width:44,height:24,borderRadius:999,border:'none',cursor:'pointer',
-                  background:autoImport[item.key]?'var(--teal)':'var(--border2)',position:'relative',transition:'background .2s',flexShrink:0}}>
-                  <div style={{position:'absolute',top:3,left:autoImport[item.key]?23:3,width:18,height:18,
-                    borderRadius:'50%',background:'white',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)'}} />
-                </button>
-              </div>
-            ))}
-          </section>
-
-          {/* Recent imported transactions */}
-          {bankTransactions.length > 0 && (
-            <section className="card">
-              <p className="eyebrow">Recent Imports</p>
-              <h3 style={{margin:'4px 0 14px'}}>Imported Transactions</h3>
-              {bankTransactions.slice(0,20).map((tx,i) => {
-                const isIncome = Number(tx.amount) < 0
-                return (
-                  <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-                    <div>
-                      <div style={{fontWeight:600,fontSize:'.88rem'}}>{tx.name}</div>
-                      <div className="muted" style={{fontSize:'.75rem'}}>{tx.date} · {tx.category?.[0] || 'Uncategorized'}</div>
-                    </div>
-                    <strong style={{color:isIncome?'var(--success)':'var(--danger)'}}>
-                      {isIncome ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
-                    </strong>
-                  </div>
-                )
-              })}
-            </section>
-          )}
-
-          {/* Plaid setup guide */}
-          <section className="card" style={{background:'var(--stone)'}}>
-            <p className="eyebrow">Developer Setup</p>
-            <h3 style={{margin:'4px 0 10px',fontSize:'.95rem'}}>Activate Bank Linking</h3>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:12,lineHeight:1.5}}>To enable live bank connections, complete these steps:</p>
-            {[
-              ['1', 'Create a free account at plaid.com/developers'],
-              ['2', 'Get your Client ID and Secret from the Plaid dashboard'],
-              ['3', 'Add to Vercel env vars: PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ENV=sandbox'],
-              ['4', 'Deploy the /api/plaid/ serverless functions (provided separately)'],
-              ['5', 'Switch from sandbox → production when ready to launch'],
-            ].map(([num, step]) => (
-              <div key={num} style={{display:'flex',gap:10,marginBottom:8,alignItems:'flex-start'}}>
-                <div style={{width:22,height:22,borderRadius:'50%',background:'var(--brass)',color:'var(--ink)',
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.75rem',fontWeight:700,flexShrink:0}}>{num}</div>
-                <p style={{fontSize:'.8rem',color:'var(--ink2)',lineHeight:1.5,margin:0}}>{step}</p>
-              </div>
-            ))}
+            <button onClick={() => setTab('expenses')} style={{
+              marginTop:24,padding:'12px 28px',background:'var(--teal)',color:'white',
+              border:'none',borderRadius:999,fontWeight:700,fontSize:'.9rem',cursor:'pointer',
+            }}>
+              Log Expenses Manually →
+            </button>
           </section>
         </div>
-      </ProTabGate>)}
+        </ProTabGate>
+        )}
 
       {tab === 'income' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -4739,6 +4608,33 @@ function NoteComposer({ onSave }) {
 
 
 function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, onEdit, onDelete, saveItem, settings, isPro = false, onUpgrade = () => {} }) {
+  const { user } = useAuth()
+
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'productivity', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Productivity sync error:', e) }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data').select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'productivity')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'checklists') setChecklists(row.data_value || [])
+          if (row.data_key === 'cleaningLog') setCleaningLog(row.data_value || {})
+          if (row.data_key === 'brainDump') setBrainDump(row.data_value || [])
+        })
+      })
+  }, [user?.id])
+
   const TABS = [
     { id: 'tasks', label: '✓ Tasks' },
     { id: 'braindump', label: '🧠 Brain Dump' },
@@ -4760,7 +4656,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); lsSet('cleaning_log_v2', updated) }
   const [cleaningFreq, setCleaningFreq] = useState('daily')
   const [brainDump, setBrainDump] = useState(() => { try { return localStorage.getItem('planner.p.braindump')||'' } catch { return '' } })
-  const saveBrainDump = (v) => { setBrainDump(v); try { localStorage.setItem('planner.p.braindump', v) } catch {} }
+  const saveBrainDump = (v) => { setBrainDump(v); syncPageData('brainDump', v) }
   const WORK_MINS = 25
   const BREAK_MINS = 5
   const [focusCustomMins, setFocusCustomMins] = useState(25)
@@ -4840,7 +4736,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
 
-  const saveChecklists = (c) => { setChecklists(c); lsSet('checklists', c) }
+  const saveChecklists = (c) => { setChecklists(c); syncPageData('checklists', c) }
 
 
   return (
@@ -5868,10 +5764,35 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
 }
 
 function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) {
+  const { user } = useAuth()
+
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'goals', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Goals sync error:', e) }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data').select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'goals')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'visionItems') setVisionItems(row.data_value || [])
+        })
+      })
+  }, [user?.id])
+
   const [activeFrame, setActiveFrame] = useState('all')
   const [visionItems, setVisionItems] = useState(() => { try { const v = localStorage.getItem('planner.g.vision'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newVision, setNewVision] = useState('')
-  const saveVision = (v) => { setVisionItems(v); try { localStorage.setItem('planner.g.vision', JSON.stringify(v)) } catch {} }
+  const saveVision = (v) => { setVisionItems(v); syncPageData('visionItems', v) }
 
   const TIMEFRAMES = [
     {id:'all',label:'All'},
@@ -6033,6 +5954,33 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
 
 
 function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
+  const { user } = useAuth()
+
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'growth', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Growth sync error:', e) }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data').select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'growth')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'reviewAnswers') setReviewAnswers(row.data_value || {})
+          if (row.data_key === 'reviewHistory') setReviewHistory(row.data_value || [])
+          if (row.data_key === 'intentionText') setIntentionText(row.data_value || '')
+        })
+      })
+  }, [user?.id])
+
   const weekStart = startOfWeek(TODAY)
   const weekEnd = endOfWeek(TODAY)
   const weekLogs = habitLogs.filter((log) => log.date >= weekStart && log.date <= weekEnd)
@@ -6477,16 +6425,38 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
     <div className="screen-stack">
         <section className="card">
           <p className="eyebrow">Subscription</p>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
-            <div>
-              <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>The Living Planner Pro</div>
-              <div style={{fontSize:'.82rem',color:'var(--ink2)',marginTop:2}}>Free tier · Limited features</div>
-            </div>
-            <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited everything plus exclusive features.')} style={{
-              padding:'8px 18px', borderRadius:999, background:'var(--teal)',
-              color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
-            }}>Upgrade</button>
-          </div>
+          {(() => {
+            const tier = (typeof window !== 'undefined' && localStorage.getItem('planner_tier')) || 'free'
+            const isPro = tier === 'pro' || tier === 'trial'
+            return (
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8,gap:12}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>The Living Planner {isPro ? 'Pro ✓' : ''}</div>
+                  <div style={{fontSize:'.82rem',color:'var(--ink2)',marginTop:2}}>
+                    {isPro ? 'All features unlocked · Thanks for supporting' : 'Free tier · Limited features'}
+                  </div>
+                </div>
+                {isPro ? (
+                  <a href="mailto:support@thelivingplanner.app?subject=Manage%20My%20Subscription"
+                     style={{
+                       padding:'8px 18px', borderRadius:999, background:'var(--stone)',
+                       color:'var(--ink)', textDecoration:'none', border:'1.5px solid var(--border2)',
+                       fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap',
+                     }}>Manage</a>
+                ) : (
+                  <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited everything plus exclusive features.')} style={{
+                    padding:'8px 18px', borderRadius:999, background:'var(--teal)',
+                    color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
+                  }}>Upgrade</button>
+                )}
+              </div>
+            )
+          })()}
+          <p className="muted" style={{fontSize:'.72rem',marginTop:12,marginBottom:0,lineHeight:1.5}}>
+            To cancel or update payment, email{' '}
+            <a href="mailto:support@thelivingplanner.app" style={{color:'var(--teal)'}}>support@thelivingplanner.app</a>{' '}
+            or visit your Stripe receipt email and follow the cancellation link.
+          </p>
         </section>
 
       <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
