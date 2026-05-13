@@ -5092,7 +5092,7 @@ function PeriodTrackerTab() {
 }
 
 
-function LifestylePage() {
+function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
