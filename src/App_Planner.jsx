@@ -1179,7 +1179,7 @@ function AuthPage() {
         <p style={{color:'rgba(255,255,255,.80)', fontSize:'.95rem', lineHeight:1.7, marginBottom:32}}>
           One place for your tasks, goals, habits, finances, health, and everything in between.
         </p>
-        <div style={{display:'grid', gap:10}}>
+        <div style={{display:'grid', gap:7}}>
           <button onClick={() => setStep('features')}
             style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
             See What's Inside →
@@ -1214,7 +1214,7 @@ function AuthPage() {
             </div>
           ))}
         </div>
-        <div style={{display:'grid', gap:10}}>
+        <div style={{display:'grid', gap:7}}>
           <button onClick={() => setStep('signin')}
             style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
             Get Started →
@@ -1632,7 +1632,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
-        <h3 style={{margin:'4px 0 14px', color:'white', fontSize:'1rem'}}>Three things that matter today</h3>
+        <h3 style={{margin:'2px 0 10px', color:'white', fontSize:'.92rem'}}>Three things that matter today</h3>
 
         {(() => {
           // Pick top task: priority high, due today/overdue, not completed
@@ -1655,35 +1655,35 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           const topGoal = goals.find(g => !g.completed)
 
           return (
-            <div style={{display:'grid', gap:10}}>
+            <div style={{display:'grid', gap:7}}>
               {/* Focus 1: Top Task */}
               {topTask ? (
                 <div onClick={() => onEdit('task', topTask)} style={{
-                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   cursor:'pointer', border:'1px solid rgba(255,255,255,.1)',
                 }}>
                   <div style={{
-                    width:28, height:28, borderRadius:'50%',
+                    width:22, height:22, borderRadius:'50%',
                     border:'2px solid var(--teal)', flexShrink:0,
                   }} />
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.7rem', color:'var(--teal)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
-                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:'.62rem', color:'var(--teal)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
+                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topTask.title}
                     </div>
                   </div>
                 </div>
               ) : (
                 <Link to="/tasks" style={{
-                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.5rem', opacity:.5}}>✓</div>
+                  <div style={{fontSize:'1.2rem', opacity:.5}}>✓</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
-                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>A blank page awaits — add your first</div>
+                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
+                    <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>A blank page awaits — add your first</div>
                   </div>
                 </Link>
               )}
@@ -1691,43 +1691,43 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               {/* Focus 2: Top Habit */}
               {topHabit ? (
                 <div style={{
-                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px solid rgba(255,255,255,.1)',
                 }}>
                   <div style={{
-                    width:28, height:28, borderRadius:'50%',
+                    width:22, height:22, borderRadius:'50%',
                     border:'2px solid var(--brass)', flexShrink:0,
                   }} />
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.7rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
-                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:'.62rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
+                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topHabit.title}
                     </div>
                   </div>
                 </div>
               ) : habits.length > 0 ? (
                 <div style={{
-                  background:'rgba(34,197,94,.15)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(34,197,94,.15)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px solid rgba(34,197,94,.3)',
                 }}>
-                  <div style={{fontSize:'1.5rem'}}>✓</div>
+                  <div style={{fontSize:'1.2rem'}}>✓</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.7rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>HABITS COMPLETE</div>
-                    <div style={{fontSize:'.85rem', marginTop:2}}>All habits checked off for today 🔥</div>
+                    <div style={{fontSize:'.62rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>HABITS COMPLETE</div>
+                    <div style={{fontSize:'.78rem', marginTop:1}}>All habits checked off for today 🔥</div>
                   </div>
                 </div>
               ) : (
                 <Link to="/habits" style={{
-                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.5rem', opacity:.5}}>🔁</div>
+                  <div style={{fontSize:'1.2rem', opacity:.5}}>🔁</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
-                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
+                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
+                    <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
                   </div>
                 </Link>
               )}
@@ -1735,29 +1735,29 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               {/* Focus 3: Top Goal */}
               {topGoal ? (
                 <Link to="/goals" style={{
-                  background:'rgba(255,255,255,.08)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px solid rgba(255,255,255,.1)',
                   textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.5rem'}}>🎯</div>
+                  <div style={{fontSize:'1.2rem'}}>🎯</div>
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.7rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
-                    <div style={{fontWeight:600, fontSize:'.92rem', marginTop:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:'.62rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topGoal.title}
                     </div>
                   </div>
                 </Link>
               ) : (
                 <Link to="/goals" style={{
-                  background:'rgba(255,255,255,.05)', padding:'12px 14px',
-                  borderRadius:12, display:'flex', alignItems:'center', gap:12,
+                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
+                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.5rem', opacity:.5}}>🎯</div>
+                  <div style={{fontSize:'1.2rem', opacity:.5}}>🎯</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
-                    <div style={{fontSize:'.85rem', marginTop:2, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
+                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
                   </div>
                 </Link>
               )}
@@ -3336,13 +3336,49 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           <section className="card">
             <p className="eyebrow">Variable Expenses</p>
             <h3 style={{ margin: '4px 0 10px' }}>Tracked Spending</h3>
+
+            {/* Quick Tap Categories */}
+            {!addingExpense && (
+              <div style={{marginBottom:14}}>
+                <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>Quick Add</p>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(76px, 1fr))',gap:8,marginBottom:10}}>
+                  {[
+                    {icon:'🛒', label:'Groceries', cat:'Food'},
+                    {icon:'⛽', label:'Gas', cat:'Transport'},
+                    {icon:'🍔', label:'Eating Out', cat:'Food'},
+                    {icon:'☕', label:'Coffee', cat:'Food'},
+                    {icon:'🛍', label:'Shopping', cat:'Shopping'},
+                    {icon:'🎬', label:'Fun', cat:'Entertainment'},
+                    {icon:'💊', label:'Health', cat:'Health'},
+                    {icon:'🏠', label:'Home', cat:'Home'},
+                  ].map(({icon, label, cat}) => (
+                    <button key={label} onClick={() => {
+                      setNewExpense({desc:label, amount:'', category:cat, period:'one-time', date:TODAY})
+                      setAddingExpense(true)
+                    }} style={{
+                      display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                      padding:'10px 6px', borderRadius:12, background:'var(--stone)',
+                      border:'1.5px solid var(--border2)', cursor:'pointer',
+                      transition:'all .15s',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--teal)'; e.currentTarget.style.background = 'var(--stone2)' }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'var(--stone)' }}
+                    >
+                      <div style={{fontSize:'1.4rem'}}>{icon}</div>
+                      <div style={{fontSize:'.7rem',color:'var(--ink2)',fontWeight:600,textAlign:'center'}}>{label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Quick add variable expense */}
             {!addingExpense ? (
               <button onClick={() => setAddingExpense(true)} style={{
                 width:'100%', padding:'9px', borderRadius:10, marginBottom:12,
                 border:'1.5px dashed var(--border2)', background:'transparent',
                 color:'var(--teal)', fontWeight:600, fontSize:'.88rem', cursor:'pointer'
-              }}>+ Add Expense</button>
+              }}>+ Custom Expense</button>
             ) : (
               <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -3718,6 +3754,40 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       {/* ── BUDGET PLAN ──────────────────────────────────────────────────── */}
       {tab === 'budget' && (
         <div>
+          {/* Weekly Spending Target (discretionary cap) */}
+          <section className="card">
+            <p className="eyebrow">Weekly Target</p>
+            <h3 style={{margin:'4px 0 6px'}}>Weekly Spending Target</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:10}}>
+              Discretionary only — bills and rent don't count. Used to calculate the Finance dimension of your life score.
+            </p>
+            <div style={{display:'flex',gap:10,alignItems:'center'}}>
+              <input type="number" value={budget.weeklyTarget}
+                onChange={(e) => setBudget({ weeklyTarget: Number(e.target.value) })}
+                style={{flex:1,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem'}} />
+              <span className="muted" style={{fontSize:'.85rem'}}>/week</span>
+            </div>
+            {/* Progress bar showing how much of weekly target you've spent */}
+            {budget.weeklyTarget > 0 && (
+              <div style={{marginTop:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
+                  <span className="muted">Spent this week</span>
+                  <strong style={{color: fpWeekSpend > budget.weeklyTarget ? 'var(--danger)' : 'var(--ink)'}}>
+                    {fmt(fpWeekSpend)} / {fmt(budget.weeklyTarget)}
+                  </strong>
+                </div>
+                <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
+                  <div style={{
+                    height:'100%',
+                    width: `${Math.min(100, (fpWeekSpend / budget.weeklyTarget) * 100)}%`,
+                    background: fpWeekSpend > budget.weeklyTarget ? 'var(--danger)' : 'var(--teal)',
+                    borderRadius:999, transition:'width .3s',
+                  }} />
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* Summary pulled from all tabs */}
           <section className="card">
             <p className="eyebrow">Budget Plan</p>
@@ -6570,6 +6640,14 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
 
 const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
 
+function ScrollToTop() {
+  const location = useLocation()
+  React.useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
+  return null
+}
+
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
@@ -6627,6 +6705,7 @@ function PlannerApp() {
     <>
       {showWelcomePro && <WelcomeProBanner onDismiss={() => setShowWelcomePro(false)} />}
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
+      <ScrollToTop />
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} />} />
