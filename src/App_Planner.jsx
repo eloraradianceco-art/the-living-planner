@@ -947,6 +947,46 @@ function usePlannerData() {
   }, [isAuthenticated, user?.id, mode])
 
   const scores = useMemo(() => computeScores(collections), [collections])
+  const [scoreHistory, setScoreHistory] = useState([])
+
+  // Snapshot today's score to Supabase once per day
+  useEffect(() => {
+    if (!user || !scores || loading) return
+    const today = TODAY
+    const lastSnapshot = localStorage.getItem('planner_last_score_snapshot')
+    if (lastSnapshot === today) return
+    if (!hasSupabaseEnv) return
+
+    const overall = Math.round(Object.values(scores).reduce((s, v) => s + v, 0) / Object.keys(scores).length)
+    const snapshot = {
+      user_id: user.id,
+      date: today,
+      overall_score: overall,
+      scores: scores,
+    }
+
+    supabase.from('score_history').upsert(snapshot, { onConflict: 'user_id,date' })
+      .then(({ error }) => {
+        if (!error) {
+          try { localStorage.setItem('planner_last_score_snapshot', today) } catch {}
+        }
+      })
+  }, [scores, user?.id, loading])
+
+  // Load score history on mount
+  useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+    supabase.from('score_history')
+      .select('date, overall_score, scores')
+      .eq('user_id', user.id)
+      .gte('date', thirtyDaysAgo)
+      .order('date', { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && data) setScoreHistory(data)
+      })
+  }, [user?.id])
+
 
   const saveItem = async (type, payload, modeArg = 'create') => {
     if (!user) return
@@ -1048,7 +1088,7 @@ function usePlannerData() {
   }
 
   return {
-    ...collections, scores, loading, syncing, error,
+    ...collections, scores, scoreHistory, loading, syncing, error,
     saveItem, deleteItem, toggleTask, toggleHabit,
     updateBudget, updateProfile, updateSettings,
   }
@@ -5698,7 +5738,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
 }
 
 
-function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
+function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
   const weekStart = startOfWeek(TODAY)
   const weekEnd = endOfWeek(TODAY)
   const weekLogs = habitLogs.filter((log) => log.date >= weekStart && log.date <= weekEnd)
@@ -5816,6 +5856,52 @@ function GrowthPage({ scores, habits, habitLogs, goals, tasks, projects, onToggl
       </section>
 
       {/* ── Weekly Pulse ────────────────────────────────────────────────── */}
+      <section className="card">
+        <p className="eyebrow">Progress Over Time</p>
+        <h3 style={{margin:'4px 0 14px'}}>Score Trend — Last 30 Days</h3>
+        {scoreHistory.length === 0 ? (
+          <EmptyState icon="📈" title="No history yet" message="Your daily score snapshots will appear here as you use the app." />
+        ) : (
+          <>
+            <div style={{
+              display:'flex', alignItems:'flex-end', gap:3,
+              height:120, marginBottom:14, padding:'0 4px',
+            }}>
+              {scoreHistory.map((day, i) => {
+                const max = 10
+                const height = Math.max(2, (day.overall_score / max) * 100)
+                return (
+                  <div key={day.date} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2}}>
+                    <div style={{
+                      width:'100%', height:`${height}%`, minHeight:2,
+                      background: day.overall_score >= 7 ? 'var(--success)' : day.overall_score >= 5 ? 'var(--teal)' : 'var(--warning)',
+                      borderRadius:'3px 3px 0 0', transition:'height .3s',
+                    }} title={`${day.date}: ${day.overall_score}/10`} />
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:10}}>
+              {(() => {
+                const avg = scoreHistory.length ? Math.round(scoreHistory.reduce((s,d)=>s+d.overall_score,0)/scoreHistory.length*10)/10 : 0
+                const latest = scoreHistory[scoreHistory.length-1]?.overall_score || 0
+                const best = scoreHistory.length ? Math.max(...scoreHistory.map(d=>d.overall_score)) : 0
+                return [
+                  ['Average', avg.toFixed(1), 'var(--teal)'],
+                  ['Latest', latest, 'var(--brass)'],
+                  ['Best', best, 'var(--success)'],
+                ].map(([label, val, color]) => (
+                  <div key={label} style={{textAlign:'center', background:'var(--stone)', borderRadius:8, padding:'10px 4px'}}>
+                    <div className="muted" style={{fontSize:'.7rem', marginBottom:2}}>{label}</div>
+                    <strong style={{color, fontSize:'1.1rem'}}>{val}</strong>
+                  </div>
+                ))
+              })()}
+            </div>
+          </>
+        )}
+      </section>
+
       <section className="card premium-card">
         <div className="section-title-row">
           <div>
@@ -6221,7 +6307,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
 const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
 
 function PlannerApp() {
-  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
   // Subscription
   const subscription = useSubscription(user)
@@ -6285,7 +6371,7 @@ function PlannerApp() {
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
