@@ -2535,7 +2535,7 @@ function TabNav({ tabs, activeTab, onSelect }) {
 
 
 
-function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
+function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
@@ -3099,12 +3099,23 @@ function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
             </div>
             {(expenses||[]).length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}><EmptyState icon="💳" title="No expenses yet" message="Log your first expense to start tracking spending." /></p>}
             {(expenses||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20).map((exp, i) => (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-                <div>
+              <div key={exp.id || i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)',gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:'.88rem'}}>{exp.description || exp.category}</div>
-                  <div className="muted" style={{fontSize:'.75rem'}}>{exp.category} · {exp.date}</div>
+                  <div className="muted" style={{fontSize:'.75rem'}}>
+                    {exp.category} · {exp.date}
+                    {exp.period && exp.period !== 'one-time' && <span style={{color:'var(--teal)',marginLeft:6,fontWeight:600}}>· {exp.period}</span>}
+                  </div>
                 </div>
-                <strong style={{color:'var(--danger)'}}>{fmt(exp.amount)}</strong>
+                <strong style={{color:'var(--danger)',whiteSpace:'nowrap'}}>{fmt(exp.amount)}</strong>
+                <button onClick={() => {
+                  if (window.confirm(`Delete "${exp.description || exp.category}"?`)) {
+                    deleteItem('expense', exp.id)
+                  }
+                }} style={{
+                  background:'none',border:'none',color:'var(--muted)',
+                  cursor:'pointer',padding:'4px 8px',fontSize:'1rem',
+                }} title="Delete expense">✕</button>
               </div>
             ))}
             {(expenses||[]).length > 0 && (() => {
@@ -6037,7 +6048,7 @@ function PlannerApp() {
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
-          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} goals={goals} />} />
+          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} />} />
           <Route path="/wellness" element={<HealthWellnessPage />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage />} />
