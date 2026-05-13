@@ -6029,7 +6029,18 @@ function NotificationSettings({ settings, updateSettings }) {
         </div>
       )}
     </section>
-        <section className="card" style={{marginBottom:14}}>
+
+        
+  )
+}
+
+
+function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
+  const { signOut } = useAuth()
+
+  return (
+    <div className="screen-stack">
+        <section className="card">
           <p className="eyebrow">Subscription</p>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
             <div>
@@ -6043,16 +6054,6 @@ function NotificationSettings({ settings, updateSettings }) {
           </div>
         </section>
 
-        
-  )
-}
-
-
-function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
-  const { signOut } = useAuth()
-
-  return (
-    <div className="screen-stack">
       <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
         <span style={{fontSize:"1.1rem"}}>⚙</span>
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Settings</p>
