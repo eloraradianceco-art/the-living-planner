@@ -2894,6 +2894,54 @@ function TabNav({ tabs, activeTab, onSelect }) {
 
 
 function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals, isPro = false, onUpgrade = () => {} }) {
+  const { user } = useAuth()
+
+  // Generic Supabase sync for FinancePage state
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'finance', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Finance sync error:', e) }
+  }, [user?.id])
+
+  // Load finance data from Supabase on mount
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data')
+      .select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'finance')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'incomes') setIncomes(row.data_value || [])
+          if (row.data_key === 'bills') setBills(row.data_value || [])
+          if (row.data_key === 'debts') setDebts(row.data_value || [])
+          if (row.data_key === 'savingsGoals') setSavingsGoals(row.data_value || [])
+          if (row.data_key === 'noSpend') setNoSpend(row.data_value || { days: 30, checked: [] })
+        })
+      })
+
+    const channel = supabase
+      .channel('finance_realtime_' + user.id)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'page_data',
+        filter: `user_id=eq.${user.id}`,
+      }, payload => {
+        const row = payload.new
+        if (!row || row.page !== 'finance') return
+        if (row.data_key === 'incomes') setIncomes(row.data_value || [])
+        if (row.data_key === 'bills') setBills(row.data_value || [])
+        if (row.data_key === 'debts') setDebts(row.data_value || [])
+        if (row.data_key === 'savingsGoals') setSavingsGoals(row.data_value || [])
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user?.id])
+
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
@@ -2903,22 +2951,22 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   // ── Shared state (linked across tabs) ─────────────────────────────────
   const [incomes, setIncomes] = useState(() => lsGet('incomes', []))
   const [newIncome, setNewIncome] = useState({ label: '', amount: '', category: 'Primary', period: 'monthly' })
-  const saveIncomes = (v) => { setIncomes(v); lsSet('incomes', v) }
+  const saveIncomes = (v) => { setIncomes(v); syncPageData('incomes', v) }
 
   const [bills, setBills] = useState(() => lsGet('bills', []))
   const [newBill, setNewBill] = useState({ label: '', amount: '', category: 'Need', frequency: 'monthly' })
-  const saveBills = (v) => { setBills(v); lsSet('bills', v) }
+  const saveBills = (v) => { setBills(v); syncPageData('bills', v) }
 
   const [debts, setDebts] = useState(() => lsGet('debts', []))
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
-  const saveDebts = (d) => { setDebts(d); lsSet('debts', d) }
+  const saveDebts = (d) => { setDebts(d); syncPageData('debts', d) }
 
   const [savingsGoals, setSavingsGoals] = useState(() => lsGet('savingsGoals', [
     { id: 1, label: 'Emergency Fund', goal: 1000, current: 0, color: 'var(--teal)' },
   ]))
   const [newSavings, setNewSavings] = useState({ label: '', goal: '', current: '' })
   const [editingSavings, setEditingSavings] = useState({})
-  const saveSavingsGoals = (v) => { setSavingsGoals(v); lsSet('savingsGoals', v) }
+  const saveSavingsGoals = (v) => { setSavingsGoals(v); syncPageData('savingsGoals', v) }
 
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const saveNoSpend = (n) => { setNoSpend(n); lsSet('noSpend', n) }
@@ -3943,6 +3991,37 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
 // ── WELLNESS PAGE ─────────────────────────────────────────────────────────
 function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
+  const { user } = useAuth()
+
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'wellness', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Wellness sync error:', e) }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data')
+      .select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'wellness')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'books') setBooks(row.data_value || [])
+          if (row.data_key === 'routine') setRoutine(row.data_value || [])
+          if (row.data_key === 'meds') setMeds(row.data_value || [])
+          if (row.data_key === 'anxiety') setAnxiety(row.data_value || [])
+          if (row.data_key === 'migraines') setMigraines(row.data_value || [])
+          if (row.data_key === 'journalEntries') setJournalEntries(row.data_value || [])
+        })
+      })
+  }, [user?.id])
+
   // ── Shared ─────────────────────────────────────────────────────────────
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.hw.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.hw.' + k, JSON.stringify(v)) } catch {} }
@@ -3959,8 +4038,8 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const [journalText, setJournalText] = useState('')
   const [journalPrompt, setJournalPrompt] = useState(0)
 
-  const saveBooks = (b) => { setBooks(b); lsSet('books', b) }
-  const saveRoutine = (r) => { setRoutine(r); lsSet('routine', r) }
+  const saveBooks = (b) => { setBooks(b); syncPageData('books', b) }
+  const saveRoutine = (r) => { setRoutine(r); syncPageData('routine', r) }
   const saveLog = (l) => { setRoutineLog(l); lsSet('routineLog', l) }
   const saveWellness = (w) => { setWellnessLog(w); lsSet('wellnessLog', w) }
   const saveJournal = (j) => { setJournalEntries(j); lsSet('journal', j) }
@@ -4018,10 +4097,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const [sleep, setSleep] = useState(() => lsGet('sleep', []))
   const [form, setForm] = useState({})
 
-  const saveMeds = (m) => { setMeds(m); lsSet('meds', m) }
+  const saveMeds = (m) => { setMeds(m); syncPageData('meds', m) }
   const saveMedLog = (l) => { setMedLog(l); lsSet('medLog', l) }
-  const saveAnxiety = (a) => { setAnxiety(a); lsSet('anxiety', a) }
-  const saveMigraines = (m) => { setMigraines(m); lsSet('migraines', m) }
+  const saveAnxiety = (a) => { setAnxiety(a); syncPageData('anxiety', a) }
+  const saveMigraines = (m) => { setMigraines(m); syncPageData('migraines', m) }
   const saveSleep = (s) => { setSleep(s); lsSet('sleep', s) }
 
   const todayMedKey = TODAY
@@ -5292,6 +5371,36 @@ function PeriodTrackerTab() {
 
 
 function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
+  const { user } = useAuth()
+
+  const syncPageData = React.useCallback(async (key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    try {
+      await supabase.from('page_data').upsert({
+        user_id: user.id, page: 'lifestyle', data_key: key, data_value: value,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id,page,data_key' })
+    } catch (e) { console.error('Lifestyle sync error:', e) }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data')
+      .select('data_key, data_value')
+      .eq('user_id', user.id).eq('page', 'lifestyle')
+      .then(({ data, error }) => {
+        if (error || !data) return
+        data.forEach(row => {
+          if (row.data_key === 'trips') setTrips(row.data_value || [])
+          if (row.data_key === 'birthdays') setBirthdays(row.data_value || [])
+          if (row.data_key === 'contacts') setContacts(row.data_value || [])
+          if (row.data_key === 'groceries') setGroceries(row.data_value || [])
+          if (row.data_key === 'passwords') setPasswords(row.data_value || [])
+        })
+      })
+  }, [user?.id])
+
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
@@ -5300,8 +5409,8 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', notes: '', packing: '' })
   const [birthdays, setBirthdays] = useState(() => { try { const v = localStorage.getItem('planner.l.birthdays'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newBirthday, setNewBirthday] = useState({ name: '', date: '', relationship: '', notes: '' })
-  const saveTrips = (t) => { setTrips(t); try { localStorage.setItem('planner.l.trips', JSON.stringify(t)) } catch {} }
-  const saveBirthdays = (b) => { setBirthdays(b); try { localStorage.setItem('planner.l.birthdays', JSON.stringify(b)) } catch {} }
+  const saveTrips = (t) => { setTrips(t); syncPageData('trips', t) }
+  const saveBirthdays = (b) => { setBirthdays(b); syncPageData('birthdays', b) }
   const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
   const [contacts, setContacts] = useState(() => lsGet('contacts', []))
