@@ -1138,29 +1138,35 @@ input:focus, select:focus, textarea:focus {
 }
 
 /* ── Hero Focus Card (the daily greeting) ────────────────────────── */
+/* Hero focus card — enhance the existing dark card with brass glow */
 .hero-focus-card {
-  background: linear-gradient(135deg, var(--warm-white) 0%, #FDF8EE 100%);
-  border: 1px solid var(--stone3);
-  border-radius: var(--radius-lg);
-  padding: 24px 22px;
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(184,150,90,.15);
 }
-.hero-focus-card::before {
+.hero-focus-card::after {
   content: '';
   position: absolute;
   top: -40%; right: -10%;
-  width: 200px; height: 200px;
-  background: radial-gradient(circle, var(--brass-glow) 0%, transparent 70%);
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(184,150,90,.12) 0%, transparent 70%);
   pointer-events: none;
+  z-index: 0;
+}
+.hero-focus-card > * {
+  position: relative;
+  z-index: 1;
 }
 .hero-focus-card h2 {
+  color: var(--warm-white);
   font-family: var(--serif);
   font-weight: 400;
   letter-spacing: -.015em;
-  position: relative;
-  z-index: 1;
+}
+.hero-focus-card .eyebrow {
+  color: var(--brass);
+}
+.hero-focus-card p:not(.eyebrow) {
+  color: rgba(255,255,255,.75);
 }
 
 /* ── Pill / QuickAccessGrid refinement ───────────────────────────── */
