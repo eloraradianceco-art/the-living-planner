@@ -1179,7 +1179,7 @@ function AuthPage() {
         <p style={{color:'rgba(255,255,255,.80)', fontSize:'.95rem', lineHeight:1.7, marginBottom:32}}>
           One place for your tasks, goals, habits, finances, health, and everything in between.
         </p>
-        <div style={{display:'grid', gap:7}}>
+        <div style={{display:'grid', gap:6}}>
           <button onClick={() => setStep('features')}
             style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
             See What's Inside →
@@ -1214,7 +1214,7 @@ function AuthPage() {
             </div>
           ))}
         </div>
-        <div style={{display:'grid', gap:7}}>
+        <div style={{display:'grid', gap:6}}>
           <button onClick={() => setStep('signin')}
             style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
             Get Started →
@@ -1297,7 +1297,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
             <div style={{display:'flex',flexDirection:'column',gap:1}}>
               <strong style={{lineHeight:1.1}}>{displayName}</strong>
-              <span style={{fontSize:'.62rem',opacity:.7}}>{profile?.plannerMode || 'Balanced'} mode</span>
+              <span style={{fontSize:'.58rem',opacity:.7}}>{profile?.plannerMode || 'Balanced'} mode</span>
             </div>
           </div>
         </div>
@@ -1547,7 +1547,7 @@ function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
               border: '1px solid var(--brass-glow)',
               minHeight: 4, transition:'height .3s ease'
             }} />
-            <div style={{fontSize:'.62rem', color:'var(--slate)', fontWeight:600, textAlign:'center'}}>{item.label}</div>
+            <div style={{fontSize:'.58rem', color:'var(--slate)', fontWeight:600, textAlign:'center'}}>{item.label}</div>
           </div>
         )
       })}
@@ -1574,7 +1574,7 @@ function MiniLineChart({ data }) {
 }
 
 
-function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate }) {
+function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit }) {
   const navigate = useNavigate()
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
   const openTasks = tasks.filter(t => !t.completed)
@@ -1632,7 +1632,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
-        <h3 style={{margin:'2px 0 10px', color:'white', fontSize:'.92rem'}}>Three things that matter today</h3>
+        <h3 style={{margin:'2px 0 8px', color:'white', fontSize:'.85rem'}}>Three things that matter today</h3>
 
         {(() => {
           // Pick top task: priority high, due today/overdue, not completed
@@ -1655,34 +1655,36 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           const topGoal = goals.find(g => !g.completed)
 
           return (
-            <div style={{display:'grid', gap:7}}>
+            <div style={{display:'grid', gap:6}}>
               {/* Focus 1: Top Task */}
               {topTask ? (
-                <div onClick={() => onEdit('task', topTask)} style={{
-                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
-                  cursor:'pointer', border:'1px solid rgba(255,255,255,.1)',
+                <div style={{
+                  background:'rgba(255,255,255,.08)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
+                  border:'1px solid rgba(255,255,255,.1)',
                 }}>
-                  <div style={{
-                    width:22, height:22, borderRadius:'50%',
-                    border:'2px solid var(--teal)', flexShrink:0,
-                  }} />
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.62rem', color:'var(--teal)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
-                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                  <button onClick={(e) => { e.stopPropagation(); onToggle && onToggle(topTask.id) }} style={{
+                    width:18, height:18, borderRadius:'50%',
+                    border:'2px solid var(--teal)', background:'transparent',
+                    cursor:'pointer', flexShrink:0, padding:0,
+                  }} aria-label="Mark task complete" />
+                  <div style={{flex:1, minWidth:0, cursor:'pointer'}}
+                    onClick={() => onEdit('task', topTask)}>
+                    <div style={{fontSize:'.58rem', color:'var(--teal)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK · TAP CIRCLE</div>
+                    <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topTask.title}
                     </div>
                   </div>
                 </div>
               ) : (
                 <Link to="/tasks" style={{
-                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(255,255,255,.05)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.2rem', opacity:.5}}>✓</div>
+                  <div style={{fontSize:'1rem', opacity:.5}}>✓</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
+                    <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>A blank page awaits — add your first</div>
                   </div>
                 </Link>
@@ -1691,42 +1693,43 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               {/* Focus 2: Top Habit */}
               {topHabit ? (
                 <div style={{
-                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(255,255,255,.08)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px solid rgba(255,255,255,.1)',
                 }}>
-                  <div style={{
-                    width:22, height:22, borderRadius:'50%',
-                    border:'2px solid var(--brass)', flexShrink:0,
-                  }} />
-                  <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.62rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
-                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                  <button onClick={(e) => { e.stopPropagation(); onToggleHabit && onToggleHabit(topHabit.id) }} style={{
+                    width:18, height:18, borderRadius:'50%',
+                    border:'2px solid var(--brass)', background:'transparent',
+                    cursor:'pointer', flexShrink:0, padding:0,
+                  }} aria-label="Mark habit complete" />
+                  <Link to="/habits" style={{flex:1, minWidth:0, textDecoration:'none', color:'inherit'}}>
+                    <div style={{fontSize:'.58rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT · TAP CIRCLE</div>
+                    <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topHabit.title}
                     </div>
-                  </div>
+                  </Link>
                 </div>
               ) : habits.length > 0 ? (
                 <div style={{
-                  background:'rgba(34,197,94,.15)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(34,197,94,.15)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px solid rgba(34,197,94,.3)',
                 }}>
-                  <div style={{fontSize:'1.2rem'}}>✓</div>
+                  <div style={{fontSize:'1rem'}}>✓</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.62rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>HABITS COMPLETE</div>
+                    <div style={{fontSize:'.58rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>HABITS COMPLETE</div>
                     <div style={{fontSize:'.78rem', marginTop:1}}>All habits checked off for today 🔥</div>
                   </div>
                 </div>
               ) : (
                 <Link to="/habits" style={{
-                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(255,255,255,.05)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.2rem', opacity:.5}}>🔁</div>
+                  <div style={{fontSize:'1rem', opacity:.5}}>🔁</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
+                    <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
                   </div>
                 </Link>
@@ -1735,28 +1738,28 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               {/* Focus 3: Top Goal */}
               {topGoal ? (
                 <Link to="/goals" style={{
-                  background:'rgba(255,255,255,.08)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(255,255,255,.08)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px solid rgba(255,255,255,.1)',
                   textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.2rem'}}>🎯</div>
+                  <div style={{fontSize:'1rem'}}>🎯</div>
                   <div style={{flex:1, minWidth:0}}>
-                    <div style={{fontSize:'.62rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
-                    <div style={{fontWeight:600, fontSize:'.85rem', marginTop:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                    <div style={{fontSize:'.58rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topGoal.title}
                     </div>
                   </div>
                 </Link>
               ) : (
                 <Link to="/goals" style={{
-                  background:'rgba(255,255,255,.05)', padding:'9px 12px',
-                  borderRadius:10, display:'flex', alignItems:'center', gap:10,
+                  background:'rgba(255,255,255,.05)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1.2rem', opacity:.5}}>🎯</div>
+                  <div style={{fontSize:'1rem', opacity:.5}}>🎯</div>
                   <div style={{flex:1}}>
-                    <div style={{fontSize:'.62rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
+                    <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
                   </div>
                 </Link>
@@ -3111,7 +3114,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>💰</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
       </div>
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
 
@@ -4082,7 +4085,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>🌿</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
       </div>
 
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
@@ -4103,7 +4106,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
                   transition:'all .15s'
                 }}>
                   <div style={{fontSize:'1.4rem',marginBottom:3}}>{m.emoji}</div>
-                  <div style={{fontSize:'.62rem',fontWeight:600,color:todayWellness.mood===m.value?'var(--brass)':'var(--muted)'}}>{m.label}</div>
+                  <div style={{fontSize:'.58rem',fontWeight:600,color:todayWellness.mood===m.value?'var(--brass)':'var(--muted)'}}>{m.label}</div>
                 </button>
               ))}
             </div>
@@ -5728,7 +5731,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>🔁</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Habits</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Habits</p>
       </div>
 
       {/* Active habits */}
@@ -5916,7 +5919,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>🎯</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Goals</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Goals</p>
       </div>
 
       {/* SMART goals guide */}
@@ -6129,7 +6132,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>↑</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Growth</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Growth</p>
       </div>
 
       {/* ── Life Score ──────────────────────────────────────────────────── */}
@@ -6736,7 +6739,7 @@ function PlannerApp() {
       <ScrollToTop />
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
         <Routes>
-          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} />} />
+          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
@@ -6929,7 +6932,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
     <div className="screen-stack">
       <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
         <span style={{fontSize:'1.1rem'}}>✝</span>
-        <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Faith</p>
+        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Faith</p>
       </div>
 
       {/* Stats strip */}
