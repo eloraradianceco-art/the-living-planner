@@ -4377,6 +4377,34 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
         <section className="card">
           <p className="eyebrow">Sleep Tracker</p>
           <h3 style={{ margin: '4px 0 12px' }}>Sleep Log</h3>
+
+          {/* Quick Sleep Quality */}
+          <div style={{marginBottom:16}}>
+            <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>How did you sleep?</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(5, 1fr)',gap:6}}>
+              {[
+                {icon:'😴', label:'Great', val:5},
+                {icon:'🙂', label:'Good', val:4},
+                {icon:'😐', label:'OK', val:3},
+                {icon:'😕', label:'Poor', val:2},
+                {icon:'😩', label:'Awful', val:1},
+              ].map(({icon, label, val}) => (
+                <button key={label} onClick={() => {
+                  logWellness('sleep', val)
+                }} style={{
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                  padding:'10px 4px', borderRadius:10, background:'var(--stone)',
+                  border:'1.5px solid var(--border2)', cursor:'pointer',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--teal)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
+                >
+                  <div style={{fontSize:'1.5rem'}}>{icon}</div>
+                  <div style={{fontSize:'.65rem',color:'var(--ink2)',fontWeight:600}}>{label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <label style={{ flex: 1, display: 'grid', gap: 4, fontSize: '.82rem', fontWeight: 600, color: 'var(--text2)' }}>
@@ -7067,6 +7095,38 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
           <p className="eyebrow">Gratitude Journal</p>
           <h3 style={{ margin: '4px 0 8px' }}>Count Your Blessings</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>A grateful heart is a powerful heart. Log at least 3 things daily.</p>
+
+          {/* Quick Gratitude */}
+          <div style={{marginBottom:14}}>
+            <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>Quick Add</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(76px, 1fr))',gap:8}}>
+              {[
+                {icon:'👨‍👩‍👧', label:'Family'},
+                {icon:'🏥', label:'Health'},
+                {icon:'🏠', label:'Home'},
+                {icon:'💼', label:'Work'},
+                {icon:'🍞', label:'Food'},
+                {icon:'🌅', label:'New Day'},
+                {icon:'☮️', label:'Peace'},
+                {icon:'🤝', label:'Friends'},
+              ].map(({icon, label}) => (
+                <button key={label} onClick={() => {
+                  saveGratitude([...gratitude, {id: Date.now(), text: label, date: TODAY}])
+                }} style={{
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                  padding:'10px 6px', borderRadius:12, background:'var(--stone)',
+                  border:'1.5px solid var(--border2)', cursor:'pointer',
+                  transition:'all .15s',
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brass)'; e.currentTarget.style.background = 'var(--stone2)' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'var(--stone)' }}
+                >
+                  <div style={{fontSize:'1.4rem'}}>{icon}</div>
+                  <div style={{fontSize:'.7rem',color:'var(--ink2)',fontWeight:600,textAlign:'center'}}>{label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
           <div style={{background:'var(--stone)',borderRadius:10,padding:'12px',marginBottom:14,display:'flex',justifyContent:'space-between'}}>
             <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Today</p><strong style={{color:'var(--brass)'}}>{todayGratitude.length} entries</strong></div>
             <div style={{textAlign:'right'}}><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>All time</p><strong>{gratitude.length} blessings</strong></div>
