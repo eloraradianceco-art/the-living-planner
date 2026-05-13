@@ -2574,7 +2574,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
   const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
   const [challengeGoal, setChallengeGoal] = useState(() => lsGet('challengeGoal', 10000))
   const [addingExpense, setAddingExpense] = useState(false)
-  const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',date:TODAY})
+  const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',period:'one-time',date:TODAY})
   const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
   const saveChallengeGoal = (v) => { setChallengeGoal(v); lsSet('challengeGoal', v) }
   const toggleWeek = (w) => saveCheckedWeeks(checkedWeeks.includes(w) ? checkedWeeks.filter(x => x !== w) : [...checkedWeeks, w])
@@ -2590,10 +2590,31 @@ function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
 
   const fpWeekStart = startOfWeek(TODAY)
   const fpWeekEnd = endOfWeek(TODAY)
-  const fpWeekExpenses = (expenses || []).filter(e => e.date >= fpWeekStart && e.date <= fpWeekEnd)
-  const fpWeekSpend = fpWeekExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
-  const fpMonthExpenses = (expenses || []).filter(e => e.date && e.date.slice(0, 7) === TODAY.slice(0, 7))
-  const fpMonthSpend = fpMonthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  // Helper: convert any expense to weekly equivalent based on its period
+  const toWeekly = (e) => {
+    const amt = parseFloat(e.amount || 0)
+    const p = e.period || 'one-time'
+    if (p === 'weekly') return amt
+    if (p === 'biweekly') return amt / 2
+    if (p === 'monthly') return amt / 4.33
+    if (p === 'yearly') return amt / 52
+    return amt  // one-time
+  }
+  // One-time expenses: only count if in date range
+  // Recurring expenses: always count as weekly equivalent
+  const fpOneTimeWeek = (expenses || [])
+    .filter(e => (e.period || 'one-time') === 'one-time' && e.date >= fpWeekStart && e.date <= fpWeekEnd)
+    .reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const fpRecurringWeek = (expenses || [])
+    .filter(e => (e.period || 'one-time') !== 'one-time')
+    .reduce((s, e) => s + toWeekly(e), 0)
+  const fpWeekSpend = fpOneTimeWeek + fpRecurringWeek
+
+  const fpOneTimeMonth = (expenses || [])
+    .filter(e => (e.period || 'one-time') === 'one-time' && e.date && e.date.slice(0,7) === TODAY.slice(0,7))
+    .reduce((s, e) => s + parseFloat(e.amount || 0), 0)
+  const fpRecurringMonth = fpRecurringWeek * 4.33
+  const fpMonthSpend = fpOneTimeMonth + fpRecurringMonth
 
   const totalBillsMonthly = bills.reduce((s, b) => s + Number(b.amount || 0), 0)
   const totalBillsForPeriod = totalBillsMonthly * ((PERIOD_MULT[period] || 4.33) / 4.33)
@@ -3035,15 +3056,23 @@ function FinancePage({ expenses, budget, setBudget, saveItem, goals }) {
                     style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}}>
                     {['Food','Transport','Shopping','Entertainment','Health','Personal','Home','Other'].map(c=><option key={c}>{c}</option>)}
                   </select>
-                  <input type="date" value={newExpense.date} onChange={e=>setNewExpense(p=>({...p,date:e.target.value}))}
-                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+                  <select value={newExpense.period||'one-time'} onChange={e=>setNewExpense(p=>({...p,period:e.target.value}))}
+                    style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}}>
+                    <option value="one-time">One-time</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Bi-weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
                 </div>
+                <input type="date" value={newExpense.date} onChange={e=>setNewExpense(p=>({...p,date:e.target.value}))}
+                  style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
                 <div style={{display:'flex',gap:8}}>
                   <button onClick={()=>{
                     if(!newExpense.desc||!newExpense.amount) return
                     saveItem('expense',{description:newExpense.desc,amount:Number(newExpense.amount),
-                      category:newExpense.category,date:newExpense.date||TODAY},'create')
-                    setNewExpense({desc:'',amount:'',category:'Food',date:TODAY})
+                      category:newExpense.category,period:newExpense.period||'one-time',date:newExpense.date||TODAY},'create')
+                    setNewExpense({desc:'',amount:'',category:'Food',period:'one-time',date:TODAY})
                     setAddingExpense(false)
                   }} style={{flex:1,padding:'10px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
                     Save
