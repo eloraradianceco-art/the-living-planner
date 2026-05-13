@@ -2367,6 +2367,9 @@ function WelcomeProBanner({ onDismiss }) {
 const PRO_TABS = {
   faith: ['fasting', 'sermons', 'goals'],
   finance: ['bank', 'income', 'expenses', 'savings', 'debt', 'nospend'],
+  lifestyle: ['trips', 'birthdays', 'contacts', 'workout', 'period', 'passwords'],
+  productivity: ['checklists', 'focus', 'cleaning'],
+  wellness: ['sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
 function ProTabGate({ isPro, onUpgrade, children }) {
@@ -3742,7 +3745,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
 
 // ── WELLNESS PAGE ─────────────────────────────────────────────────────────
-function HealthWellnessPage() {
+function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   // ── Shared ─────────────────────────────────────────────────────────────
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.hw.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.hw.' + k, JSON.stringify(v)) } catch {} }
@@ -3867,7 +3870,7 @@ function HealthWellnessPage() {
         <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
       </div>
 
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
       {tab === 'mood' && (
@@ -3934,6 +3937,7 @@ function HealthWellnessPage() {
       {/* ── Sleep ────────────────────────────────────────────────── */}
       {/* ── Journal ──────────────────────────────────────────────── */}
       {tab === 'journal' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
             <p className="eyebrow">Reflection</p>
@@ -3967,10 +3971,11 @@ function HealthWellnessPage() {
             </section>
           ))}
         </div>
-      )}
+      </ProTabGate>)}
 
       {/* ── Routine ──────────────────────────────────────────────── */}
       {tab === 'routine' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Daily Routine Builder</p>
           <h3 style={{margin:'4px 0 14px'}}>Your Rhythm</h3>
@@ -4019,10 +4024,11 @@ function HealthWellnessPage() {
             }}>Add to Routine</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {/* ── Reading ──────────────────────────────────────────────── */}
       {tab === 'reading' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <div className="section-title-row">
             <div><p className="eyebrow">Reading Tracker</p><h3>Your Library</h3></div>
@@ -4060,9 +4066,10 @@ function HealthWellnessPage() {
             }}>Add Book</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'meds' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <>
           <section className="card">
             <p className="eyebrow">Today's Medications</p>
@@ -4148,9 +4155,10 @@ function HealthWellnessPage() {
             )}
           </section>
         </>
-      )}
+      </ProTabGate>)}
 
       {tab === 'sleep' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Sleep Tracker</p>
           <h3 style={{ margin: '4px 0 12px' }}>Sleep Log</h3>
@@ -4195,9 +4203,10 @@ function HealthWellnessPage() {
             </div>
           ))}
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'anxiety' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Anxiety Tracker</p>
           <h3 style={{ margin: '4px 0 12px' }}>Daily Check-In</h3>
@@ -4234,9 +4243,10 @@ function HealthWellnessPage() {
             ))}
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'migraines' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Migraine & Headache Tracker</p>
           <h3 style={{ margin: '4px 0 12px' }}>Log an Episode</h3>
@@ -4289,9 +4299,10 @@ function HealthWellnessPage() {
             </div>
           ))}
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'coping' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Coping Skills</p>
           <h3 style={{margin:'4px 0 12px'}}>Your Toolkit</h3>
@@ -4343,9 +4354,10 @@ function HealthWellnessPage() {
             </div>
           )}
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'metrics' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
             <p className="eyebrow">Body Metrics</p>
@@ -4401,7 +4413,7 @@ function HealthWellnessPage() {
             </section>
           )}
         </div>
-      )}
+      </ProTabGate>)}
 
       <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
@@ -4450,7 +4462,7 @@ function NoteComposer({ onSave }) {
 }
 
 
-function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, onEdit, onDelete, saveItem, settings }) {
+function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, onEdit, onDelete, saveItem, settings, isPro = false, onUpgrade = () => {} }) {
   const TABS = [
     { id: 'tasks', label: '✓ Tasks' },
     { id: 'braindump', label: '🧠 Brain Dump' },
@@ -4561,15 +4573,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
         <span style={{fontSize:"1.1rem"}}>⚡</span>
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
       </div>
-      <QuickAccessGrid tabs={[
-        { id: 'tasks', label: '✓ Tasks' },
-        { id: 'braindump', label: '🧠 Brain Dump' },
-        { id: 'notes', label: '📝 Notes' },
-        { id: 'checklists', label: '📋 Checklists' },
-        { id: 'focus', label: '⏱ Focus Timer' },
-        { id: 'cleaning', label: '🧹 Cleaning' },
-        { id: 'tips', label: '💡 Tips' },
-      ]} activeTab={tab} onSelect={setTab} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
 
       {tab === 'tasks' && (
         <section className="card">
@@ -4608,6 +4612,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
       )}
 
       {tab === 'focus' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Focus Timer</p>
           <h3 style={{ margin: '4px 0 8px' }}>Pomodoro Technique</h3>
@@ -4668,10 +4673,11 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             ))}
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
 
       {tab === 'checklists' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <>
           {checklists.map((cl, ci) => (
             <section key={cl.id} className="card">
@@ -4709,9 +4715,10 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               onClick={() => { if (!newChecklist) return; saveChecklists([...checklists, { id: Date.now(), title: newChecklist, items: [] }]); setNewChecklist('') }}>Create</button>
           </div>
         </>
-      )}
+      </ProTabGate>)}
 
       {tab === 'cleaning' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card" style={{padding:'12px 14px'}}>
             <p className="eyebrow">Home Cleaning Tracker</p>
@@ -4799,7 +4806,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             )}
           </section>
         </div>
-      )}
+      </ProTabGate>)}
 
             {tab === 'notes' && (
         <section className="card">
@@ -5128,7 +5135,7 @@ function LifestylePage() {
         <span style={{fontSize:"1.1rem"}}>🌍</span>
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Lifestyle</p>
       </div>
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
 
 
       {tab === 'groceries' && (
@@ -5221,6 +5228,7 @@ function LifestylePage() {
       )}
 
       {tab === 'contacts' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Contacts</p>
           <h3 style={{ margin: '4px 0 12px' }}>Key People</h3>
@@ -5234,13 +5242,14 @@ function LifestylePage() {
             <button className="primary-btn" onClick={() => { if (!form.cName) return; save('contacts', setContacts, [...contacts, { name: form.cName, phone: form.cPhone, email: form.cEmail, notes: form.cNotes }]); setForm(p => ({ ...p, cName: '', cPhone: '', cEmail: '', cNotes: '' })) }}>Add Contact</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'workout' && <WorkoutTrackerTab />}
 
       {tab === 'period' && <PeriodTrackerTab />}
 
       {tab === 'passwords' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <div style={{ background: 'rgba(240,180,41,.1)', border: '1px solid rgba(240,180,41,.3)', borderRadius: 'var(--radius-sm)', padding: 10, marginBottom: 14, fontSize: '.82rem', color: 'var(--warning)' }}>
             ⚠️ Stored locally on this device only. Do not store critical passwords here without a backup.
@@ -5255,9 +5264,10 @@ function LifestylePage() {
             <button className="primary-btn" onClick={() => { if (!form.pwSrv) return; save('passwords', setPasswords, [...passwords, { service: form.pwSrv, username: form.pwUser, password: form.pwPass }]); setForm(p => ({ ...p, pwSrv: '', pwUser: '', pwPass: '' })) }}>Save</button>
           </div>
         </section>
-      )}
+      </ProTabGate>)}
 
       {tab === 'trips' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
             <p className="eyebrow">Trip Planner</p>
@@ -5302,9 +5312,10 @@ function LifestylePage() {
             </div>
           </section>
         </div>
-      )}
+      </ProTabGate>)}
 
       {tab === 'birthdays' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
             <p className="eyebrow">Birthday Reminders</p>
@@ -5365,7 +5376,7 @@ function LifestylePage() {
             </div>
           </section>
         </div>
-      )}
+      </ProTabGate>)}
       <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
     </div>
   )
@@ -6268,11 +6279,11 @@ function PlannerApp() {
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
-          <Route path="/wellness" element={<HealthWellnessPage />} />
-          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
-          <Route path="/lifestyle" element={<LifestylePage />} />
+          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, period tracking, and passwords.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
-          <Route path="/health" element={<HealthWellnessPage />} />
+          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
