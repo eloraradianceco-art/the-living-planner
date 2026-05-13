@@ -6167,6 +6167,21 @@ const modalEmpty = { open: false, type: 'task', mode: 'create', item: null }
 
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  // Subscription
+  const subscription = useSubscription()
+  const [showWelcomePro, setShowWelcomePro] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('welcome') === 'pro'
+    } catch { return false }
+  })
+  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [upgradeContext, setUpgradeContext] = useState({title: '', message: ''})
+  const triggerUpgrade = (title, message) => {
+    setUpgradeContext({title, message})
+    setShowUpgrade(true)
+  }
+
   const [modalState, setModalState] = useState(modalEmpty)
   const [toasts, setToasts] = useState([])
 
@@ -6204,6 +6219,8 @@ function PlannerApp() {
 
   return (
     <>
+      {showWelcomePro && <WelcomeProBanner onDismiss={() => setShowWelcomePro(false)} />}
+      {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} />} />
