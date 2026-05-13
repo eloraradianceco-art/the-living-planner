@@ -1623,9 +1623,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             : 'A clear day. What will you make of it?'}
         </p>
         <div className="hero-focus-actions" style={{marginTop:14}}>
-          <button className="primary-btn" style={{fontSize:'.82rem', padding:'8px 16px'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
-          <button className="secondary-btn" style={{fontSize:'.82rem', padding:'8px 16px'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
-          <Link className="secondary-btn" to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px'}}>Day View</Link>
+          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
+          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
+          <Link to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, textDecoration:'none', display:'inline-block'}}>Day View</Link>
         </div>
       </div>
 
@@ -2906,7 +2906,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const saveIncomes = (v) => { setIncomes(v); lsSet('incomes', v) }
 
   const [bills, setBills] = useState(() => lsGet('bills', []))
-  const [newBill, setNewBill] = useState({ label: '', amount: '', category: 'Need' })
+  const [newBill, setNewBill] = useState({ label: '', amount: '', category: 'Need', frequency: 'monthly' })
   const saveBills = (v) => { setBills(v); lsSet('bills', v) }
 
   const [debts, setDebts] = useState(() => lsGet('debts', []))
@@ -2974,7 +2974,18 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const fpRecurringMonth = fpRecurringWeek * 4.33
   const fpMonthSpend = fpOneTimeMonth + fpRecurringMonth
 
-  const totalBillsMonthly = bills.reduce((s, b) => s + Number(b.amount || 0), 0)
+  // Convert each bill to monthly equivalent based on its frequency
+  const billToMonthly = (b) => {
+    const amt = Number(b.amount || 0)
+    const freq = b.frequency || 'monthly'
+    if (freq === 'weekly') return amt * 4.33
+    if (freq === 'biweekly') return amt * 2.17
+    if (freq === 'monthly') return amt
+    if (freq === 'quarterly') return amt / 3
+    if (freq === 'yearly') return amt / 12
+    return amt
+  }
+  const totalBillsMonthly = bills.reduce((s, b) => s + billToMonthly(b), 0)
   const totalBillsForPeriod = totalBillsMonthly * ((PERIOD_MULT[period] || 4.33) / 4.33)
   const totalDebtPayments = debts.reduce((s, d) => s + Number(d.minPayment || 0), 0)
   const totalSavingsStored = savingsGoals.reduce((s, g) => s + Number(g.current || 0), 0)
@@ -3067,7 +3078,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ['Total Bills', fmt(totalBillsForPeriod), 'var(--danger)'],
             ['Expenses (tracked)', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)'],
             ['Debt Min Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)'],
-            ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - fpWeekSpend * (PERIOD_MULT[period]||4.33)), totalIncomeForPeriod > totalBillsForPeriod ? 'var(--success)' : 'var(--danger)'],
+            ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33) - fpWeekSpend * (PERIOD_MULT[period]||4.33)), totalIncomeForPeriod > totalBillsForPeriod ? 'var(--success)' : 'var(--danger)'],
             ['This Week Spend', fmt(fpWeekSpend), 'var(--brass)'],
             ['This Month Spend', fmt(fpMonthSpend), 'var(--slate)'],
             ['Total Saved (goals)', fmt(totalSavingsStored), 'var(--teal)'],
@@ -3363,6 +3374,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                 <div>
                   <span style={{fontWeight:600,fontSize:'.88rem'}}>{b.label}</span>
                   {b.category && <span className="muted" style={{fontSize:'.72rem',marginLeft:6}}>{b.category}</span>}
+                  {b.frequency && b.frequency !== 'monthly' && <span style={{fontSize:'.7rem',color:'var(--teal)',marginLeft:6,fontWeight:600}}>· {b.frequency}</span>}
                 </div>
                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <strong style={{color:'var(--danger)'}}>{fmt(b.amount)}</strong>
@@ -3381,14 +3393,24 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                   onChange={e=>setNewBill(p=>({...p,amount:e.target.value}))}
                   style={{padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem'}} />
               </div>
-              <select value={newBill.category} onChange={e=>setNewBill(p=>({...p,category:e.target.value}))}
-                style={{padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem'}}>
-                {['Need','Utility','Insurance','Subscription','Debt Payment','Other'].map(c=><option key={c}>{c}</option>)}
-              </select>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                <select value={newBill.category} onChange={e=>setNewBill(p=>({...p,category:e.target.value}))}
+                  style={{padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem'}}>
+                  {['Need','Utility','Insurance','Subscription','Debt Payment','Other'].map(c=><option key={c}>{c}</option>)}
+                </select>
+                <select value={newBill.frequency||'monthly'} onChange={e=>setNewBill(p=>({...p,frequency:e.target.value}))}
+                  style={{padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.82rem'}}>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Bi-weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
               <button className="primary-btn" onClick={() => {
                 if (!newBill.label || !newBill.amount) return
                 saveBills([...bills, { ...newBill, id: Date.now() }])
-                setNewBill({ label: '', amount: '', category: 'Need' })
+                setNewBill({ label: '', amount: '', category: 'Need', frequency: 'monthly' })
               }}>+ Add Bill</button>
             </div>
           </section>
