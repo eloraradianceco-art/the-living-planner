@@ -1040,21 +1040,36 @@ function usePlannerData() {
   const toggleHabit = async (habitId, date = TODAY) => {
     if (!user) return
     // Optimistic update — immediately flip the UI before Supabase responds
-    const existingLog = collections.habitLogs.find(l => l.habitId === habitId && l.date === date)
-    const optimisticLogs = existingLog
-      ? collections.habitLogs.filter(l => !(l.habitId === habitId && l.date === date))
-      : [...collections.habitLogs, { id: 'optimistic_' + Date.now(), habitId, date, completed: true, completedAt: new Date().toISOString() }]
-    setCollections(prev => ({ ...prev, habitLogs: optimisticLogs }))
+    const existingLog = collections.habitLogs.find(l => l.habitId === habitId && l.date === date && !String(l.id).startsWith('optimistic_'))
+    const wasCompleted = existingLog?.completed
+    
+    // Optimistically update: filter out any old/optimistic log for this habit+date, add the new state
+    setCollections(prev => ({
+      ...prev,
+      habitLogs: [
+        ...prev.habitLogs.filter(l => !(l.habitId === habitId && l.date === date)),
+        { id: 'optimistic_' + habitId + '_' + date, habitId, date, completed: !wasCompleted, completedAt: new Date().toISOString() }
+      ]
+    }))
+    
     setSyncing(true); setError('')
     try {
       const nextLog = await plannerService.toggleHabitLog(habitId, date, user.id, collections.habitLogs)
-      setCollections((current) => {
-        const existing = current.habitLogs.find((log) => log.habitId === habitId && log.date === date)
-        if (!existing) return { ...current, habitLogs: [...current.habitLogs, nextLog] }
-        return { ...current, habitLogs: current.habitLogs.map((log) => log.id === existing.id ? nextLog : log) }
-      })
+      // Replace the optimistic entry with the real one (or remove if toggle was OFF and returned nothing)
+      setCollections((current) => ({
+        ...current,
+        habitLogs: [
+          ...current.habitLogs.filter(l => !(l.habitId === habitId && l.date === date)),
+          ...(nextLog && nextLog.completed ? [nextLog] : [])
+        ]
+      }))
     } catch (err) {
-      setError(err.message || 'Could not toggle habit.'); throw err
+      // On error, revert optimistic update
+      setCollections(prev => ({
+        ...prev,
+        habitLogs: prev.habitLogs.filter(l => !(l.habitId === habitId && l.date === date && String(l.id).startsWith('optimistic_')))
+      }))
+      setError(err.message || 'Could not toggle habit.')
     } finally { setSyncing(false) }
   }
 
@@ -5101,13 +5116,21 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               .map(note => (
                 <div key={note.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                    <div style={{flex:1}}>
+                    <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:'.9rem',marginBottom:4}}>{note.title}</div>
                       {note.content && <div style={{fontSize:'.85rem',color:'var(--ink2)',lineHeight:1.6,whiteSpace:'pre-wrap'}}>{note.content}</div>}
                       <div className="muted" style={{fontSize:'.72rem',marginTop:4}}>{note.category||'General'} · {note.date}</div>
                     </div>
-                    <button onClick={() => deleteItem('note', note.id)}
-                      style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>✕</button>
+                    <div style={{display:'flex',gap:6,flexShrink:0}}>
+                      <button onClick={() => onEdit('note', note)}
+                        title="Edit note"
+                        style={{background:'none',border:'none',color:'var(--teal)',cursor:'pointer',fontSize:'.85rem',padding:'4px 8px'}}>Edit</button>
+                      <button onClick={() => {
+                        if (window.confirm(`Delete note "${note.title}"?`)) onDelete('note', note.id)
+                      }}
+                        title="Delete note"
+                        style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1rem',padding:'4px 8px'}}>✕</button>
+                    </div>
                   </div>
                 </div>
               ))
