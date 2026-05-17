@@ -2558,9 +2558,9 @@ function WelcomeProBanner({ onDismiss }) {
 
 // ── Pro-only Tab Configuration ────────────────────────────────────────────
 const PRO_TABS = {
-  faith: ['fasting', 'sermons', 'goals'],
-  finance: ['bank', 'income', 'expenses', 'savings', 'debt', 'nospend'],
-  lifestyle: ['trips', 'birthdays', 'contacts', 'workout', 'period', 'passwords'],
+  faith: ['fasting', 'sermons', 'goals', 'reading'],
+  finance: ['income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
+  lifestyle: ['recipes', 'trips', 'birthdays', 'gifts', 'workout'],
   productivity: ['checklists', 'focus', 'cleaning'],
   wellness: ['sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
@@ -2939,6 +2939,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           if (row.data_key === 'bills') setBills(row.data_value || [])
           if (row.data_key === 'debts') setDebts(row.data_value || [])
           if (row.data_key === 'savingsGoals') setSavingsGoals(row.data_value || [])
+          if (row.data_key === 'donations') setDonations(row.data_value || [])
           if (row.data_key === 'noSpend') setNoSpend(row.data_value || { days: 30, checked: [] })
         })
       })
@@ -2997,6 +2998,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const currentWeekNum = Math.ceil((new Date(TODAY) - new Date(new Date(TODAY).getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
   const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
   const [challengeGoal, setChallengeGoal] = useState(() => lsGet('challengeGoal', 10000))
+  const [donations, setDonations] = useState(() => lsGet('donations', []))
+  const saveDonations = (d) => { setDonations(d); syncPageData('donations', d) }
+  const [newDonation, setNewDonation] = useState({ recipient: '', amount: '', category: 'Tithe', date: TODAY, taxDeductible: true })
   const [addingExpense, setAddingExpense] = useState(false)
   const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',period:'one-time',date:TODAY})
   const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
@@ -3107,11 +3111,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   const TABS = [
     { id: 'overview', label: '📊 Overview' },
-    { id: 'bank', label: '🏦 Bank Link' },
     { id: 'income', label: '💵 Income' },
     { id: 'expenses', label: '💳 Expenses & Bills' },
     { id: 'savings', label: '💰 Savings' },
     { id: 'debt', label: '📉 Debt' },
+    { id: 'donations', label: '✝️ Giving' },
     { id: 'budget', label: '📋 Budget Plan' },
     { id: 'nospend', label: '🌿 No-Spend' },
   ]
@@ -3196,40 +3200,109 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       )}
 
       {/* ── INCOME ───────────────────────────────────────────────────────── */}
-      {tab === 'bank' && (
+      {tab === 'donations' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <div>
-          {/* Coming Soon */}
-          <section className="card" style={{textAlign:'center',padding:'40px 24px'}}>
-            <div style={{fontSize:'3rem',marginBottom:16}}>🏦</div>
-            <p className="eyebrow" style={{color:'var(--brass)'}}>Coming Soon</p>
-            <h3 style={{margin:'4px 0 12px',color:'var(--ink)'}}>Automatic Bank Sync</h3>
-            <p className="muted" style={{fontSize:'.88rem',lineHeight:1.7,maxWidth:340,margin:'0 auto 20px'}}>
-              We're working on integration with Plaid for secure, automatic transaction sync from your bank accounts. In the meantime, manual entry gives you full control and complete privacy.
-            </p>
-            <div style={{display:'grid',gap:10,maxWidth:340,margin:'0 auto'}}>
-              {[
-                ['📊','Manual entry is more accurate','You see every transaction. No miscategorization.'],
-                ['🔒','Manual entry is more private','Your bank credentials never leave your device.'],
-                ['💪','Manual entry builds awareness','Logging expenses by hand reinforces mindful spending.'],
-              ].map(([icon,title,desc]) => (
-                <div key={title} style={{display:'flex',gap:12,padding:14,background:'var(--stone)',borderRadius:12,textAlign:'left'}}>
-                  <div style={{fontSize:'1.5rem',flexShrink:0}}>{icon}</div>
-                  <div>
-                    <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--ink)',marginBottom:2}}>{title}</div>
-                    <div style={{fontSize:'.78rem',color:'var(--ink2)',lineHeight:1.5}}>{desc}</div>
+        <section className="card">
+          <p className="eyebrow">Giving</p>
+          <h3 style={{ margin: '4px 0 8px' }}>Tithes & Offerings</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
+            "Bring the whole tithe into the storehouse" — Malachi 3:10
+          </p>
+
+          {/* Summary stats */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
+            {(() => {
+              const thisYear = new Date().getFullYear()
+              const ytd = donations.filter(d => d.date && d.date.startsWith(thisYear+'')).reduce((s,d)=>s+Number(d.amount||0),0)
+              const thisMonth = donations.filter(d => d.date && d.date.slice(0,7) === TODAY.slice(0,7)).reduce((s,d)=>s+Number(d.amount||0),0)
+              const taxDed = donations.filter(d => d.date && d.date.startsWith(thisYear+'') && d.taxDeductible).reduce((s,d)=>s+Number(d.amount||0),0)
+              return [
+                ['This Month', fmt(thisMonth), 'var(--teal)'],
+                ['Year to Date', fmt(ytd), 'var(--brass)'],
+                ['Tax-Deductible', fmt(taxDed), 'var(--success)'],
+              ].map(([label,val,color]) => (
+                <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
+                  <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>{label}</div>
+                  <strong style={{color,fontSize:'.92rem'}}>{val}</strong>
+                </div>
+              ))
+            })()}
+          </div>
+
+          {/* Quick Add Pills */}
+          <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>Quick Categories</p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(4, 1fr)',gap:6,marginBottom:14}}>
+            {[
+              {icon:'✝️', label:'Tithe', cat:'Tithe'},
+              {icon:'🎁', label:'Offering', cat:'Offering'},
+              {icon:'🤲', label:'Missions', cat:'Missions'},
+              {icon:'💝', label:'Charity', cat:'Charity'},
+            ].map(({icon, label, cat}) => (
+              <button key={cat} onClick={() => setNewDonation(p => ({...p, category: cat}))} style={{
+                display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                padding:'8px 4px', borderRadius:10, cursor:'pointer',
+                background: newDonation.category === cat ? 'var(--brass-dim)' : 'var(--stone)',
+                border: newDonation.category === cat ? '1.5px solid var(--brass)' : '1.5px solid var(--border2)',
+              }}>
+                <div style={{fontSize:'1.2rem'}}>{icon}</div>
+                <div style={{fontSize:'.7rem',color:'var(--ink2)',fontWeight:600}}>{label}</div>
+              </button>
+            ))}
+          </div>
+
+          {/* Add form */}
+          <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <input placeholder="Recipient (church, charity)" value={newDonation.recipient}
+                onChange={e => setNewDonation(p => ({...p, recipient: e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+              <input type="number" placeholder="Amount" value={newDonation.amount}
+                onChange={e => setNewDonation(p => ({...p, amount: e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <input type="date" value={newDonation.date}
+                onChange={e => setNewDonation(p => ({...p, date: e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:'.82rem',cursor:'pointer'}}>
+                <input type="checkbox" checked={newDonation.taxDeductible}
+                  onChange={e => setNewDonation(p => ({...p, taxDeductible: e.target.checked}))} />
+                Tax-deductible
+              </label>
+            </div>
+            <button onClick={() => {
+              if(!newDonation.recipient || !newDonation.amount) return
+              saveDonations([...donations, {...newDonation, id: Date.now(), amount: Number(newDonation.amount)}])
+              setNewDonation({recipient:'', amount:'', category:'Tithe', date:TODAY, taxDeductible:true})
+            }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+              + Log Donation
+            </button>
+          </div>
+
+          {/* List */}
+          {donations.length === 0 ? (
+            <EmptyState icon="✝️" title="Track your giving" message="Log tithes, offerings, and charitable donations. Total at tax time." />
+          ) : (
+            <div>
+              {donations.slice().reverse().map(d => (
+                <div key={d.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)',gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:'.88rem'}}>{d.recipient}</div>
+                    <div className="muted" style={{fontSize:'.74rem'}}>
+                      <span style={{color:'var(--brass)',fontWeight:600}}>{d.category}</span> · {d.date}
+                      {d.taxDeductible && <span style={{color:'var(--success)',marginLeft:6}}>· Tax ✓</span>}
+                    </div>
                   </div>
+                  <strong style={{color:'var(--brass)',whiteSpace:'nowrap'}}>{fmt(d.amount)}</strong>
+                  <button onClick={() => {
+                    if(window.confirm(`Delete donation to ${d.recipient}?`))
+                      saveDonations(donations.filter(x => x.id !== d.id))
+                  }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'4px 8px'}}>✕</button>
                 </div>
               ))}
             </div>
-            <button onClick={() => setTab('expenses')} style={{
-              marginTop:24,padding:'12px 28px',background:'var(--teal)',color:'white',
-              border:'none',borderRadius:999,fontWeight:700,fontSize:'.9rem',cursor:'pointer',
-            }}>
-              Log Expenses Manually →
-            </button>
-          </section>
-        </div>
+          )}
+        </section>
         </ProTabGate>
         )}
 
@@ -5416,6 +5489,8 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'birthdays') setBirthdays(row.data_value || [])
           if (row.data_key === 'contacts') setContacts(row.data_value || [])
           if (row.data_key === 'groceries') setGroceries(row.data_value || [])
+          if (row.data_key === 'recipes') setRecipes(row.data_value || [])
+          if (row.data_key === 'gifts') setGifts(row.data_value || [])
           if (row.data_key === 'passwords') setPasswords(row.data_value || [])
         })
       })
@@ -5432,18 +5507,26 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const saveTrips = (t) => { setTrips(t); syncPageData('trips', t) }
   const saveBirthdays = (b) => { setBirthdays(b); syncPageData('birthdays', b) }
   const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
+  const [recipes, setRecipes] = useState(() => lsGet('recipes', []))
+  const saveRecipes = (r) => { setRecipes(r); syncPageData('recipes', r) }
+  const [newRecipe, setNewRecipe] = useState({title:'',url:'',category:'Dinner',favorite:false,notes:''})
+  const [gifts, setGifts] = useState(() => lsGet('gifts', []))
+  const saveGifts = (g) => { setGifts(g); syncPageData('gifts', g) }
+  const [newGift, setNewGift] = useState({recipient:'',occasion:'Birthday',idea:'',amount:'',purchased:false,year:new Date().getFullYear()+''})
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
   const [contacts, setContacts] = useState(() => lsGet('contacts', []))
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
+  const [recipeFilter, setRecipeFilter] = useState('All')
   const [form, setForm] = useState({})
   const save = (key, setter, val) => { setter(val); lsSet(key, val) }
 
   const TABS = [
     { id: 'groceries', label: '🛒 Groceries' },
-    { id: 'trips', label: '✈ Trips' }, { id: 'birthdays', label: '🎂 Birthdays' },
-    { id: 'contacts', label: '👥 Contacts' },
-    { id: 'workout', label: '💪 Workout' }, { id: 'period', label: '🌸 Period' },
-    { id: 'passwords', label: '🔑 Passwords' },
+    { id: 'recipes', label: '🍳 Recipes' },
+    { id: 'trips', label: '✈ Trips' },
+    { id: 'birthdays', label: '🎂 Birthdays' },
+    { id: 'gifts', label: '🎁 Gifts' },
+    { id: 'workout', label: '💪 Workout' },
   ]
 
   const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
@@ -5551,6 +5634,184 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
             ))}
           </section>
         </div>
+      )}
+
+      {tab === 'recipes' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+        <section className="card">
+          <p className="eyebrow">Recipes</p>
+          <h3 style={{margin:'4px 0 8px'}}>Your Cookbook</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
+            Save favorites and recipes to try. Build your family's go-to collection.
+          </p>
+
+          {/* Category pills */}
+          <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+            {['All','Favorites','Breakfast','Lunch','Dinner','Sides','Desserts','Drinks'].map(cat => {
+              const active = (recipeFilter || 'All') === cat
+              return (
+                <button key={cat} onClick={() => setRecipeFilter(cat)} style={{
+                  padding:'5px 12px', borderRadius:999, fontSize:'.78rem', fontWeight:600, cursor:'pointer',
+                  background: active ? 'var(--teal)' : 'var(--stone)',
+                  color: active ? 'white' : 'var(--ink2)',
+                  border: '1.5px solid ' + (active ? 'var(--teal)' : 'var(--border2)'),
+                }}>{cat}</button>
+              )
+            })}
+          </div>
+
+          {/* Add recipe form */}
+          <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
+            <input placeholder="Recipe title" value={newRecipe.title}
+              onChange={e => setNewRecipe(p => ({...p, title: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+            <input placeholder="URL (optional)" value={newRecipe.url}
+              onChange={e => setNewRecipe(p => ({...p, url: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <select value={newRecipe.category} onChange={e => setNewRecipe(p => ({...p, category: e.target.value}))}
+                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}}>
+                {['Breakfast','Lunch','Dinner','Sides','Desserts','Drinks'].map(c => <option key={c}>{c}</option>)}
+              </select>
+              <label style={{display:'flex',alignItems:'center',gap:6,fontSize:'.82rem',cursor:'pointer'}}>
+                <input type="checkbox" checked={newRecipe.favorite}
+                  onChange={e => setNewRecipe(p => ({...p, favorite: e.target.checked}))} />
+                ⭐ Favorite
+              </label>
+            </div>
+            <button onClick={() => {
+              if(!newRecipe.title) return
+              saveRecipes([...recipes, {...newRecipe, id: Date.now()}])
+              setNewRecipe({title:'',url:'',category:'Dinner',favorite:false,notes:''})
+            }} style={{padding:'10px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+              + Save Recipe
+            </button>
+          </div>
+
+          {/* Recipe list */}
+          {(() => {
+            const filtered = recipes.filter(r => {
+              if (!recipeFilter || recipeFilter === 'All') return true
+              if (recipeFilter === 'Favorites') return r.favorite
+              return r.category === recipeFilter
+            })
+            if (filtered.length === 0) return <EmptyState icon="🍳" title="No recipes yet" message="Save your first recipe. Build your cookbook over time." />
+            return filtered.map(r => (
+              <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)',gap:8}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                    {r.favorite && <span style={{color:'var(--brass)'}}>⭐</span>}
+                    <strong style={{fontSize:'.88rem'}}>{r.title}</strong>
+                  </div>
+                  <div className="muted" style={{fontSize:'.74rem'}}>
+                    <span style={{color:'var(--teal)',fontWeight:600}}>{r.category}</span>
+                    {r.url && <> · <a href={r.url} target="_blank" rel="noopener noreferrer" style={{color:'var(--teal)'}}>Open recipe →</a></>}
+                  </div>
+                </div>
+                <button onClick={() => saveRecipes(recipes.map(x => x.id === r.id ? {...x, favorite: !x.favorite} : x))} style={{
+                  background:'none',border:'none',cursor:'pointer',fontSize:'1.1rem',padding:'4px',
+                }}>{r.favorite ? '⭐' : '☆'}</button>
+                <button onClick={() => {
+                  if(window.confirm(`Delete "${r.title}"?`)) saveRecipes(recipes.filter(x => x.id !== r.id))
+                }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'4px 8px'}}>✕</button>
+              </div>
+            ))
+          })()}
+        </section>
+        </ProTabGate>
+      )}
+
+      {tab === 'gifts' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+        <section className="card">
+          <p className="eyebrow">Gift Tracker</p>
+          <h3 style={{margin:'4px 0 8px'}}>Gifts & Ideas</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
+            Remember what you gave, plan what's next. Never repeat a gift.
+          </p>
+
+          {/* Summary */}
+          {(() => {
+            const thisYear = new Date().getFullYear()
+            const yearGifts = gifts.filter(g => g.year == thisYear)
+            const purchased = yearGifts.filter(g => g.purchased).length
+            const totalSpent = yearGifts.filter(g => g.purchased).reduce((s,g) => s + Number(g.amount||0), 0)
+            return (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
+                <div style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
+                  <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>Ideas</div>
+                  <strong style={{color:'var(--teal)',fontSize:'1rem'}}>{yearGifts.length}</strong>
+                </div>
+                <div style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
+                  <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>Bought</div>
+                  <strong style={{color:'var(--success)',fontSize:'1rem'}}>{purchased}</strong>
+                </div>
+                <div style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
+                  <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>Spent</div>
+                  <strong style={{color:'var(--brass)',fontSize:'1rem'}}>{fmt(totalSpent)}</strong>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Add */}
+          <div style={{background:'var(--stone)',borderRadius:12,padding:14,marginBottom:14,display:'grid',gap:8}}>
+            <input placeholder="Recipient" value={newGift.recipient}
+              onChange={e => setNewGift(p => ({...p, recipient: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+            <input placeholder="Gift idea" value={newGift.idea}
+              onChange={e => setNewGift(p => ({...p, idea: e.target.value}))}
+              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+              <select value={newGift.occasion} onChange={e => setNewGift(p => ({...p, occasion: e.target.value}))}
+                style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}}>
+                {['Birthday','Christmas','Easter','Anniversary','Wedding','Baby','Just Because','Other'].map(o => <option key={o}>{o}</option>)}
+              </select>
+              <input type="number" placeholder="Budget" value={newGift.amount}
+                onChange={e => setNewGift(p => ({...p, amount: e.target.value}))}
+                style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}} />
+              <input type="number" placeholder="Year" value={newGift.year}
+                onChange={e => setNewGift(p => ({...p, year: e.target.value}))}
+                style={{padding:'9px 8px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}} />
+            </div>
+            <button onClick={() => {
+              if(!newGift.recipient || !newGift.idea) return
+              saveGifts([...gifts, {...newGift, id: Date.now()}])
+              setNewGift({recipient:'',occasion:'Birthday',idea:'',amount:'',purchased:false,year:new Date().getFullYear()+''})
+            }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+              + Add Gift
+            </button>
+          </div>
+
+          {/* List */}
+          {gifts.length === 0 ? (
+            <EmptyState icon="🎁" title="No gifts tracked yet" message="Add ideas as they come. Mark purchased when bought. Never repeat a gift." />
+          ) : (
+            <div>
+              {gifts.slice().reverse().map(g => (
+                <div key={g.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)',gap:8}}>
+                  <button onClick={() => saveGifts(gifts.map(x => x.id === g.id ? {...x, purchased: !x.purchased} : x))} style={{
+                    width:22,height:22,borderRadius:6,flexShrink:0,cursor:'pointer',padding:0,
+                    background: g.purchased ? 'var(--success)' : 'transparent',
+                    border: '2px solid ' + (g.purchased ? 'var(--success)' : 'var(--border2)'),
+                    color:'white',fontSize:'.85rem',
+                  }}>{g.purchased && '✓'}</button>
+                  <div style={{flex:1,minWidth:0,textDecoration: g.purchased ? 'line-through' : 'none',opacity: g.purchased ? .6 : 1}}>
+                    <div style={{fontWeight:600,fontSize:'.88rem'}}>{g.recipient} — {g.idea}</div>
+                    <div className="muted" style={{fontSize:'.74rem'}}>
+                      <span style={{color:'var(--brass)',fontWeight:600}}>{g.occasion}</span> · {g.year}
+                      {g.amount && <> · {fmt(g.amount)}</>}
+                    </div>
+                  </div>
+                  <button onClick={() => {
+                    if(window.confirm(`Delete gift for ${g.recipient}?`)) saveGifts(gifts.filter(x => x.id !== g.id))
+                  }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'4px 8px'}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+        </ProTabGate>
       )}
 
       {tab === 'contacts' && (
@@ -6857,6 +7118,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'fasting') setFasting(row.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
           if (row.data_key === 'faithGoals') setFaithGoals(row.data_value || [])
           if (row.data_key === 'sermons') setSermons(row.data_value || [])
+          if (row.data_key === 'bibleReading') setBibleReading(row.data_value || { plan: 'M\'Cheyne', completedDates: [], notes: {} })
         })
       })
 
@@ -6934,6 +7196,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
 
   // Sermon notes
   const [sermons, setSermons] = useState(() => lsGet('sermons', []))
+  const [bibleReading, setBibleReading] = useState(() => lsGet('bibleReading', { plan: 'M\'Cheyne', completedDates: [], notes: {} }))
+  const saveBibleReading = (v) => { setBibleReading(v); syncFaith('bibleReading', v) }
+  const [readingNote, setReadingNote] = useState('')
   const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
   const saveSermons = (v) => { setSermons(v); syncFaith('sermons', v) }
 
@@ -6945,6 +7210,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
     { id: 'devotional', label: '📖 Devotional' },
     { id: 'prayer', label: '🙏 Prayer' },
     { id: 'scripture', label: '📜 Scripture' },
+    { id: 'reading', label: '📚 Bible Reading' },
     { id: 'gratitude', label: '🌸 Gratitude' },
     { id: 'fasting', label: '⚡ Fasting' },
     { id: 'sermons', label: '🎙 Sermons' },
@@ -7113,6 +7379,113 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
             }}>+ Save Scripture</button>
           </div>
         </section>
+      )}
+
+      {tab === 'reading' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+        <section className="card">
+          <p className="eyebrow">Bible Reading</p>
+          <h3 style={{margin:'4px 0 8px'}}>Daily Reading</h3>
+          <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
+            "Man shall not live by bread alone, but by every word from the mouth of God." — Matthew 4:4
+          </p>
+
+          {/* Plan selector */}
+          <div style={{marginBottom:14}}>
+            <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:6}}>Reading Plan</p>
+            <select value={bibleReading.plan || "M'Cheyne"}
+              onChange={e => saveBibleReading({...bibleReading, plan: e.target.value})}
+              style={{width:'100%',padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.9rem',background:'white'}}>
+              <option value="Bible in a Year">Bible in a Year — Genesis to Revelation, daily</option>
+              <option value="Chronological">Chronological — events in order they happened</option>
+              <option value="M'Cheyne">M'Cheyne — 4 chapters daily (OT, NT, Psalms/Gospels)</option>
+              <option value="F-260">F-260 — 1 chapter, 5 days/week (Foundations)</option>
+              <option value="New Testament">New Testament Only — Matthew to Revelation</option>
+              <option value="Psalms & Proverbs">Psalms & Proverbs daily</option>
+              <option value="Custom">Custom — track on your own</option>
+            </select>
+          </div>
+
+          {/* Today's check-in */}
+          <div style={{background:'var(--brass-dim)',borderRadius:12,padding:'14px 16px',marginBottom:14}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <strong style={{fontSize:'.92rem',color:'var(--ink)'}}>Today's Reading</strong>
+              <button onClick={() => {
+                const completed = bibleReading.completedDates || []
+                const has = completed.includes(TODAY)
+                const next = has
+                  ? completed.filter(d => d !== TODAY)
+                  : [...completed, TODAY]
+                saveBibleReading({...bibleReading, completedDates: next})
+              }} style={{
+                padding:'6px 14px', borderRadius:999, fontSize:'.8rem', fontWeight:700, cursor:'pointer',
+                background: (bibleReading.completedDates||[]).includes(TODAY) ? 'var(--success)' : 'var(--brass)',
+                color:'white', border:'none',
+              }}>{(bibleReading.completedDates||[]).includes(TODAY) ? '✓ Done Today' : 'Mark Read'}</button>
+            </div>
+            <textarea
+              placeholder="Notes from today's reading..."
+              value={bibleReading.notes?.[TODAY] || ''}
+              onChange={e => saveBibleReading({
+                ...bibleReading,
+                notes: {...(bibleReading.notes||{}), [TODAY]: e.target.value}
+              })}
+              style={{width:'100%',minHeight:80,padding:'10px',border:'1.5px solid rgba(184,150,90,.3)',borderRadius:8,fontSize:'.88rem',resize:'vertical',background:'white',fontFamily:'inherit'}} />
+          </div>
+
+          {/* Streak + stats */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:14}}>
+            {(() => {
+              const dates = (bibleReading.completedDates || []).sort()
+              // Current streak
+              let current = 0
+              let d = new Date()
+              if (!dates.includes(d.toISOString().slice(0,10))) {
+                d.setDate(d.getDate() - 1)
+              }
+              while (dates.includes(d.toISOString().slice(0,10))) {
+                current++
+                d.setDate(d.getDate() - 1)
+              }
+              // Longest streak
+              let longest = 0, run = 0
+              for (let i = 0; i < dates.length; i++) {
+                if (i === 0 || (new Date(dates[i]) - new Date(dates[i-1])) === 86400000) {
+                  run++
+                  longest = Math.max(longest, run)
+                } else { run = 1 }
+              }
+              const total = dates.length
+              return [
+                ['Current Streak', current + 'd', current > 0 ? 'var(--warning)' : 'var(--muted)'],
+                ['Longest', longest + 'd', 'var(--brass)'],
+                ['Total Days', total + '', 'var(--teal)'],
+              ].map(([label, val, color]) => (
+                <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
+                  <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>{label}</div>
+                  <strong style={{color,fontSize:'1rem'}}>{val}</strong>
+                </div>
+              ))
+            })()}
+          </div>
+
+          {/* Last 30 days visual */}
+          <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>Last 30 Days</p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(10, 1fr)',gap:4}}>
+            {Array.from({length: 30}).map((_, i) => {
+              const date = new Date(Date.now() - (29-i) * 86400000).toISOString().slice(0,10)
+              const done = (bibleReading.completedDates || []).includes(date)
+              return (
+                <div key={i} title={date} style={{
+                  aspectRatio:'1', borderRadius:6,
+                  background: done ? 'var(--brass)' : 'var(--stone2)',
+                  border: '1px solid ' + (done ? 'var(--brass)' : 'var(--border)'),
+                }} />
+              )
+            })}
+          </div>
+        </section>
+        </ProTabGate>
       )}
 
       {/* ── GRATITUDE ──────────────────────────────────────────────────────── */}
