@@ -5806,6 +5806,7 @@ function PeriodTrackerTab() {
 
 function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
+  const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
@@ -8109,10 +8110,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
               <button className="primary-btn" onClick={() => saveFasting({...fasting, active:true, startDate: fasting.startDate||TODAY})}>Begin Fast</button>
             </div>
           )}
-          {fasting.log.length > 0 && (
+          {(fasting.log || []).length > 0 && (
             <div>
               <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Fast History</p>
-              {fasting.log.map((entry, i) => (
+              {(fasting.log || []).map((entry, i) => (
                 <div key={i} style={{padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{fontWeight:600,fontSize:'.88rem'}}>{entry.intention || 'Fast'}</div>
                   <div className="muted" style={{fontSize:'.75rem'}}>{entry.start} → {entry.end}</div>
