@@ -1644,6 +1644,35 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         </div>
       </div>
 
+      {/* ── Word of the Year ──────────────────────────────── */}
+      <section className="card" style={{padding:'14px 16px',marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{flex:1}}>
+            <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:0}}>Word of the Year</p>
+            {(() => {
+              const word = (typeof window !== 'undefined' && localStorage.getItem('planner_word_of_year')) || ''
+              return word ? (
+                <h2 style={{margin:'4px 0 0',fontFamily:'var(--serif)',fontSize:'1.8rem',fontWeight:400,color:'var(--ink)',letterSpacing:'-.01em',fontStyle:'italic'}}>{word}</h2>
+              ) : (
+                <p style={{margin:'4px 0 0',fontSize:'.85rem',color:'var(--ink2)',fontStyle:'italic'}}>What single word will guide your year?</p>
+              )
+            })()}
+          </div>
+          <button onClick={() => {
+            const current = (typeof window !== 'undefined' && localStorage.getItem('planner_word_of_year')) || ''
+            const next = prompt('Your word for ' + new Date().getFullYear() + ':', current)
+            if (next !== null) {
+              try { localStorage.setItem('planner_word_of_year', next) } catch {}
+              window.location.reload()
+            }
+          }} style={{
+            padding:'6px 14px',borderRadius:999,background:'transparent',
+            color:'var(--brass)',border:'1px solid var(--brass)',
+            fontSize:'.74rem',fontWeight:600,cursor:'pointer',
+          }}>Set</button>
+        </div>
+      </section>
+
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
@@ -1914,6 +1943,50 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         </div>
         <MiniBarChart data={completionSeries} dataKey="completed" maxKey="total" />
       </section>
+
+      {/* ── Tomorrow's Top 3 (evening prompt) ──────────────────────────── */}
+      {(() => {
+        const hour = new Date().getHours()
+        if (hour < 18) return null  // Only show evening (6pm+)
+        const stored = (typeof window !== 'undefined' && localStorage.getItem('planner_tomorrow_top3'))
+        const top3 = stored ? JSON.parse(stored) : { date: '', items: ['','',''] }
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0,10)
+        // Reset if it's for a different tomorrow
+        const items = top3.date === tomorrow ? top3.items : ['','','']
+        return (
+          <section className="card" style={{
+            background:'linear-gradient(135deg, rgba(184,150,90,.08) 0%, rgba(42,140,140,.05) 100%)',
+            border:'1.5px solid rgba(184,150,90,.2)',
+            padding:'16px 18px',
+          }}>
+            <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Plan Tomorrow</p>
+            <h3 style={{margin:'0 0 4px',fontSize:'1rem',color:'var(--ink)'}}>Your Top 3</h3>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:12,fontStyle:'italic'}}>
+              "He who fails to plan is planning to fail." — Set the night before. Rise focused.
+            </p>
+            {[0,1,2].map(i => (
+              <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                <span style={{
+                  width:24,height:24,borderRadius:'50%',background:'var(--brass)',
+                  color:'white',display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:'.75rem',fontWeight:700,flexShrink:0,
+                }}>{i+1}</span>
+                <input
+                  placeholder={`Priority ${i+1}...`}
+                  defaultValue={items[i]}
+                  onBlur={e => {
+                    const updated = [...items]
+                    updated[i] = e.target.value
+                    try { localStorage.setItem('planner_tomorrow_top3', JSON.stringify({date: tomorrow, items: updated})) } catch {}
+                  }}
+                  style={{flex:1,padding:'8px 12px',border:'1px solid var(--border2)',borderRadius:8,fontSize:'.88rem',background:'white'}}
+                />
+              </div>
+            ))}
+          </section>
+        )
+      })()}
+
 
       <PageNav />
     </div>
@@ -2940,6 +3013,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           if (row.data_key === 'debts') setDebts(row.data_value || [])
           if (row.data_key === 'savingsGoals') setSavingsGoals(row.data_value || [])
           if (row.data_key === 'donations') setDonations(row.data_value || [])
+          if (row.data_key === 'netWorthHistory') setNetWorthHistory(row.data_value || [])
+          if (row.data_key === 'sinkingFunds') setSinkingFunds(row.data_value || [])
           if (row.data_key === 'noSpend') setNoSpend(row.data_value || { days: 30, checked: [] })
         })
       })
@@ -2998,10 +3073,18 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const currentWeekNum = Math.ceil((new Date(TODAY) - new Date(new Date(TODAY).getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
   const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
   const [challengeGoal, setChallengeGoal] = useState(() => lsGet('challengeGoal', 10000))
+  const [netWorthHistory, setNetWorthHistory] = useState(() => lsGet('netWorthHistory', []))
+  const saveNetWorth = (h) => { setNetWorthHistory(h); syncPageData('netWorthHistory', h) }
+  const [newNetWorth, setNewNetWorth] = useState({assets:'', liabilities:'', date:TODAY})
+  const [sinkingFunds, setSinkingFunds] = useState(() => lsGet('sinkingFunds', []))
+  const saveSinkingFunds = (f) => { setSinkingFunds(f); syncPageData('sinkingFunds', f) }
+  const [newSinking, setNewSinking] = useState({name:'', target:'', current:'', dueDate:''})
   const [donations, setDonations] = useState(() => lsGet('donations', []))
   const saveDonations = (d) => { setDonations(d); syncPageData('donations', d) }
   const [newDonation, setNewDonation] = useState({ recipient: '', amount: '', category: 'Tithe', date: TODAY, taxDeductible: true })
   const [addingExpense, setAddingExpense] = useState(false)
+  const [showNetWorthForm, setShowNetWorthForm] = useState(false)
+  const [showSinkingForm, setShowSinkingForm] = useState(false)
   const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',period:'one-time',date:TODAY})
   const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
   const saveChallengeGoal = (v) => { setChallengeGoal(v); lsSet('challengeGoal', v) }
@@ -3140,6 +3223,65 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && (
         <section className="card">
+          {/* Net Worth Tracker */}
+          {(() => {
+            const latest = netWorthHistory[netWorthHistory.length-1]
+            const prev = netWorthHistory[netWorthHistory.length-2]
+            const netWorth = latest ? (Number(latest.assets) - Number(latest.liabilities)) : 0
+            const change = (latest && prev) ? netWorth - (Number(prev.assets) - Number(prev.liabilities)) : 0
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, var(--ink) 0%, var(--navy, #0B1829) 100%)',
+                borderRadius: 14, padding: '18px 20px', marginBottom: 16, color: 'white',
+              }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div>
+                    <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Net Worth</p>
+                    <strong style={{fontSize:'1.6rem',display:'block'}}>{fmt(netWorth)}</strong>
+                    {change !== 0 && (
+                      <span style={{fontSize:'.78rem',color: change > 0 ? '#22C55E' : '#EF4444',fontWeight:600}}>
+                        {change > 0 ? '↑' : '↓'} {fmt(Math.abs(change))} from last entry
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={() => setShowNetWorthForm(!showNetWorthForm)} style={{
+                    padding:'6px 14px',borderRadius:999,background:'rgba(184,150,90,.18)',
+                    color:'var(--brass)',border:'1px solid rgba(184,150,90,.35)',
+                    fontSize:'.78rem',fontWeight:600,cursor:'pointer',
+                  }}>{showNetWorthForm ? 'Cancel' : '+ Update'}</button>
+                </div>
+                {showNetWorthForm && (
+                  <div style={{marginTop:14,padding:14,background:'rgba(255,255,255,.05)',borderRadius:10,display:'grid',gap:8}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                      <input type="number" placeholder="Total assets ($)" value={newNetWorth.assets}
+                        onChange={e => setNewNetWorth(p => ({...p, assets: e.target.value}))}
+                        style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.2)',borderRadius:8,fontSize:'.88rem',background:'rgba(255,255,255,.1)',color:'white'}} />
+                      <input type="number" placeholder="Total liabilities ($)" value={newNetWorth.liabilities}
+                        onChange={e => setNewNetWorth(p => ({...p, liabilities: e.target.value}))}
+                        style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.2)',borderRadius:8,fontSize:'.88rem',background:'rgba(255,255,255,.1)',color:'white'}} />
+                    </div>
+                    <button onClick={() => {
+                      if(!newNetWorth.assets) return
+                      saveNetWorth([...netWorthHistory, {...newNetWorth, id: Date.now(), assets: Number(newNetWorth.assets), liabilities: Number(newNetWorth.liabilities||0)}])
+                      setNewNetWorth({assets:'', liabilities:'', date:TODAY})
+                      setShowNetWorthForm(false)
+                    }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>Save Snapshot</button>
+                  </div>
+                )}
+                {netWorthHistory.length > 1 && (
+                  <div style={{marginTop:12,display:'flex',alignItems:'flex-end',gap:2,height:40}}>
+                    {netWorthHistory.slice(-12).map((nw, i) => {
+                      const val = Number(nw.assets) - Number(nw.liabilities)
+                      const max = Math.max(...netWorthHistory.slice(-12).map(x => Number(x.assets) - Number(x.liabilities)))
+                      const h = Math.max(4, (val / max) * 100)
+                      return <div key={i} style={{flex:1,height:h+'%',background:'var(--brass)',borderRadius:'2px 2px 0 0',opacity:.6}} />
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
           <p className="eyebrow">Financial Overview</p>
           <h3 style={{ margin: '4px 0 14px' }}>Your Money at a Glance</h3>
           <PeriodPills />
@@ -3370,6 +3512,37 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
         <div>
           {/* Bills section — moved here from Budget */}
           <section className="card">
+          {/* Subscription Audit */}
+          {(() => {
+            const subs = bills.filter(b => b.category === 'Subscription' || (b.label||'').toLowerCase().includes('subscription'))
+            const totalMonthly = subs.reduce((s,b) => s + billToMonthly(b), 0)
+            if (subs.length === 0) return null
+            return (
+              <div style={{
+                background: 'var(--warning, #FEF3C7)20',
+                background: 'rgba(245,158,11,.08)',
+                border: '1.5px solid rgba(245,158,11,.25)',
+                borderRadius: 12, padding: '12px 14px', marginBottom: 14,
+              }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                  <p style={{fontSize:'.65rem',fontWeight:700,letterSpacing:'.08em',color:'var(--warning,#D97706)',textTransform:'uppercase',margin:0}}>⚠️ Subscription Audit</p>
+                  <strong style={{fontSize:'.85rem',color:'var(--warning,#D97706)'}}>{fmt(totalMonthly)}/mo · {fmt(totalMonthly*12)}/yr</strong>
+                </div>
+                <p style={{fontSize:'.78rem',color:'var(--ink2)',marginBottom:8}}>
+                  You have {subs.length} active subscription{subs.length !== 1 ? 's' : ''}. Review each — is it still earning its keep?
+                </p>
+                <div style={{display:'grid',gap:4}}>
+                  {subs.map(s => (
+                    <div key={s.id || s.label} style={{display:'flex',justifyContent:'space-between',fontSize:'.78rem',padding:'4px 0',borderBottom:'1px solid rgba(245,158,11,.15)'}}>
+                      <span>{s.label}</span>
+                      <span style={{fontWeight:600}}>{fmt(billToMonthly(s))}/mo</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
             <p className="eyebrow">Fixed Bills</p>
             <h3 style={{ margin: '4px 0 10px' }}>Monthly Recurring Expenses</h3>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'2px solid var(--border)',marginBottom:6}}>
@@ -3575,6 +3748,81 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
+          {/* Sinking Funds */}
+          <div style={{marginBottom:16}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',margin:0}}>Sinking Funds</p>
+              <button onClick={() => setShowSinkingForm(!showSinkingForm)} style={{
+                fontSize:'.72rem',padding:'4px 10px',borderRadius:999,
+                background:'transparent',color:'var(--teal)',border:'1px solid var(--teal)',
+                cursor:'pointer',fontWeight:600,
+              }}>{showSinkingForm ? 'Cancel' : '+ New'}</button>
+            </div>
+            <p className="muted" style={{fontSize:'.74rem',marginBottom:10,fontStyle:'italic'}}>
+              Save monthly for known future expenses (Christmas, car repair, vacation).
+            </p>
+
+            {showSinkingForm && (
+              <div style={{background:'var(--stone)',borderRadius:10,padding:12,marginBottom:10,display:'grid',gap:8}}>
+                <input placeholder="Fund name (e.g. Christmas 2026)" value={newSinking.name}
+                  onChange={e => setNewSinking(p => ({...p, name: e.target.value}))}
+                  style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.88rem'}} />
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                  <input type="number" placeholder="Target $" value={newSinking.target}
+                    onChange={e => setNewSinking(p => ({...p, target: e.target.value}))}
+                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}} />
+                  <input type="number" placeholder="Saved $" value={newSinking.current}
+                    onChange={e => setNewSinking(p => ({...p, current: e.target.value}))}
+                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}} />
+                  <input type="date" placeholder="Due" value={newSinking.dueDate}
+                    onChange={e => setNewSinking(p => ({...p, dueDate: e.target.value}))}
+                    style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:8,fontSize:'.82rem'}} />
+                </div>
+                <button onClick={() => {
+                  if(!newSinking.name || !newSinking.target) return
+                  saveSinkingFunds([...sinkingFunds, {...newSinking, id: Date.now(), target: Number(newSinking.target), current: Number(newSinking.current||0)}])
+                  setNewSinking({name:'', target:'', current:'', dueDate:''})
+                  setShowSinkingForm(false)
+                }} style={{padding:'10px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+                  Add Fund
+                </button>
+              </div>
+            )}
+
+            {sinkingFunds.length === 0 ? null : sinkingFunds.map(f => {
+              const pct = Math.min(100, (Number(f.current) / Number(f.target)) * 100)
+              const remaining = Math.max(0, Number(f.target) - Number(f.current))
+              const monthsLeft = f.dueDate ? Math.max(1, Math.ceil((new Date(f.dueDate) - new Date()) / (30 * 86400000))) : null
+              const monthlyNeeded = monthsLeft ? Math.ceil(remaining / monthsLeft) : null
+              return (
+                <div key={f.id} style={{background:'var(--stone)',borderRadius:10,padding:'12px 14px',marginBottom:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                    <strong style={{fontSize:'.88rem'}}>{f.name}</strong>
+                    <span style={{fontSize:'.82rem',color:'var(--teal)',fontWeight:600}}>{fmt(f.current)} / {fmt(f.target)}</span>
+                  </div>
+                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden',marginBottom:6}}>
+                    <div style={{height:'100%',width:`${pct}%`,background:'var(--teal)',transition:'width .3s'}} />
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:'.74rem'}}>
+                    <span className="muted">
+                      {monthlyNeeded ? `Save ${fmt(monthlyNeeded)}/month` : 'Set due date for monthly target'}
+                    </span>
+                    <div style={{display:'flex',gap:8}}>
+                      <button onClick={() => {
+                        const add = prompt(`Add to ${f.name}:`)
+                        if(!add) return
+                        saveSinkingFunds(sinkingFunds.map(x => x.id === f.id ? {...x, current: Number(x.current) + Number(add)} : x))
+                      }} style={{background:'none',border:'none',color:'var(--teal)',cursor:'pointer',fontWeight:600,fontSize:'.74rem'}}>+ Add</button>
+                      <button onClick={() => {
+                        if(window.confirm(`Delete ${f.name}?`)) saveSinkingFunds(sinkingFunds.filter(x => x.id !== f.id))
+                      }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
             <p className="eyebrow">Savings Challenge</p>
             <h3 style={{ margin: '4px 0 6px' }}>Build Your Savings — Your Way</h3>
 
@@ -4047,6 +4295,8 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'meds') setMeds(row.data_value || [])
           if (row.data_key === 'anxiety') setAnxiety(row.data_value || [])
           if (row.data_key === 'migraines') setMigraines(row.data_value || [])
+          if (row.data_key === 'waterLog') setWaterLog(row.data_value || {})
+          if (row.data_key === 'measurements') setMeasurements(row.data_value || [])
           if (row.data_key === 'journalEntries') setJournalEntries(row.data_value || [])
         })
       })
@@ -4124,6 +4374,11 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const todayCopingUsed = copingUsed[todayCopingKey] || []
   const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
   const [migraines, setMigraines] = useState(() => lsGet('migraines', []))
+  const [waterLog, setWaterLog] = useState(() => lsGet('waterLog', {}))
+  const saveWaterLog = (w) => { setWaterLog(w); syncPageData('waterLog', w) }
+  const [measurements, setMeasurements] = useState(() => lsGet('measurements', []))
+  const saveMeasurements = (m) => { setMeasurements(m); syncPageData('measurements', m) }
+  const [newMeasurement, setNewMeasurement] = useState({weight:'', waist:'', hip:'', bodyFat:'', date:TODAY})
   const [sleep, setSleep] = useState(() => lsGet('sleep', []))
   const [form, setForm] = useState({})
 
@@ -4182,6 +4437,32 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
       {tab === 'mood' && (
         <div>
           <section className="card">
+          {/* Water Intake */}
+          <div style={{marginBottom:16}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',margin:0}}>💧 Water Today</p>
+              <strong style={{fontSize:'.85rem',color:'var(--teal)'}}>{waterLog[TODAY] || 0} / 8 cups</strong>
+            </div>
+            <div style={{display:'flex',gap:6,marginBottom:8}}>
+              {Array.from({length: 8}).map((_, i) => {
+                const filled = (waterLog[TODAY] || 0) > i
+                return (
+                  <button key={i} onClick={() => {
+                    const current = waterLog[TODAY] || 0
+                    saveWaterLog({...waterLog, [TODAY]: i+1 <= current ? i : i+1})
+                  }} style={{
+                    flex:1, aspectRatio:'1', borderRadius:8, cursor:'pointer',
+                    background: filled ? 'var(--teal)' : 'transparent',
+                    border: '1.5px solid var(--teal)',
+                    color: filled ? 'white' : 'var(--teal)',
+                    fontSize:'1.2rem',padding:0,
+                  }}>{filled ? '💧' : ''}</button>
+                )
+              })}
+            </div>
+            <p className="muted" style={{fontSize:'.74rem',margin:0,fontStyle:'italic'}}>Tap to log each cup (8oz). Goal: 64oz daily.</p>
+          </div>
+
             <p className="eyebrow">Daily Check-In</p>
             <h3 style={{margin:'4px 0 14px'}}>How are you feeling today?</h3>
             <div style={{display:'flex',gap:8,justifyContent:'space-between',marginBottom:16}}>
@@ -4694,6 +4975,66 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
+          {/* Body Measurements */}
+          <div style={{marginBottom:18}}>
+            <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>📏 Body Measurements</p>
+            
+            {/* Latest snapshot */}
+            {measurements.length > 0 && (() => {
+              const latest = measurements[measurements.length-1]
+              const prev = measurements[measurements.length-2]
+              return (
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6,marginBottom:10}}>
+                  {[
+                    ['Weight', latest.weight, prev?.weight, 'lbs'],
+                    ['Waist', latest.waist, prev?.waist, 'in'],
+                    ['Hip', latest.hip, prev?.hip, 'in'],
+                    ['Body Fat', latest.bodyFat, prev?.bodyFat, '%'],
+                  ].map(([label, val, prevVal, unit]) => {
+                    if (!val) return null
+                    const delta = prevVal ? Number(val) - Number(prevVal) : 0
+                    return (
+                      <div key={label} style={{background:'var(--stone)',borderRadius:8,padding:'8px 4px',textAlign:'center'}}>
+                        <div className="muted" style={{fontSize:'.62rem',fontWeight:600,marginBottom:2}}>{label}</div>
+                        <strong style={{fontSize:'.92rem',color:'var(--ink)'}}>{val}<span style={{fontSize:'.65rem',color:'var(--muted)'}}>{unit}</span></strong>
+                        {delta !== 0 && (
+                          <div style={{fontSize:'.65rem',color: delta > 0 ? 'var(--danger)' : 'var(--success)',marginTop:2}}>
+                            {delta > 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
+            {/* Form */}
+            <div style={{background:'var(--stone)',borderRadius:10,padding:12,display:'grid',gap:8}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:6}}>
+                <input type="number" placeholder="Weight" value={newMeasurement.weight}
+                  onChange={e => setNewMeasurement(p => ({...p, weight: e.target.value}))}
+                  style={{padding:'8px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+                <input type="number" placeholder="Waist" value={newMeasurement.waist}
+                  onChange={e => setNewMeasurement(p => ({...p, waist: e.target.value}))}
+                  style={{padding:'8px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+                <input type="number" placeholder="Hip" value={newMeasurement.hip}
+                  onChange={e => setNewMeasurement(p => ({...p, hip: e.target.value}))}
+                  style={{padding:'8px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+                <input type="number" placeholder="BF%" value={newMeasurement.bodyFat}
+                  onChange={e => setNewMeasurement(p => ({...p, bodyFat: e.target.value}))}
+                  style={{padding:'8px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
+              </div>
+              <button onClick={() => {
+                if(!newMeasurement.weight && !newMeasurement.waist) return
+                saveMeasurements([...measurements, {...newMeasurement, id: Date.now()}])
+                setNewMeasurement({weight:'', waist:'', hip:'', bodyFat:'', date:TODAY})
+              }} style={{padding:'9px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer',fontSize:'.85rem'}}>
+                + Log Measurement
+              </button>
+            </div>
+          </div>
+
             <p className="eyebrow">Body Metrics</p>
             <h3 style={{margin:'4px 0 6px'}}>Log Today</h3>
             <div style={{display:'grid',gap:10,marginBottom:14}}>
@@ -7088,6 +7429,48 @@ class AppErrorBoundary extends React.Component {
 
 
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
+
+// ── Verse of the Day Library ──────────────────────────────────────────────
+const VERSE_LIBRARY = [
+  {v: "Trust in the Lord with all your heart, and do not lean on your own understanding.", r: "Proverbs 3:5"},
+  {v: "I can do all things through Christ who strengthens me.", r: "Philippians 4:13"},
+  {v: "For God so loved the world that he gave his one and only Son.", r: "John 3:16"},
+  {v: "Be still, and know that I am God.", r: "Psalm 46:10"},
+  {v: "And we know that in all things God works for the good of those who love him.", r: "Romans 8:28"},
+  {v: "The Lord is my shepherd; I shall not want.", r: "Psalm 23:1"},
+  {v: "Wait on the Lord; be of good courage, and He shall strengthen your heart.", r: "Psalm 27:14"},
+  {v: "Do not be anxious about anything, but in every situation by prayer and petition present your requests to God.", r: "Philippians 4:6"},
+  {v: "Cast all your anxiety on him because he cares for you.", r: "1 Peter 5:7"},
+  {v: "Therefore do not worry about tomorrow, for tomorrow will worry about itself.", r: "Matthew 6:34"},
+  {v: "Be strong and courageous. Do not be afraid; do not be discouraged, for the Lord your God will be with you wherever you go.", r: "Joshua 1:9"},
+  {v: "The Lord will fight for you; you need only to be still.", r: "Exodus 14:14"},
+  {v: "Come to me, all you who are weary and burdened, and I will give you rest.", r: "Matthew 11:28"},
+  {v: "Greater love has no one than this: to lay down one's life for one's friends.", r: "John 15:13"},
+  {v: "I have fought the good fight, I have finished the race, I have kept the faith.", r: "2 Timothy 4:7"},
+  {v: "Above all else, guard your heart, for everything you do flows from it.", r: "Proverbs 4:23"},
+  {v: "Commit to the Lord whatever you do, and he will establish your plans.", r: "Proverbs 16:3"},
+  {v: "Many are the plans in a person's heart, but it is the Lord's purpose that prevails.", r: "Proverbs 19:21"},
+  {v: "She is clothed with strength and dignity; she can laugh at the days to come.", r: "Proverbs 31:25"},
+  {v: "In their hearts humans plan their course, but the Lord establishes their steps.", r: "Proverbs 16:9"},
+  {v: "Train up a child in the way he should go; even when he is old he will not depart from it.", r: "Proverbs 22:6"},
+  {v: "Two are better than one, because they have a good return for their labor.", r: "Ecclesiastes 4:9"},
+  {v: "There is a time for everything, and a season for every activity under the heavens.", r: "Ecclesiastes 3:1"},
+  {v: "Now faith is confidence in what we hope for and assurance about what we do not see.", r: "Hebrews 11:1"},
+  {v: "Let us not become weary in doing good, for at the proper time we will reap a harvest if we do not give up.", r: "Galatians 6:9"},
+  {v: "But seek first his kingdom and his righteousness, and all these things will be given to you as well.", r: "Matthew 6:33"},
+  {v: "Where your treasure is, there your heart will be also.", r: "Matthew 6:21"},
+  {v: "Whatever you do, work at it with all your heart, as working for the Lord, not for human masters.", r: "Colossians 3:23"},
+  {v: "Be kind and compassionate to one another, forgiving each other, just as in Christ God forgave you.", r: "Ephesians 4:32"},
+  {v: "Therefore, my beloved brothers, be steadfast, immovable, always abounding in the work of the Lord.", r: "1 Corinthians 15:58"},
+  {v: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.", r: "Jeremiah 29:11"},
+]
+
+function getVerseOfDay() {
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000)
+  return VERSE_LIBRARY[dayOfYear % VERSE_LIBRARY.length]
+}
+
+
 function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
@@ -7199,6 +7582,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const [bibleReading, setBibleReading] = useState(() => lsGet('bibleReading', { plan: 'M\'Cheyne', completedDates: [], notes: {} }))
   const saveBibleReading = (v) => { setBibleReading(v); syncFaith('bibleReading', v) }
   const [readingNote, setReadingNote] = useState('')
+  const [revealedVerse, setRevealedVerse] = useState(null)
   const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
   const saveSermons = (v) => { setSermons(v); syncFaith('sermons', v) }
 
@@ -7244,6 +7628,36 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
       {tab === 'devotional' && (
         <section className="card">
+          {/* Verse of the Day */}
+          {(() => {
+            const vod = getVerseOfDay()
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, var(--brass-dim) 0%, rgba(184,150,90,.1) 100%)',
+                border: '1.5px solid rgba(184,150,90,.3)',
+                borderRadius: 14, padding: '18px 20px', marginBottom: 16,
+                position: 'relative',
+              }}>
+                <p style={{
+                  fontSize: '.62rem', fontWeight: 700, letterSpacing: '.1em',
+                  color: 'var(--brass)', textTransform: 'uppercase', marginBottom: 8,
+                }}>Verse of the Day</p>
+                <p style={{
+                  fontFamily: "var(--serif)", fontSize: '1.02rem', lineHeight: 1.5,
+                  color: 'var(--ink)', fontStyle: 'italic', marginBottom: 8,
+                }}>"{vod.v}"</p>
+                <p style={{fontSize: '.78rem', color: 'var(--brass)', fontWeight: 700, textAlign: 'right'}}>— {vod.r}</p>
+                <button onClick={() => {
+                  saveScriptures([...scriptures, { id: Date.now(), verse: vod.v, reference: vod.r, date: TODAY }])
+                }} style={{
+                  marginTop: 10, padding: '7px 14px', borderRadius: 999,
+                  background: 'var(--brass)', color: 'white', border: 'none',
+                  fontSize: '.78rem', fontWeight: 600, cursor: 'pointer',
+                }}>+ Save to Scripture</button>
+              </div>
+            )
+          })()}
+
           <p className="eyebrow">Daily Devotional</p>
           <h3 style={{ margin: '4px 0 8px' }}>Time with God</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Use this space for your daily quiet time — reading, reflection, what God is speaking to you.</p>
@@ -7281,6 +7695,42 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         <section className="card">
           <p className="eyebrow">Prayer Journal</p>
           <h3 style={{ margin: '4px 0 14px' }}>Your Prayer Life</h3>
+
+          {/* Praise Reports — Answered Prayers */}
+          {(() => {
+            const answered = prayers.filter(p => p.answered)
+            if (answered.length === 0) return null
+            return (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(34,197,94,.08) 0%, rgba(34,197,94,.03) 100%)',
+                border: '1.5px solid rgba(34,197,94,.25)',
+                borderRadius: 14, padding: '14px 16px', marginBottom: 16,
+              }}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                  <p style={{
+                    fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em',
+                    color: 'var(--success)', textTransform: 'uppercase', margin: 0,
+                  }}>🙌 Praise Reports</p>
+                  <strong style={{fontSize:'.78rem',color:'var(--success)'}}>{answered.length} answered</strong>
+                </div>
+                <p style={{fontSize:'.78rem',color:'var(--ink2)',marginBottom:10,fontStyle:'italic'}}>
+                  "Give thanks to the Lord, for he is good; his love endures forever." — Psalm 107:1
+                </p>
+                <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:120,overflow:'auto'}}>
+                  {answered.slice(0,5).map(p => (
+                    <div key={p.id} style={{
+                      fontSize:'.82rem',color:'var(--ink)',padding:'6px 10px',
+                      background:'rgba(255,255,255,.6)',borderRadius:8,
+                      borderLeft:'3px solid var(--success)',
+                    }}>
+                      <strong>✓ {p.title || p.request}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
 
           {/* Active prayers */}
           <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Active Requests</p>
@@ -7344,6 +7794,54 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
       {/* ── SCRIPTURE ──────────────────────────────────────────────────────── */}
       {tab === 'scripture' && (
         <section className="card">
+          {/* Memory Verse Practice */}
+          {scriptures.filter(s => s.memorizing).length > 0 && (
+            <div style={{
+              background: 'var(--brass-dim)',
+              border: '1.5px solid rgba(184,150,90,.25)',
+              borderRadius: 14, padding: '14px 16px', marginBottom: 16,
+            }}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <p style={{
+                  fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em',
+                  color: 'var(--brass)', textTransform: 'uppercase', margin: 0,
+                }}>📚 Memorizing</p>
+                <strong style={{fontSize:'.78rem',color:'var(--brass)'}}>{scriptures.filter(s => s.memorized).length} of {scriptures.filter(s => s.memorizing).length} mastered</strong>
+              </div>
+              {scriptures.filter(s => s.memorizing && !s.memorized).slice(0, 3).map(s => {
+                const isRevealed = revealedVerse === s.id
+                // Create a fill-in-blank version (hide ~30% of words)
+                const words = (s.verse || '').split(' ')
+                const hidden = words.map((w, i) => i % 3 === 1 ? '___' : w).join(' ')
+                return (
+                  <div key={s.id} style={{
+                    padding:'10px 12px',background:'rgba(255,255,255,.7)',
+                    borderRadius:10,marginBottom:8,borderLeft:'3px solid var(--brass)',
+                  }}>
+                    <p style={{fontSize:'.85rem',fontFamily:'var(--serif)',fontStyle:'italic',lineHeight:1.5,marginBottom:6}}>
+                      {isRevealed ? s.verse : hidden}
+                    </p>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <p style={{fontSize:'.74rem',color:'var(--brass)',fontWeight:700,margin:0}}>— {s.reference}</p>
+                      <div style={{display:'flex',gap:6}}>
+                        <button onClick={() => setRevealedVerse(isRevealed ? null : s.id)} style={{
+                          fontSize:'.72rem',padding:'4px 10px',borderRadius:999,
+                          background:'transparent',color:'var(--brass)',
+                          border:'1px solid var(--brass)',cursor:'pointer',fontWeight:600,
+                        }}>{isRevealed ? 'Hide' : 'Reveal'}</button>
+                        <button onClick={() => saveScriptures(scriptures.map(x => x.id === s.id ? {...x, memorized: true} : x))} style={{
+                          fontSize:'.72rem',padding:'4px 10px',borderRadius:999,
+                          background:'var(--success)',color:'white',
+                          border:'none',cursor:'pointer',fontWeight:600,
+                        }}>✓ Memorized</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           <p className="eyebrow">Scripture Journal</p>
           <h3 style={{ margin: '4px 0 14px' }}>God's Word in Your Life</h3>
           {scriptures.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="📖" title="Hide the Word in your heart" message="Save a verse that speaks today. Return to it tomorrow." /></p>}
@@ -7351,8 +7849,18 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
             <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
                 <strong style={{color:'var(--brass)',fontSize:'.85rem'}}>{s.reference}</strong>
-                <button onClick={() => saveScriptures(scriptures.filter((_,j)=>j!==i))}
-                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                <div style={{display:'flex',gap:6}}>
+                  <button onClick={() => saveScriptures(scriptures.map((x,j)=>j===i?{...x, memorizing: !x.memorizing, memorized: x.memorizing ? false : x.memorized}:x))}
+                    style={{
+                      background: s.memorizing ? 'var(--brass)' : 'transparent',
+                      color: s.memorizing ? 'white' : 'var(--brass)',
+                      border: '1px solid var(--brass)', borderRadius: 999,
+                      padding: '3px 10px', fontSize: '.7rem', fontWeight: 600,
+                      cursor: 'pointer',
+                    }}>{s.memorized ? '✓ Memorized' : s.memorizing ? '📚 Memorizing' : '+ Memorize'}</button>
+                  <button onClick={() => saveScriptures(scriptures.filter((_,j)=>j!==i))}
+                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                </div>
               </div>
               <p style={{fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,margin:'0 0 8px',fontStyle:'italic',color:'var(--ink)'}}>{s.text}</p>
               {s.reflection && <p style={{fontSize:'.82rem',color:'var(--ink2)',lineHeight:1.5,margin:0}}>💭 {s.reflection}</p>}
