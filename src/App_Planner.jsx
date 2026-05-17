@@ -7490,20 +7490,25 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
     supabase.from('faith_data')
-      .select('data_key, data_value')
+      .select('data_key, data_value, updated_at')
       .eq('user_id', user.id)
       .then(({ data, error }) => {
         if (error || !data) return
+        // Pick most recent row per key — prevents duplicate rows overwriting good data
+        const latest = {}
         data.forEach(row => {
-          if (row.data_key === 'prayers') setPrayers(row.data_value || [])
-          if (row.data_key === 'scriptures') setScriptures(row.data_value || [])
-          if (row.data_key === 'gratitude') setGratitude(row.data_value || [])
-          if (row.data_key === 'devotional') setDevotional(row.data_value || { text: '', date: '' })
-          if (row.data_key === 'fasting') setFasting(row.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
-          if (row.data_key === 'faithGoals') setFaithGoals(row.data_value || [])
-          if (row.data_key === 'sermons') setSermons(row.data_value || [])
-          if (row.data_key === 'bibleReading') setBibleReading(row.data_value || { plan: 'M\'Cheyne', completedDates: [], notes: {} })
+          if (!latest[row.data_key] || row.updated_at > latest[row.data_key].updated_at) {
+            latest[row.data_key] = row
+          }
         })
+        if (latest.prayers)      setPrayers(latest.prayers.data_value || [])
+        if (latest.scriptures)   setScriptures(latest.scriptures.data_value || [])
+        if (latest.gratitude)    setGratitude(latest.gratitude.data_value || [])
+        if (latest.devotional)   setDevotional(latest.devotional.data_value || { text: '', date: '' })
+        if (latest.fasting)      setFasting(latest.fasting.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
+        if (latest.faithGoals)   setFaithGoals(latest.faithGoals.data_value || [])
+        if (latest.sermons)      setSermons(latest.sermons.data_value || [])
+        if (latest.bibleReading) setBibleReading(latest.bibleReading.data_value || { plan: "M'Cheyne", completedDates: [], notes: {} })
       })
 
     // Realtime subscription for faith data
@@ -7515,13 +7520,14 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
       }, payload => {
         const row = payload.new
         if (!row) return
-        if (row.data_key === 'prayers') setPrayers(row.data_value || [])
-        if (row.data_key === 'scriptures') setScriptures(row.data_value || [])
-        if (row.data_key === 'gratitude') setGratitude(row.data_value || [])
-        if (row.data_key === 'devotional') setDevotional(row.data_value || { text: '', date: '' })
-        if (row.data_key === 'fasting') setFasting(row.data_value || {})
-        if (row.data_key === 'faithGoals') setFaithGoals(row.data_value || [])
-        if (row.data_key === 'sermons') setSermons(row.data_value || [])
+        if (row.data_key === 'prayers')      setPrayers(row.data_value || [])
+        if (row.data_key === 'scriptures')   setScriptures(row.data_value || [])
+        if (row.data_key === 'gratitude')    setGratitude(row.data_value || [])
+        if (row.data_key === 'devotional')   setDevotional(row.data_value || { text: '', date: '' })
+        if (row.data_key === 'fasting')      setFasting(row.data_value || {})
+        if (row.data_key === 'faithGoals')   setFaithGoals(row.data_value || [])
+        if (row.data_key === 'sermons')      setSermons(row.data_value || [])
+        if (row.data_key === 'bibleReading') setBibleReading(row.data_value || {})
       })
       .subscribe()
 
@@ -7536,23 +7542,6 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const [prayers, setPrayers] = useState(() => lsGet('prayers', []))
   const [newPrayer, setNewPrayer] = useState({ text: '', type: 'Request', answered: false })
 
-  // Load faith data from Supabase on mount
-  useEffect(() => {
-    if (!supabase || !user?.id) return
-    supabase.from('faith_data').select('*').eq('user_id', user.id).limit(1)
-      .then(({ data, error }) => {
-        if (error || !data?.[0]) return
-        const row = data[0]
-        const sj = (k, fb) => { try { return row[k] ? JSON.parse(row[k]) : fb } catch { return fb } }
-        if (row.prayers) setPrayers(sj('prayers', []))
-        if (row.scriptures) setScriptures(sj('scriptures', []))
-        if (row.gratitude) setGratitude(sj('gratitude', []))
-        if (row.devotional) setDevotional(sj('devotional', {}))
-        if (row.fasting) setFasting(sj('fasting', {}))
-        if (row.faith_goals) setFaithGoals(sj('faith_goals', []))
-        if (row.sermons) setSermons(sj('sermons', []))
-      })
-  }, [user?.id])
   const savePrayers = (v) => { setPrayers(v); syncFaith('prayers', v) }
 
   // Scripture journal state
