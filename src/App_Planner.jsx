@@ -3016,6 +3016,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           if (row.data_key === 'netWorthHistory') setNetWorthHistory(row.data_value || [])
           if (row.data_key === 'sinkingFunds') setSinkingFunds(row.data_value || [])
           if (row.data_key === 'noSpend') setNoSpend(row.data_value || { days: 30, checked: [] })
+          if (row.data_key === 'weekPlan') setCheckedWeeks(row.data_value || [])
+          if (row.data_key === 'challengeGoal') setChallengeGoal(row.data_value || 10000)
         })
       })
 
@@ -3063,7 +3065,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const saveSavingsGoals = (v) => { setSavingsGoals(v); syncPageData('savingsGoals', v) }
 
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
-  const saveNoSpend = (n) => { setNoSpend(n); lsSet('noSpend', n) }
+  const saveNoSpend = (n) => { setNoSpend(n); syncPageData('noSpend', n) }
 
   const [monthlyIncome, setMonthlyIncome] = useState(() => lsGet('monthlyIncome', 0))
   const saveMonthlyIncome = (v) => { setMonthlyIncome(v); lsSet('monthlyIncome', v) }
@@ -3086,8 +3088,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const [showNetWorthForm, setShowNetWorthForm] = useState(false)
   const [showSinkingForm, setShowSinkingForm] = useState(false)
   const [newExpense, setNewExpense] = useState({desc:'',amount:'',category:'Food',period:'one-time',date:TODAY})
-  const saveCheckedWeeks = (v) => { setCheckedWeeks(v); lsSet('weekPlan', v) }
-  const saveChallengeGoal = (v) => { setChallengeGoal(v); lsSet('challengeGoal', v) }
+  const saveCheckedWeeks = (v) => { setCheckedWeeks(v); syncPageData('weekPlan', v) }
+  const saveChallengeGoal = (v) => { setChallengeGoal(v); syncPageData('challengeGoal', v) }
   const toggleWeek = (w) => saveCheckedWeeks(checkedWeeks.includes(w) ? checkedWeeks.filter(x => x !== w) : [...checkedWeeks, w])
   const totalSavedSoFar = checkedWeeks.reduce((s, w) => s + (WEEK_PLAN[w - 1] || 0), 0)
 
@@ -4298,6 +4300,12 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'waterLog') setWaterLog(row.data_value || {})
           if (row.data_key === 'measurements') setMeasurements(row.data_value || [])
           if (row.data_key === 'journalEntries') setJournalEntries(row.data_value || [])
+          if (row.data_key === 'routineLog') setRoutineLog(row.data_value || {})
+          if (row.data_key === 'wellnessLog') setWellnessLog(row.data_value || {})
+          if (row.data_key === 'medLog') setMedLog(row.data_value || {})
+          if (row.data_key === 'sleep') setSleep(row.data_value || [])
+          if (row.data_key === 'copingUsed') setCopingUsed(row.data_value || {})
+          if (row.data_key === 'metricsLog') setMetricsLog(row.data_value || [])
         })
       })
   }, [user?.id])
@@ -4320,9 +4328,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
 
   const saveBooks = (b) => { setBooks(b); syncPageData('books', b) }
   const saveRoutine = (r) => { setRoutine(r); syncPageData('routine', r) }
-  const saveLog = (l) => { setRoutineLog(l); lsSet('routineLog', l) }
-  const saveWellness = (w) => { setWellnessLog(w); lsSet('wellnessLog', w) }
-  const saveJournal = (j) => { setJournalEntries(j); lsSet('journal', j) }
+  const saveLog = (l) => { setRoutineLog(l); syncPageData('routineLog', l) }
+  const saveWellness = (w) => { setWellnessLog(w); syncPageData('wellnessLog', w) }
+  const saveJournal = (j) => { setJournalEntries(j); syncPageData('journalEntries', j) }
 
   const todayKey = TODAY
   const todayLog = routineLog[todayKey] || []
@@ -4365,11 +4373,11 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   // tab state above
   const [metricsLog, setMetricsLog] = useState(() => { try { const v = localStorage.getItem('planner.h.metrics'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
-  const saveMetrics = (m) => { setMetricsLog(m); try { localStorage.setItem('planner.h.metrics', JSON.stringify(m)) } catch {} }
+  const saveMetrics = (m) => { setMetricsLog(m); syncPageData('metricsLog', m) }
   const [meds, setMeds] = useState(() => lsGet('meds', []))
   const [medLog, setMedLog] = useState(() => lsGet('medLog', {}))
   const [copingUsed, setCopingUsed] = useState(() => lsGet('copingUsed', {}))
-  const saveCopingUsed = (v) => { setCopingUsed(v); lsSet('copingUsed', v) }
+  const saveCopingUsed = (v) => { setCopingUsed(v); syncPageData('copingUsed', v) }
   const todayCopingKey = TODAY
   const todayCopingUsed = copingUsed[todayCopingKey] || []
   const [anxiety, setAnxiety] = useState(() => lsGet('anxiety', []))
@@ -4383,10 +4391,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const [form, setForm] = useState({})
 
   const saveMeds = (m) => { setMeds(m); syncPageData('meds', m) }
-  const saveMedLog = (l) => { setMedLog(l); lsSet('medLog', l) }
+  const saveMedLog = (l) => { setMedLog(l); syncPageData('medLog', l) }
   const saveAnxiety = (a) => { setAnxiety(a); syncPageData('anxiety', a) }
   const saveMigraines = (m) => { setMigraines(m); syncPageData('migraines', m) }
-  const saveSleep = (s) => { setSleep(s); lsSet('sleep', s) }
+  const saveSleep = (s) => { setSleep(s); syncPageData('sleep', s) }
 
   const todayMedKey = TODAY
   const todayMeds = medLog[todayMedKey] || []
@@ -5183,7 +5191,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   // notes now come from Supabase via props - use saveItem
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
   const [cleaningLog, saveCleaningLogDirect] = useState(() => lsGet('cleaning_log_v2', {}))
-  const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); lsSet('cleaning_log_v2', updated) }
+  const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); syncPageData('cleaningLog', updated) }
   const [cleaningFreq, setCleaningFreq] = useState('daily')
   const [brainDump, setBrainDump] = useState(() => { try { return localStorage.getItem('planner.p.braindump')||'' } catch { return '' } })
   const saveBrainDump = (v) => { setBrainDump(v); syncPageData('brainDump', v) }
@@ -5860,7 +5868,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
   const [recipeFilter, setRecipeFilter] = useState('All')
   const [form, setForm] = useState({})
-  const save = (key, setter, val) => { setter(val); lsSet(key, val) }
+  const save = (key, setter, val) => { setter(val); lsSet(key, val); syncPageData(key, val) }
 
   const TABS = [
     { id: 'groceries', label: '🛒 Groceries' },
@@ -6953,7 +6961,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
         {weeklyReviewPrompts.map((prompt,i) => (
           <div key={i} style={{marginBottom:14}}>
             <div style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6,letterSpacing:'.03em'}}>{prompt}</div>
-            <textarea value={reviewAnswers[i]||''} onChange={e=>{const u={...reviewAnswers,[i]:e.target.value};setReviewAnswers(u);try{localStorage.setItem('planner.gr.review',JSON.stringify(u))}catch{}}}
+            <textarea value={reviewAnswers[i]||''} onChange={e=>{const u={...reviewAnswers,[i]:e.target.value};setReviewAnswers(u);syncPageData('reviewAnswers',u)}}
               placeholder="Write freely..."
               style={{width:'100%',minHeight:70,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
               fontSize:'.85rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
@@ -6962,10 +6970,10 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
         <button className="primary-btn" style={{width:'100%',fontSize:'.88rem'}}
           onClick={()=>{
             const entry = {date:TODAY,answers:{...reviewAnswers},id:Date.now()}
-            const prev = JSON.parse(localStorage.getItem('planner.gr.reviewHistory')||'[]')
+            const prev = reviewHistory
             const updated = [entry,...prev].slice(0,52)
-            localStorage.setItem('planner.gr.reviewHistory',JSON.stringify(updated))
             setReviewHistory(updated)
+            syncPageData('reviewHistory',updated)
             setReviewAnswers({})
             localStorage.removeItem('planner.gr.review')
           }}>Save This Week's Review</button>
@@ -7494,7 +7502,6 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
       .eq('user_id', user.id)
       .then(({ data, error }) => {
         if (error || !data) return
-        // Pick most recent row per key — prevents duplicate rows overwriting good data
         const latest = {}
         data.forEach(row => {
           if (!latest[row.data_key] || row.updated_at > latest[row.data_key].updated_at) {
