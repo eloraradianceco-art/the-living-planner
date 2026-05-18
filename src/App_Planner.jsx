@@ -7516,6 +7516,27 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         if (latest.faithGoals)   setFaithGoals(latest.faithGoals.data_value || [])
         if (latest.sermons)      setSermons(latest.sermons.data_value || [])
         if (latest.bibleReading) setBibleReading(latest.bibleReading.data_value || { plan: "M'Cheyne", completedDates: [], notes: {} })
+
+        // ── One-time migration: push any localStorage data that never made it to Supabase ──
+        // Runs silently — if Supabase already has the key, upsert will update it only if localStorage is newer
+        const FAITH_KEYS = ['prayers','scriptures','gratitude','devotional','fasting','faithGoals','sermons','bibleReading']
+        FAITH_KEYS.forEach(key => {
+          if (!latest[key]) {
+            // Nothing in Supabase for this key — check if localStorage has data to push up
+            try {
+              const raw = localStorage.getItem('planner.faith.' + key)
+              if (!raw) return
+              const parsed = JSON.parse(raw)
+              const hasData = Array.isArray(parsed) ? parsed.length > 0 : parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0 && parsed !== '{}'
+              if (hasData) {
+                supabase.from('faith_data').upsert({
+                  user_id: user.id, data_key: key, data_value: parsed,
+                  updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id,data_key' }).then(() => {})
+              }
+            } catch {}
+          }
+        })
       })
 
     // Realtime subscription for faith data
