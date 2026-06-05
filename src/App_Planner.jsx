@@ -2622,31 +2622,98 @@ const FREE_LIMITS = {
 const OWNER_EMAILS = ['aja2012@gmail.com']
 
 function useSubscription(user) {
-  const [tier, setTier] = React.useState(() => {
+  const [tier, setTierState] = React.useState(() => {
     try { return localStorage.getItem('planner_tier') || 'free' } catch { return 'free' }
   })
-
-  // Auto-pro for owner emails
-  React.useEffect(() => {
-    if (user?.email && OWNER_EMAILS.includes(user.email.toLowerCase())) {
-      setTier('pro')
-      try { localStorage.setItem('planner_tier', 'pro') } catch {}
-    }
-  }, [user?.email])
-  const [trialEndsAt, setTrialEndsAt] = React.useState(() => {
+  const [trialEndsAt, setTrialEndsAtState] = React.useState(() => {
     try { return localStorage.getItem('planner_trial_ends') } catch { return null }
   })
 
-  // Check URL for welcome=pro and activate pro
+  // ── Load tier from Supabase profile on mount (source of truth) ───────────
+  React.useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    let cancelled = false
+
+    const loadTier = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('tier, trial_ends_at')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (cancelled || error || !data) return
+
+      // Owner emails always get pro, even if profile says otherwise
+      const isOwner = user.email && OWNER_EMAILS.includes(user.email.toLowerCase())
+      const finalTier = isOwner ? 'pro' : (data.tier || 'free')
+
+      setTierState(finalTier)
+      setTrialEndsAtState(data.trial_ends_at || null)
+      try {
+        localStorage.setItem('planner_tier', finalTier)
+        if (data.trial_ends_at) localStorage.setItem('planner_trial_ends', data.trial_ends_at)
+      } catch {}
+
+      // Sync owner upgrade back to profile if needed
+      if (isOwner && data.tier !== 'pro') {
+        supabase.from('profiles').update({ tier: 'pro', updated_at: new Date().toISOString() }).eq('user_id', user.id).then(()=>{})
+      }
+    }
+
+    loadTier()
+
+    // Realtime — if tier changes elsewhere (Stripe webhook, admin, another device), update here
+    const channel = supabase
+      .channel('subscription_' + user.id)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'profiles',
+        filter: `user_id=eq.${user.id}`,
+      }, payload => {
+        const row = payload.new
+        if (!row) return
+        const isOwner = user.email && OWNER_EMAILS.includes(user.email.toLowerCase())
+        const finalTier = isOwner ? 'pro' : (row.tier || 'free')
+        setTierState(finalTier)
+        setTrialEndsAtState(row.trial_ends_at || null)
+        try { localStorage.setItem('planner_tier', finalTier) } catch {}
+      })
+      .subscribe()
+
+    return () => { cancelled = true; supabase.removeChannel(channel) }
+  }, [user?.id, user?.email])
+
+  // ── Setter that writes to BOTH localStorage and Supabase ─────────────────
+  const setTier = React.useCallback(async (newTier) => {
+    setTierState(newTier)
+    try { localStorage.setItem('planner_tier', newTier) } catch {}
+    if (user && hasSupabaseEnv) {
+      await supabase.from('profiles').update({
+        tier: newTier, updated_at: new Date().toISOString()
+      }).eq('user_id', user.id)
+    }
+  }, [user?.id])
+
+  const setTrialEndsAt = React.useCallback(async (date) => {
+    setTrialEndsAtState(date)
+    try {
+      if (date) localStorage.setItem('planner_trial_ends', date)
+      else localStorage.removeItem('planner_trial_ends')
+    } catch {}
+    if (user && hasSupabaseEnv) {
+      await supabase.from('profiles').update({
+        trial_ends_at: date, updated_at: new Date().toISOString()
+      }).eq('user_id', user.id)
+    }
+  }, [user?.id])
+
+  // Check URL for welcome=pro and activate pro (post-Stripe checkout)
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('welcome') === 'pro') {
       setTier('pro')
-      try { localStorage.setItem('planner_tier', 'pro') } catch {}
-      // Clean URL
       window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [])
+  }, [setTier])
 
   const isPro = tier === 'pro' || tier === 'trial'
   const isTrialing = tier === 'trial' && trialEndsAt && new Date(trialEndsAt) > new Date()
