@@ -890,7 +890,10 @@ function AuthProvider({ children }) {
   const signUp = async ({ email, password }) => {
     if (mode === 'mock') return signIn({ email, password })
     if (!hasSupabaseEnv) return { data: null, error: new Error('Supabase env vars missing.') }
-    return supabase.auth.signUp({ email, password })
+    return supabase.auth.signUp({
+      email, password,
+      options: { emailRedirectTo: window.location.origin }
+    })
   }
 
   const signOut = async () => {
