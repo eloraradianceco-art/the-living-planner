@@ -1116,10 +1116,11 @@ function AuthGate({ children, fallback }) {
 
   if (loading) {
     return (
-      <div className="auth-shell">
-        <div className="auth-card">
-          <p className="eyebrow">Loading</p>
-          <h1>Checking your planner session…</h1>
+      <div className="auth-shell" style={{background:'var(--ink)'}}>
+        <div style={{textAlign:'center'}}>
+          <div style={{fontSize:'2.5rem',marginBottom:16,opacity:.6}}>⚓</div>
+          <p style={{color:'var(--brass)',fontSize:'.75rem',fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',marginBottom:8}}>The Living Planner</p>
+          <p style={{color:'rgba(255,255,255,.4)',fontSize:'.88rem'}}>Loading your workspace…</p>
         </div>
       </div>
     )
@@ -1252,10 +1253,7 @@ function AuthPage() {
         <p className="muted" style={{marginBottom:16, fontSize:'.85rem'}}>
           {isSignup ? 'Create your account to sync across devices.' : 'Sign in to pick up where you left off.'}
         </p>
-
-
-
-<form className="auth-form" onSubmit={submit}>
+        <form className="auth-form" onSubmit={submit}>
           <label>
             Email
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -1274,6 +1272,20 @@ function AuthPage() {
           {mode === 'supabase' && (
             <button type="button" className="ghost-btn" onClick={() => setIsSignup(c => !c)}>
               {isSignup ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
+            </button>
+          )}
+          {mode === 'supabase' && !isSignup && (
+            <button type="button" onClick={async () => {
+              if (!email) { setError('Enter your email above first.'); return }
+              setLoading(true); setError('')
+              const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + '/reset-password'
+              })
+              setLoading(false)
+              if (resetError) setError(resetError.message)
+              else setMessage('Password reset email sent. Check your inbox.')
+            }} style={{background:'none',border:'none',color:'var(--muted)',fontSize:'.8rem',cursor:'pointer',fontFamily:'inherit',padding:'4px 0',textDecoration:'underline'}}>
+              Forgot password?
             </button>
           )}
         </form>
@@ -1642,36 +1654,70 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
           <Link to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, textDecoration:'none', display:'inline-block'}}>Day View</Link>
         </div>
+        {/* Overall score pill */}
+        {(() => {
+          const avg = scores ? Math.round(Object.values(scores).reduce((s,v)=>s+v,0) / Object.keys(scores).length) : null
+          if (!avg) return null
+          return (
+            <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
+              <div style={{
+                padding:'5px 12px',borderRadius:999,
+                background: avg >= 7 ? 'rgba(52,168,83,.2)' : avg >= 5 ? 'rgba(42,157,143,.2)' : 'rgba(184,150,90,.2)',
+                border: `1px solid ${avg >= 7 ? 'rgba(52,168,83,.35)' : avg >= 5 ? 'rgba(42,157,143,.35)' : 'rgba(184,150,90,.35)'}`,
+                display:'flex',alignItems:'center',gap:6,
+              }}>
+                <span style={{fontSize:'.7rem',color: avg >= 7 ? '#4ade80' : avg >= 5 ? 'var(--teal)' : 'var(--brass)',fontWeight:700}}>Life Score</span>
+                <span style={{fontSize:'.85rem',fontWeight:800,color:'white'}}>{avg}/10</span>
+              </div>
+              <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.35)'}}>
+                {avg >= 8 ? 'Thriving ✦' : avg >= 6 ? 'On track' : avg >= 4 ? 'Needs attention' : 'Time to reset'}
+              </span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* ── Word of the Year ──────────────────────────────── */}
-      <section className="card" style={{padding:'14px 16px',marginBottom:12}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div style={{flex:1}}>
-            <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:0}}>Word of the Year</p>
-            {(() => {
-              const word = (typeof window !== 'undefined' && localStorage.getItem('planner_word_of_year')) || ''
-              return word ? (
-                <h2 style={{margin:'4px 0 0',fontFamily:'var(--serif)',fontSize:'1.8rem',fontWeight:400,color:'var(--ink)',letterSpacing:'-.01em',fontStyle:'italic'}}>{word}</h2>
-              ) : (
-                <p style={{margin:'4px 0 0',fontSize:'.85rem',color:'var(--ink2)',fontStyle:'italic'}}>What single word will guide your year?</p>
-              )
-            })()}
-          </div>
-          <button onClick={() => {
-            const current = (typeof window !== 'undefined' && localStorage.getItem('planner_word_of_year')) || ''
-            const next = prompt('Your word for ' + new Date().getFullYear() + ':', current)
-            if (next !== null) {
-              try { localStorage.setItem('planner_word_of_year', next) } catch {}
-              window.location.reload()
-            }
-          }} style={{
-            padding:'6px 14px',borderRadius:999,background:'transparent',
-            color:'var(--brass)',border:'1px solid var(--brass)',
-            fontSize:'.74rem',fontWeight:600,cursor:'pointer',
-          }}>Set</button>
-        </div>
-      </section>
+      {/* ── Word of the Year ──────────────────────────────── */}
+      {(() => {
+        const [woty, setWoty] = React.useState(() => { try { return localStorage.getItem('planner_word_of_year') || '' } catch { return '' } })
+        const [editing, setEditing] = React.useState(false)
+        const [draft, setDraft] = React.useState(woty)
+        const save = () => {
+          try { localStorage.setItem('planner_word_of_year', draft) } catch {}
+          setWoty(draft); setEditing(false)
+        }
+        return (
+          <section className="card" style={{padding:'14px 16px',marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Word of the Year</p>
+                {editing ? (
+                  <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                    <input autoFocus value={draft} onChange={e=>setDraft(e.target.value)}
+                      onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')setEditing(false)}}
+                      placeholder={`Your word for ${new Date().getFullYear()}...`}
+                      style={{flex:1,padding:'6px 10px',border:'1.5px solid var(--brass)',borderRadius:8,fontSize:'1rem',fontFamily:'var(--serif)',fontStyle:'italic',background:'var(--stone)'}} />
+                    <button onClick={save} style={{padding:'6px 14px',borderRadius:999,background:'var(--brass)',color:'white',border:'none',fontSize:'.78rem',fontWeight:700,cursor:'pointer'}}>Save</button>
+                    <button onClick={()=>setEditing(false)} style={{padding:'6px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--border2)',fontSize:'.78rem',cursor:'pointer'}}>✕</button>
+                  </div>
+                ) : woty ? (
+                  <h2 onClick={()=>{setDraft(woty);setEditing(true)}} style={{margin:0,fontFamily:'var(--serif)',fontSize:'1.8rem',fontWeight:400,color:'var(--ink)',letterSpacing:'-.01em',fontStyle:'italic',cursor:'pointer'}}>{woty}</h2>
+                ) : (
+                  <p style={{margin:0,fontSize:'.85rem',color:'var(--ink2)',fontStyle:'italic'}}>What single word will guide your year?</p>
+                )}
+              </div>
+              {!editing && (
+                <button onClick={()=>{setDraft(woty);setEditing(true)}} style={{
+                  padding:'6px 14px',borderRadius:999,background:'transparent',
+                  color:'var(--brass)',border:'1px solid var(--brass)',
+                  fontSize:'.74rem',fontWeight:600,cursor:'pointer',flexShrink:0,
+                }}>{woty ? 'Edit' : 'Set'}</button>
+              )}
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
@@ -1683,8 +1729,8 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           const topTask = tasks
             .filter(t => !t.completed)
             .sort((a, b) => {
-              const aP = (a.priority === 'high' ? 3 : a.priority === 'medium' ? 2 : 1)
-              const bP = (b.priority === 'high' ? 3 : b.priority === 'medium' ? 2 : 1)
+              const aP = (a.priority?.toLowerCase() === 'high' ? 3 : a.priority?.toLowerCase() === 'medium' ? 2 : 1)
+              const bP = (b.priority?.toLowerCase() === 'high' ? 3 : b.priority?.toLowerCase() === 'medium' ? 2 : 1)
               const aOver = isOverdue(a.date) ? 10 : isToday(a.date) ? 5 : 0
               const bOver = isOverdue(b.date) ? 10 : isToday(b.date) ? 5 : 0
               return (bP + bOver) - (aP + aOver)
@@ -1815,10 +1861,10 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
       {/* ── 4 key metrics ─────────────────────────────────────────── */}
       <div className="home-metrics-strip">
-        <MetricTile label="Open Tasks" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : 'on track'} />
-        <MetricTile label="This Week" value={`${insights.completionRate}%`} helper="completion rate" />
+        <MetricTile label="Tasks Open" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : '✓ on track'} />
+        <MetricTile label="Week Done" value={`${insights.completionRate}%`} helper="completion" />
         <MetricTile label="Budget Left" value={`$${Math.max(0, budget.weeklyTarget - weekSpend).toFixed(0)}`} helper="this week" />
-        <MetricTile label="Habit Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} active`} />
+        <MetricTile label="Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} habits`} />
       </div>
 
       {/* ── Quick access to all sections ──────────────────────────── */}
@@ -1927,9 +1973,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           {Object.entries(scores).map(([key, value]) => (
             <div key={key} style={{textAlign:'center', padding:'8px 4px', background:'var(--surface)', borderRadius:'var(--radius-sm)'}}>
               <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:3, textTransform:'uppercase', letterSpacing:'.05em'}}>{key.slice(0,4)}</div>
-              <div style={{fontSize:'1.1rem', fontWeight:700, color: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)'}}>{value}</div>
+              <div style={{fontSize:'1.1rem', fontWeight:700, color: value >= 8 ? 'var(--success)' : value >= 6 ? 'var(--teal)' : value >= 4 ? 'var(--warning)' : 'var(--danger)'}}>{value}</div>
               <div style={{height:3, borderRadius:999, background:'var(--border2)', marginTop:4, overflow:'hidden'}}>
-                <div style={{height:'100%', width:`${value*10}%`, background: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)', borderRadius:999}} />
+                <div style={{height:'100%', width:`${value*10}%`, background: value >= 8 ? 'var(--success)' : value >= 6 ? 'var(--teal)' : value >= 4 ? 'var(--warning)' : 'var(--danger)', borderRadius:999}} />
               </div>
             </div>
           ))}
@@ -2024,11 +2070,13 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
             <span style={{marginLeft:6, fontSize:'.65rem', padding:'1px 5px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700}}>↻</span>
           }
         </div>
-        <div style={{fontSize:'.72rem', color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center'}}>
-          <span style={{width:6, height:6, borderRadius:'50%', background:priorityColor, display:'inline-block', flexShrink:0}} />
-          <span>{task.category}</span>
-          {task.date && <span>{isTaskOverdue ? '⚠ ' : ''}{task.date}</span>}
-          {task.time && <span>{task.time}</span>}
+        <div style={{fontSize:'.72rem', color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:2}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 7px',borderRadius:999,background:priorityColor+'18',color:priorityColor,fontWeight:700,fontSize:'.65rem',letterSpacing:'.04em'}}>
+            {task.priority || 'Low'}
+          </span>
+          <span style={{color:'var(--muted)',fontSize:'.7rem'}}>{task.category}</span>
+          {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{task.date}</span>}
+          {task.time && <span style={{color:'var(--teal)',fontWeight:600}}>{task.time}</span>}
         </div>
       </div>
 
@@ -2642,21 +2690,31 @@ function ProTabGate({ isPro, onUpgrade, children }) {
   if (isPro) return children
   return (
     <div style={{
-      position: 'relative', padding: '40px 24px', textAlign: 'center',
-      background: 'var(--stone)', borderRadius: 14, margin: '0 0 16px',
+      padding: '48px 24px', textAlign: 'center',
+      background: 'linear-gradient(135deg, var(--ink) 0%, #0B1829 100%)',
+      borderRadius: 16, margin: '0 0 16px',
+      border: '1px solid rgba(184,150,90,.2)',
     }}>
-      <div style={{ fontSize: '2.5rem', marginBottom: 16 }}>🔒</div>
-      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--ink)', marginBottom: 8 }}>
+      <div style={{
+        width: 56, height: 56, borderRadius: '50%',
+        background: 'rgba(184,150,90,.15)', border: '1.5px solid rgba(184,150,90,.3)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px', fontSize: '1.6rem'
+      }}>🔒</div>
+      <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white', marginBottom: 8 }}>
         Pro Feature
       </div>
-      <p style={{ fontSize: '.88rem', color: 'var(--ink2)', lineHeight: 1.6, maxWidth: 280, margin: '0 auto 20px' }}>
-        This section is available on the Pro plan. Upgrade to unlock everything.
+      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.55)', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 24px' }}>
+        Unlock this and every Pro feature with a 7-day free trial. No commitment required.
       </p>
       <button onClick={onUpgrade} style={{
-        padding: '12px 28px', borderRadius: 999,
-        background: 'var(--teal)', color: 'white', border: 'none',
+        padding: '13px 32px', borderRadius: 999,
+        background: 'linear-gradient(135deg, var(--brass) 0%, var(--brass2) 100%)',
+        color: 'white', border: 'none',
         fontSize: '.92rem', fontWeight: 700, cursor: 'pointer',
-      }}>Upgrade to Pro</button>
+        boxShadow: '0 4px 20px rgba(184,150,90,.35)',
+      }}>Start Free Trial →</button>
+      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.3)',marginTop:12}}>7-day free trial · Cancel anytime</p>
     </div>
   )
 }
@@ -3521,7 +3579,6 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             if (subs.length === 0) return null
             return (
               <div style={{
-                background: 'var(--warning, #FEF3C7)20',
                 background: 'rgba(245,158,11,.08)',
                 border: '1.5px solid rgba(245,158,11,.25)',
                 borderRadius: 12, padding: '12px 14px', marginBottom: 14,
@@ -5334,7 +5391,8 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               width:180,height:180,borderRadius:'50%',margin:'0 auto 16px',
               background: focusMode==='work' ? 'var(--ink)' : 'var(--success)',
               display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-              boxShadow:`0 0 0 6px ${focusMode==='work' ? 'var(--ink)' : 'var(--success)'}22`
+              boxShadow:`0 0 0 6px ${focusMode==='work' ? 'var(--ink)' : 'var(--success)'}22`,
+              position:'relative', overflow:'hidden'
             }}>
               <div style={{fontSize:'.75rem',color:'rgba(255,255,255,.6)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:4}}>
                 {focusMode==='work' ? 'Focus' : 'Break'}
@@ -6480,9 +6538,9 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
 
       {/* Suggestions */}
       <section className="card">
-        <p className="eyebrow">Suggestions</p>
-        <h3 style={{margin:'4px 0 10px'}}>50 Powerful Habits</h3>
-        <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Tap any habit to add it instantly.</p>
+        <p className="eyebrow">Habit Library</p>
+        <h3 style={{margin:'4px 0 6px'}}>50 Powerful Habits</h3>
+        <p className="muted" style={{fontSize:'.82rem',marginBottom:12}}>Tap any to add instantly. Already added habits are hidden.</p>
         <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
           {SUGGESTED.filter(([t]) => !habits.find(h=>h.title===t)).map(([title,cat]) => (
             <button key={title} onClick={() => onQuickCreate('habit',{title,category:cat})} style={{
@@ -7250,13 +7308,29 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       <section className="card">
         <p className="eyebrow">Data & Sync</p>
         <h3 style={{margin:'4px 0 14px'}}>Cross-Device Sync</h3>
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:'var(--radius-sm)',background:'var(--surface)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:'var(--radius-sm)',background:'var(--surface)',marginBottom:12}}>
           <div style={{width:12,height:12,borderRadius:'50%',background:hasSupabaseEnv?'var(--success)':'var(--warning)',flexShrink:0,boxShadow:hasSupabaseEnv?'0 0 8px var(--success)':undefined}} />
           <div>
             <div style={{fontWeight:600,fontSize:'.9rem'}}>{hasSupabaseEnv ? '✓ Connected — syncing across all devices' : 'Local mode — this device only'}</div>
-            <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{hasSupabaseEnv ? 'Your tasks, goals, habits, and data are saved to the cloud.' : 'Contact support to enable cross-device sync.'}</div>
+            <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{hasSupabaseEnv ? 'Tasks, goals, habits, faith, finance, wellness, and more — all in the cloud.' : 'Contact support to enable cross-device sync.'}</div>
           </div>
         </div>
+        {hasSupabaseEnv && (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+            {[
+              ['✓ Tasks & Calendar','Core data'],['🎯 Goals & Projects','Core data'],
+              ['🔁 Habits','Core data'],['💰 Finance','Full sync'],
+              ['✝ Faith','Full sync'],['🌿 Wellness','Full sync'],
+              ['⚡ Productivity','Full sync'],['🌍 Lifestyle','Full sync'],
+              ['↑ Growth','Full sync'],
+            ].map(([label, status]) => (
+              <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 10px',background:'var(--stone)',borderRadius:8,fontSize:'.78rem'}}>
+                <span style={{fontWeight:500,color:'var(--ink2)'}}>{label}</span>
+                <span style={{color:'var(--success)',fontWeight:600,fontSize:'.7rem'}}>✓ {status}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ── Sign out ───────────────────────────────────────────────── */}
@@ -7271,6 +7345,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       </section>
 
       {/* ── Push Notifications (coming soon) ──────────────────────────── */}
+
+      {/* ── Notifications ─────────────────────────────────────────── */}
+      <NotificationSettings settings={settings} updateSettings={updateSettings} />
 
       {/* ── Support & Contact ──────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
@@ -7627,16 +7704,16 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
       </div>
 
       {/* Stats strip */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:4}}>
         {[
-          ['🙏', prayers.filter(p=>!p.answered).length+' Active', 'Prayers'],
-          ['✅', answeredPrayers+' Answered', 'Prayers'],
-          ['🌸', todayGratitude.length+' Today', 'Gratitude'],
-        ].map(([icon,val,label]) => (
-          <div key={label+val} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
-            <div style={{fontSize:'1.1rem',marginBottom:2}}>{icon}</div>
-            <div style={{fontWeight:700,fontSize:'.88rem',color:'var(--brass)'}}>{val}</div>
-            <div className="muted" style={{fontSize:'.7rem'}}>{label}</div>
+          ['🙏', prayers.filter(p=>!p.answered).length, 'Active Prayers', 'var(--brass)'],
+          ['✅', answeredPrayers, 'Answered', 'var(--success)'],
+          ['🌸', todayGratitude.length, 'Gratitude Today', 'var(--teal)'],
+        ].map(([icon,val,label,color]) => (
+          <div key={label} style={{background:'var(--stone)',borderRadius:12,padding:'12px 8px',textAlign:'center',border:'1px solid var(--border)'}}>
+            <div style={{fontSize:'1.2rem',marginBottom:4}}>{icon}</div>
+            <div style={{fontWeight:800,fontSize:'1.2rem',color,lineHeight:1,marginBottom:2}}>{val}</div>
+            <div style={{fontSize:'.65rem',color:'var(--muted)',fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>{label}</div>
           </div>
         ))}
       </div>
@@ -8154,8 +8231,8 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
                   <strong style={{fontSize:'.9rem'}}>{s.title || 'Untitled'}</strong>
                   <div className="muted" style={{fontSize:'.75rem'}}>{s.speaker} · {s.date}</div>
                 </div>
-                <button onClick={() => saveSermons(sermons.filter((_,j)=>j!==i))}
-                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                <button onClick={() => { if(window.confirm('Delete this sermon note?')) saveSermons(sermons.filter((_,j)=>j!==i)) }}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'4px 8px',fontSize:'.85rem'}}>✕</button>
               </div>
               {s.notes && <p style={{fontSize:'.85rem',lineHeight:1.6,margin:'8px 0 6px',color:'var(--ink2)'}}>{s.notes}</p>}
               {s.application && <p style={{fontSize:'.82rem',color:'var(--teal)',margin:0}}>🎯 {s.application}</p>}
