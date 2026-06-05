@@ -597,6 +597,31 @@ async function loadLocalAll() {
   }
 }
 
+// ── Row mapper: DB column names → JS field names ────────────────────────
+// Used by both initial load AND after-save returns so the UI always gets
+// consistent field names (title, linkedGoalId, habitId, etc.)
+function mapDbRow(type, row) {
+  if (!row) return row
+  const r = { ...row }
+  // 'habit' / 'habits' both supported since saveItem uses singular type
+  const t = type === 'habit' ? 'habits'
+          : type === 'task' ? 'tasks'
+          : type === 'goal' ? 'goals'
+          : type === 'project' ? 'projects'
+          : type === 'event' ? 'events'
+          : type === 'expense' ? 'expenses'
+          : type === 'habit_log' ? 'habit_logs'
+          : type
+  if (t === 'habits')     { r.title = r.name; delete r.name }
+  if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id }
+  if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date }
+  if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date }
+  if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time }
+  if (t === 'expenses')   { r.note = r.description }
+  if (t === 'habit_logs') { r.habitId = r.habit_id; delete r.habit_id }
+  return r
+}
+
 async function loadSupabaseAll(userId) {
   const queries = [
     ['tasks', 'tasks'],
@@ -618,29 +643,15 @@ async function loadSupabaseAll(userId) {
   const { data: profileRows } = await supabase.from('profiles').select('*').eq('user_id', userId).limit(1)
   const { data: settingsRows } = await supabase.from('planner_settings').select('*').eq('user_id', userId).limit(1)
 
-  // ── Translate DB column names → JS field names ───────────────────────
-  const mapRow = (type, row) => {
-    if (!row) return row
-    const r = { ...row }
-    if (type === 'habits')    { r.title = r.name; delete r.name }
-    if (type === 'tasks')     { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id }
-    if (type === 'goals')     { r.targetDate = r.target_date; delete r.target_date }
-    if (type === 'projects')  { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date }
-    if (type === 'events')    { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time }
-    if (type === 'expenses')  { r.note = r.description }
-    if (type === 'habit_logs'){ r.habitId = r.habit_id; delete r.habit_id }
-    return r
-  }
-
   const mapped = {
-    tasks:     (rows.tasks     || []).map(r => mapRow('tasks', r)),
-    goals:     (rows.goals     || []).map(r => mapRow('goals', r)),
-    projects:  (rows.projects  || []).map(r => mapRow('projects', r)),
-    expenses:  (rows.expenses  || []).map(r => mapRow('expenses', r)),
-    notes:     (rows.notes     || []).map(r => mapRow('notes', r)),
-    events:    (rows.events    || []).map(r => mapRow('events', r)),
-    habits:    (rows.habits    || []).map(r => mapRow('habits', r)),
-    habitLogs: (rows.habitLogs || []).map(r => mapRow('habit_logs', r)),
+    tasks:     (rows.tasks     || []).map(r => mapDbRow('tasks', r)),
+    goals:     (rows.goals     || []).map(r => mapDbRow('goals', r)),
+    projects:  (rows.projects  || []).map(r => mapDbRow('projects', r)),
+    expenses:  (rows.expenses  || []).map(r => mapDbRow('expenses', r)),
+    notes:     (rows.notes     || []).map(r => mapDbRow('notes', r)),
+    events:    (rows.events    || []).map(r => mapDbRow('events', r)),
+    habits:    (rows.habits    || []).map(r => mapDbRow('habits', r)),
+    habitLogs: (rows.habitLogs || []).map(r => mapDbRow('habit_logs', r)),
   }
 
   return {
@@ -687,14 +698,14 @@ const plannerService = {
     if (mode === 'edit' && next.id) {
       const { data, error } = await supabase.from(meta.table).update(next).eq('id', next.id).eq('user_id', userId).select().single()
       if (error) throw error
-      return data
+      return mapDbRow(type, data)
     }
 
     const insertPayload = { ...next }
     delete insertPayload.id
     const { data, error } = await supabase.from(meta.table).insert(insertPayload).select().single()
     if (error) throw error
-    return data
+    return mapDbRow(type, data)
   },
 
   async deleteItem(type, id, userId) {
@@ -728,11 +739,11 @@ const plannerService = {
     if (!existing) {
       const { data, error } = await supabase.from('habit_logs').upsert({ habit_id: habitId, date, completed: true, user_id: userId }, { onConflict: 'user_id,habit_id,date' }).select().single()
       if (error) throw error
-      return data
+      return mapDbRow('habit_log', data)
     }
     const { data, error } = await supabase.from('habit_logs').update({ completed: !existing.completed }).eq('id', existing.id).eq('user_id', userId).select().single()
     if (error) throw error
-    return data
+    return mapDbRow('habit_log', data)
   },
 
   async toggleTask(task, userId) {
@@ -766,10 +777,10 @@ const plannerService = {
         if ('linkedId' in clonePayload) delete clonePayload.linkedId
         const { data: inserted, error: insertError } = await supabase.from('tasks').insert(clonePayload).select().single()
         if (insertError) throw insertError
-        extraTask = inserted
+        extraTask = mapDbRow('task', inserted)
       }
     }
-    return { updatedTask: data, extraTask }
+    return { updatedTask: mapDbRow('task', data), extraTask }
   },
 
   async saveBudget(nextBudget, userId) {
