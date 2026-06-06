@@ -1325,6 +1325,56 @@ function Layout({ children, onQuickAdd, banner, profile }) {
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
 
+  // ── iOS PWA safe-area fix — keeps topbar below the status bar ────────────
+  React.useEffect(() => {
+    // 1. Make sure viewport meta allows safe-area insets
+    let meta = document.querySelector('meta[name="viewport"]')
+    if (meta && !meta.content.includes('viewport-fit=cover')) {
+      meta.content = meta.content + ', viewport-fit=cover'
+    } else if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'viewport'
+      meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover'
+      document.head.appendChild(meta)
+    }
+
+    // 2. Status bar style for iOS PWA (matches dark topbar)
+    let statusBar = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    if (!statusBar) {
+      statusBar = document.createElement('meta')
+      statusBar.name = 'apple-mobile-web-app-status-bar-style'
+      statusBar.content = 'black-translucent'
+      document.head.appendChild(statusBar)
+    } else {
+      statusBar.content = 'black-translucent'
+    }
+
+    // 3. Inject CSS rules for safe-area padding on the topbar + body bg
+    if (!document.getElementById('safe-area-styles')) {
+      const style = document.createElement('style')
+      style.id = 'safe-area-styles'
+      style.textContent = `
+        body { background: var(--ink, #0d1f33); }
+        .topbar, .premium-topbar, .living-planner-topbar {
+          padding-top: calc(env(safe-area-inset-top) + 12px) !important;
+          padding-left: max(env(safe-area-inset-left), 14px);
+          padding-right: max(env(safe-area-inset-right), 14px);
+        }
+        .auth-shell {
+          padding-top: max(env(safe-area-inset-top), 24px) !important;
+        }
+        .bottom-nav, .mobile-bottom-nav {
+          padding-bottom: calc(env(safe-area-inset-bottom) + 6px);
+        }
+        @supports (-webkit-touch-callout: none) {
+          /* iOS-only: extra safety on home indicator area */
+          .app-shell { min-height: -webkit-fill-available; }
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
   return (
     <div className="app-shell premium-shell living-planner-shell">
       <header className="topbar premium-topbar living-planner-topbar">
