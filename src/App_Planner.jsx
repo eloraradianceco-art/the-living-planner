@@ -3083,6 +3083,55 @@ function OnboardingWalkthrough({ onComplete }) {
 }
 
 
+// ── Add to Home Screen (PWA install instructions) ────────────────
+const A2HS_PLATFORMS = [
+  { os: '🍎 iPhone / iPad (Safari)', steps: ['Tap the Share button ⎙ at the bottom of Safari', 'Scroll down and tap "Add to Home Screen"', 'Tap "Add" — done ✓'] },
+  { os: '🤖 Android (Chrome)', steps: ['Tap the three-dot menu ⋮ at the top right', 'Tap "Add to Home Screen" or "Install App"', 'Tap "Add" — done ✓'] },
+]
+
+function isStandalone() {
+  try {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+  } catch { return false }
+}
+
+function A2HSInstructions() {
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <p style={{ fontSize: '.9rem', color: 'var(--ink2,#4B5563)', lineHeight: 1.65, marginBottom: 18, textAlign: 'center' }}>
+        The Living Planner works like a native app — add it to your Home Screen for instant, full-screen, one-tap access.
+      </p>
+      {A2HS_PLATFORMS.map(p => (
+        <div key={p.os} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--teal,#2A9D8F)', marginBottom: 8 }}>{p.os}</div>
+          {p.steps.map((step, i) => (
+            <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 6, alignItems: 'flex-start' }}>
+              <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, background: 'var(--teal,#2A9D8F)', color: 'white', fontSize: '.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
+              <span style={{ fontSize: '.86rem', color: 'var(--ink2,#4B5563)', lineHeight: 1.5 }}>{step}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function A2HSModal({ onClose }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(10,18,30,.92)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--warm-white,white)', borderRadius: 24, padding: '36px 28px', maxWidth: 400, width: '100%', boxShadow: '0 32px 80px rgba(0,0,0,.4)', maxHeight: '88vh', overflowY: 'auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+          <div style={{ fontSize: '2.6rem', marginBottom: 8 }}>📱</div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink,#1A2332)', margin: 0 }}>Add to Your Home Screen</h2>
+        </div>
+        <A2HSInstructions />
+        <button onClick={onClose} style={{ width: '100%', padding: '13px', marginTop: 8, background: 'var(--teal,#2A9D8F)', color: 'white', border: 'none', borderRadius: 12, fontSize: '1rem', fontWeight: 700, cursor: 'pointer' }}>Got it</button>
+      </div>
+    </div>
+  )
+}
+
+
 // ── Quick Access Grid — shown at top of each page ─────────────────────────
 function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = false }) {
   return (
@@ -7344,6 +7393,7 @@ function NotificationSettings({ settings, updateSettings }) {
 
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut } = useAuth()
+  const [a2hsOpen, setA2hsOpen] = React.useState(false)
 
   return (
     <div className="screen-stack">
@@ -7433,6 +7483,23 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         ))}
       </section>
 
+      {/* ── Add to Home Screen ─────────────────── */}
+      <section className="card">
+        <p className="eyebrow">Quick Access</p>
+        <button onClick={() => setA2hsOpen(true)} style={{
+          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
+          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
+          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
+        }}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>📱</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Add to Home Screen</div>
+            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Install the planner for full-screen, one-tap access</div>
+          </div>
+          <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0}}>→</span>
+        </button>
+      </section>
+
 
 
       {/* ── Sync / Data ────────────────────────────────────────────── */}
@@ -7505,6 +7572,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         </div>
       </section>
 
+      {a2hsOpen && <A2HSModal onClose={() => setA2hsOpen(false)} />}
       <PageNav />
     </div>
   )
@@ -7532,6 +7600,10 @@ function PlannerApp() {
       return params.get('welcome') === 'pro'
     } catch { return false }
   })
+  const [showA2HS, setShowA2HS] = useState(() => {
+    try { return !isStandalone() && !localStorage.getItem('planner_a2hs_seen') } catch { return false }
+  })
+  const dismissA2HS = () => { try { localStorage.setItem('planner_a2hs_seen', '1') } catch {} ; setShowA2HS(false) }
   const [showUpgrade, setShowUpgrade] = useState(false)
   const [upgradeContext, setUpgradeContext] = useState({title: '', message: ''})
   const triggerUpgrade = (title, message) => {
@@ -7577,6 +7649,7 @@ function PlannerApp() {
   return (
     <>
       {showWelcomePro && <WelcomeProBanner onDismiss={() => setShowWelcomePro(false)} />}
+      {showA2HS && !showWelcomePro && <A2HSModal onClose={dismissA2HS} />}
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <ScrollToTop />
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
