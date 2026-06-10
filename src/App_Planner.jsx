@@ -5918,138 +5918,6 @@ function WorkoutTrackerTab() {
   )
 }
 
-function PeriodTrackerTab() {
-  const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
-  const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
-  const today = new Date().toISOString().slice(0,10)
-  const [cycles, setCycles] = useState(()=>lsG('cycles',[]))
-  const [cycleLen, setCycleLen] = useState(()=>lsG('cycleLen',28))
-  const [periodLen, setPeriodLen] = useState(()=>lsG('periodLen',5))
-  const [lastStart, setLastStart] = useState(()=>lsG('lastPeriodStart',''))
-  const [symptoms, setSymptoms] = useState(()=>lsG('symptoms',{}))
-  const [logDate, setLogDate] = useState(today)
-  const [cycleStart, setCycleStart] = useState('')
-  const [cycleEnd, setCycleEnd] = useState('')
-  const saveCycles = (v) => { setCycles(v); lsS('cycles',v) }
-
-  const nextStart = lastStart ? (() => {
-    const d = new Date(lastStart); d.setDate(d.getDate() + Number(cycleLen))
-    return d.toISOString().slice(0,10)
-  })() : null
-  const ovulationDay = lastStart ? (() => {
-    const d = new Date(lastStart); d.setDate(d.getDate() + Number(cycleLen) - 14)
-    return d.toISOString().slice(0,10)
-  })() : null
-  const daysUntilNext = nextStart ? Math.ceil((new Date(nextStart) - new Date(today)) / 86400000) : null
-  const currentPhase = lastStart ? (() => {
-    const daysSince = Math.ceil((new Date(today) - new Date(lastStart)) / 86400000)
-    if (daysSince <= periodLen) return {phase:'Menstrual',color:'#E85555',desc:'Rest, hydrate, use heat therapy. Iron-rich foods help.'}
-    if (daysSince <= 13) return {phase:'Follicular',color:'#FF9800',desc:'Energy rising. Great time for new projects and harder workouts.'}
-    if (daysSince <= 16) return {phase:'Ovulatory',color:'#4CAF50',desc:'Peak energy and confidence. Best time for big decisions and social events.'}
-    return {phase:'Luteal',color:'#9C27B0',desc:'Wind down. Prioritize sleep, reduce stress, gentler exercise.'}
-  })() : null
-
-  const SYMPTOM_OPTIONS = ['Cramps','Bloating','Headache','Fatigue','Mood swings','Acne','Back pain','Cravings','Tender breasts','Nausea']
-
-  return (
-    <section className="card">
-      <p className="eyebrow">Period Tracker</p>
-      <h3 style={{margin:'4px 0 14px'}}>Cycle Awareness</h3>
-
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
-        <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
-          <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Cycle Length (days)</p>
-          <input type="number" value={cycleLen} onChange={e=>{setCycleLen(Number(e.target.value));lsS('cycleLen',Number(e.target.value))}}
-            style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700,boxSizing:'border-box'}} />
-        </div>
-        <div style={{background:'var(--stone)',borderRadius:10,padding:'12px'}}>
-          <p className="muted" style={{fontSize:'.72rem',margin:'0 0 6px'}}>Period Length (days)</p>
-          <input type="number" value={periodLen} onChange={e=>{setPeriodLen(Number(e.target.value));lsS('periodLen',Number(e.target.value))}}
-            style={{width:'100%',padding:'7px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'1rem',fontWeight:700,boxSizing:'border-box'}} />
-        </div>
-      </div>
-
-      <div style={{marginBottom:16}}>
-        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Last Period Start Date</p>
-        <input type="date" value={lastStart} onChange={e=>{setLastStart(e.target.value);lsS('lastPeriodStart',e.target.value)}}
-          style={{width:'100%',padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',boxSizing:'border-box'}} />
-      </div>
-
-      {currentPhase && (
-        <div style={{background:currentPhase.color+'18',border:`1.5px solid ${currentPhase.color}44`,borderRadius:12,padding:'14px',marginBottom:16}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-            <strong style={{color:currentPhase.color,fontSize:'1rem'}}>{currentPhase.phase} Phase</strong>
-            {daysUntilNext !== null && (
-              <span className="muted" style={{fontSize:'.78rem'}}>
-                {daysUntilNext > 0 ? `Next in ${daysUntilNext}d` : daysUntilNext === 0 ? 'Due today' : `${Math.abs(daysUntilNext)}d late`}
-              </span>
-            )}
-          </div>
-          <p style={{fontSize:'.82rem',color:'var(--ink2)',margin:0,lineHeight:1.5}}>{currentPhase.desc}</p>
-        </div>
-      )}
-
-      {nextStart && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
-          {[['Next Period',nextStart,'#E85555'],['Ovulation Est.',ovulationDay,'#4CAF50']].map(([label,date,col])=>(
-            <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px',textAlign:'center'}}>
-              <p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>{label}</p>
-              <strong style={{color:col,fontSize:'.9rem'}}>{date}</strong>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div style={{marginBottom:16}}>
-        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Log Symptoms — {logDate}</p>
-        <input type="date" value={logDate} onChange={e=>setLogDate(e.target.value)}
-          style={{width:'100%',padding:'8px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',marginBottom:10,boxSizing:'border-box'}} />
-        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-          {SYMPTOM_OPTIONS.map(s => {
-            const active = (symptoms[logDate]||[]).includes(s)
-            return (
-              <button key={s} onClick={()=>{
-                const cur = symptoms[logDate]||[]
-                const next = active ? cur.filter(x=>x!==s) : [...cur,s]
-                const updated = {...symptoms,[logDate]:next}
-                setSymptoms(updated); lsS('symptoms',updated)
-              }} style={{
-                padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',fontWeight:500,
-                background:active?'#E85555':'var(--stone)',color:active?'white':'var(--ink2)',
-                border:active?'none':'1.5px solid var(--border2)'
-              }}>{s}</button>
-            )
-          })}
-        </div>
-      </div>
-
-      <div>
-        <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8}}>Period History</p>
-        {cycles.length === 0 && <EmptyState icon="🌸" title="No cycles logged" message="Start tracking to understand your body's patterns." />}
-        {cycles.slice(0,8).map((c,i)=>(
-          <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--border)',fontSize:'.85rem'}}>
-            <span>{c.start} → {c.end}</span>
-            <button onClick={()=>saveCycles(cycles.filter((_,j)=>j!==i))}
-              style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-          </div>
-        ))}
-        <div style={{display:'flex',gap:8,marginTop:10}}>
-          <input type="date" value={cycleStart} onChange={e=>setCycleStart(e.target.value)}
-            style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
-          <input type="date" value={cycleEnd} onChange={e=>setCycleEnd(e.target.value)}
-            style={{flex:1,padding:'8px 10px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
-          <button className="primary-btn" style={{padding:'8px 14px',fontSize:'.82rem'}} onClick={()=>{
-            if(!cycleStart||!cycleEnd) return
-            saveCycles([{start:cycleStart,end:cycleEnd,id:Date.now()},...cycles])
-            setCycleStart(''); setCycleEnd('')
-          }}>+ Log</button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-
 function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -6420,8 +6288,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
       </ProTabGate>)}
 
       {tab === 'workout' && <WorkoutTrackerTab />}
-
-      {tab === 'period' && <PeriodTrackerTab />}
 
       {tab === 'passwords' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -7664,7 +7530,7 @@ function PlannerApp() {
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
-          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, period tracking, and passwords.")} />} />
+          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, and passwords.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
