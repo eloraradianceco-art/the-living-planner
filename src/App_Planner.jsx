@@ -7413,6 +7413,33 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       {/* ── Notifications ─────────────────────────────────────────── */}
       <NotificationSettings settings={settings} updateSettings={updateSettings} />
 
+      {/* ── More from Elora Radiance ─────────────────────────────── */}
+      <section className="card">
+        <p className="eyebrow">Explore</p>
+        <h3 style={{margin:'4px 0 6px'}}>More from Elora Radiance Co.</h3>
+        <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:14}}>Scripture-based tools for the whole Christian life.</p>
+        {[
+          { label:'Armed & Anchored', desc:'Spiritual warfare training', url:'https://armedandanchored.vercel.app/', icon:'⚔️' },
+          { label:'Anchored Steps · Year 1', desc:'Daily devotional · Year 1', url:'https://anchored-steps.vercel.app/', icon:'⚓' },
+          { label:'Anchored Steps · Year 2', desc:'Daily devotional · Year 2', url:'https://anchored-steps-year2.vercel.app/', icon:'⚓' },
+          { label:'The Red Letters', desc:'The words of Jesus — free', url:'https://redletters.vercel.app/', icon:'✦' },
+          { label:'Anchored Verse', desc:'Scripture for every emotion — free', url:'https://anchoredverse.vercel.app/', icon:'📖' },
+        ].map(app => (
+          <a key={app.url} href={app.url} target="_blank" rel="noopener noreferrer" style={{
+            display:'flex', alignItems:'center', gap:12, padding:'12px 14px', marginBottom:8,
+            borderRadius:'var(--radius-sm)', background:'var(--surface)', border:'1.5px solid var(--border2)',
+            textDecoration:'none',
+          }}>
+            <span style={{fontSize:22,flexShrink:0}}>{app.icon}</span>
+            <span style={{flex:1,minWidth:0}}>
+              <span style={{display:'block',fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{app.label}</span>
+              <span style={{display:'block',fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>{app.desc}</span>
+            </span>
+            <span style={{color:'var(--brass)',fontSize:'.95rem',flexShrink:0}}>↗</span>
+          </a>
+        ))}
+      </section>
+
       {/* ── Support & Contact ──────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
         <p className="eyebrow" style={{color:'var(--brass)'}}>Support</p>
