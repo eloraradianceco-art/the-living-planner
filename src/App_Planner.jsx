@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import Reviews from "./Reviews"
 import { createClient } from '@supabase/supabase-js'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 
@@ -7258,8 +7259,9 @@ function NotificationSettings({ settings, updateSettings }) {
 
 
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
+  const [showReviews, setShowReviews] = React.useState(false)
 
   return (
     <div className="screen-stack">
@@ -7366,6 +7368,23 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         </button>
       </section>
 
+      {/* ── Ratings & Reviews ─────── */}
+      <section className="card">
+        <p className="eyebrow">Community</p>
+        <button onClick={() => setShowReviews(true)} style={{
+          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
+          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
+          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
+        }}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'1.1rem'}}>⭐</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Ratings &amp; Reviews</div>
+            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Share your experience or see what others say</div>
+          </div>
+          <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0}}>→</span>
+        </button>
+      </section>
+
 
 
       {/* ── Sync / Data ────────────────────────────────────────────── */}
@@ -7466,6 +7485,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       </section>
 
       {a2hsOpen && <A2HSModal onClose={() => setA2hsOpen(false)} />}
+      {showReviews && <Reviews app="tlp" appName="The Living Planner" eyebrow="The Living Planner" userEmail={user?.email} C={{ bg:'var(--stone)', bgCard:'var(--surface)', border:'var(--border2)', cream:'var(--ink)', text:'var(--text2)', muted:'var(--muted)', dim:'#C4BEB5', red:'var(--teal)', redL:'var(--teal2)', gold:'var(--brass)', goldF:'var(--brass-dim)', goldB:'var(--brass-glow)' }} lightMode={true} onClose={() => setShowReviews(false)} />}
       <PageNav />
     </div>
   )
