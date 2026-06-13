@@ -42,19 +42,19 @@ export default function Reviews({ app, appName, eyebrow, userEmail, C, lightMode
   const LS_KEY = app + '_my_review'
   const [mine, setMine] = useState(() => { try { return JSON.parse(localStorage.getItem(LS_KEY) || 'null') } catch { return null } })
 
-  useEffect(() => {
-    let alive = true
+  const load = () => {
     fetch(REVIEWS_URL + '/rest/v1/reviews?app=eq.' + app + '&status=eq.approved&select=id,rating,title,body,author_name,created_at&order=created_at.desc&limit=100', {
       headers: { apikey: REVIEWS_ANON, Authorization: 'Bearer ' + REVIEWS_ANON },
     })
       .then(r => r.ok ? r.json() : [])
-      .then(d => { if (alive) { setReviews(Array.isArray(d) ? d : []); setLoading(false) } })
-      .catch(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
-  }, [app])
+      .then(d => { setReviews(Array.isArray(d) ? d : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [app])
 
   const count = reviews.length
   const avg = count ? (reviews.reduce((s, r) => s + (r.rating || 0), 0) / count) : 0
+  const mineLive = !!mine && reviews.some(r => (r.body||'') === mine.body && (r.author_name||'') === (mine.author_name||'') && r.rating === mine.rating)
   const fmtDate = (s) => { try { return new Date(s).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) } catch { return '' } }
 
   const submit = () => {
@@ -70,7 +70,7 @@ export default function Reviews({ app, appName, eyebrow, userEmail, C, lightMode
       if (r.status === 201 || r.status === 200) {
         const rec = { rating, title: title.trim(), body: body.trim(), author_name: name.trim() || 'Anonymous', created_at: new Date().toISOString() }
         try { localStorage.setItem(LS_KEY, JSON.stringify(rec)) } catch {}
-        setMine(rec); setShowForm(false); setSubmitting(false)
+        setMine(rec); setShowForm(false); setSubmitting(false); load()
       } else if (r.status === 409) {
         setError("You've already left a review for this app \u2014 thank you!"); setSubmitting(false)
       } else {
@@ -116,7 +116,7 @@ export default function Reviews({ app, appName, eyebrow, userEmail, C, lightMode
           </div>
 
           {/* Your review / Write button / Form */}
-          {mine ? (
+          {mine && !mineLive ? (
             <div style={{ ...card, padding: '16px 18px', marginBottom: 18, borderColor: C.goldB }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 10, color: C.gold, letterSpacing: '0.12em', textTransform: 'uppercase', fontFamily: cin }}>Your Review</span>
@@ -125,6 +125,10 @@ export default function Reviews({ app, appName, eyebrow, userEmail, C, lightMode
               <StarRow value={mine.rating} size={15} C={C} />
               {mine.title && <div style={{ fontSize: 16, color: C.cream, fontFamily: cin, marginTop: 8 }}>{mine.title}</div>}
               <div style={{ fontSize: 15, color: C.text, marginTop: 6, lineHeight: 1.6 }}>{mine.body}</div>
+            </div>
+          ) : mine && mineLive ? (
+            <div style={{ ...card, padding: '14px 18px', marginBottom: 18, borderColor: C.goldB }}>
+              <span style={{ fontSize: 13, color: C.gold, fontFamily: cin, letterSpacing: '0.03em' }}>✓ Thanks — your review is published below.</span>
             </div>
           ) : !showForm ? (
             <button onClick={() => setShowForm(true)} style={{ width: '100%', background: 'linear-gradient(135deg,' + C.red + ',' + C.redL + ')', border: 'none', color: '#fff', padding: '15px', borderRadius: 12, fontSize: 13, fontFamily: cin, letterSpacing: '0.1em', textTransform: 'uppercase', fontWeight: 700, cursor: 'pointer', marginBottom: 18 }}>
