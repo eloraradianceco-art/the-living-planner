@@ -72,10 +72,10 @@ export default function Reviews({ app, appName, eyebrow, userEmail, C, lightMode
         try { localStorage.setItem(LS_KEY, JSON.stringify(rec)) } catch {}
         setMine(rec); setShowForm(false); setSubmitting(false); load()
       } else if (r.status === 409) {
-        setError("You've already left a review for this app \u2014 thank you!"); setSubmitting(false)
+        setError("You've already submitted a review for this app \u2014 if it's not showing yet, it's awaiting approval."); setSubmitting(false)
       } else {
         return r.text().then(t => {
-          setError(/duplicate|unique/i.test(t) ? "You've already reviewed this app \u2014 thank you!" : 'Something went wrong. Please try again.')
+          setError(/duplicate|unique/i.test(t) ? "You've already submitted a review for this app \u2014 if it's not showing yet, it's awaiting approval." : 'Something went wrong. Please try again.')
           setSubmitting(false)
         })
       }
