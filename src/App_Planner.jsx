@@ -522,6 +522,7 @@ function writeLocal(key, value) {
 
 function normalizePayload(type, payload, userId) {
   const raw = { ...payload, user_id: userId }
+  delete raw.itemType  // client-only timeline tag, never a DB column
 
   // ── Translate JS field names → Supabase column names ─────────────────
   if (type === 'habit') {
@@ -537,7 +538,7 @@ function normalizePayload(type, payload, userId) {
     if ('linkedProjectId' in raw) { raw.project_id = raw.linkedProjectId ? String(raw.linkedProjectId) : null; delete raw.linkedProjectId }
     if (!raw.recurrence) raw.recurrence = 'none'
     // clean up extra fields not in schema
-    delete raw.linkedType; delete raw.linkedId; delete raw.goalId
+    delete raw.linkedType; delete raw.linkedId; delete raw.goalId; delete raw.startTime
     return raw
   }
 
