@@ -1443,7 +1443,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
       {!isDesktop ? (
         <button onClick={onQuickAdd} style={{
-          position:'fixed', bottom:76, right:20, zIndex:90,
+          position:'fixed', bottom:'calc(env(safe-area-inset-bottom) + 84px)', right:20, zIndex:110,
           width:52, height:52, borderRadius:'50%',
           background:'var(--brass)', color:'var(--warm-white)',
           border:'none', fontSize:'1.6rem', fontWeight:300,
