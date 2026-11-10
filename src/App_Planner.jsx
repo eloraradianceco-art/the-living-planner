@@ -2,6 +2,15 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import Reviews from "./Reviews"
 import { createClient } from '@supabase/supabase-js'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard, Banknote, CreditCard, PiggyBank, TrendingDown, HeartHandshake, ClipboardList, CircleSlash,
+  Smile, Moon, PenLine, Sunrise, BookOpen, Pill, Activity, Wind, CloudLightning, Shield,
+  SquareCheck, Brain, StickyNote, ListChecks, Timer, Sparkles, Lightbulb,
+  ShoppingCart, ChefHat, Plane, Cake, Gift, Dumbbell,
+  HandHeart, ScrollText, BookMarked, Flower2, Hourglass, Mic, Target, Lock,
+  Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
+  CircleCheck, Folder, Receipt, ListTodo,
+} from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -1134,7 +1143,7 @@ function AuthGate({ children, fallback }) {
     return (
       <div className="auth-shell" style={{background:'var(--ink)'}}>
         <div style={{textAlign:'center'}}>
-          <div style={{fontSize:'2.5rem',marginBottom:16,opacity:.6}}>⚓</div>
+          <div style={{marginBottom:18,opacity:.9}}><BrandMark size={52} ink="#1C1C1E" /></div>
           <p style={{color:'var(--brass)',fontSize:'.75rem',fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',marginBottom:8}}>The Living Planner</p>
           <p style={{color:'rgba(255,255,255,.4)',fontSize:'.88rem'}}>Loading your workspace…</p>
         </div>
@@ -1191,21 +1200,22 @@ function AuthPage() {
   }
 
   const SECTIONS = [
-    { icon: '✓', title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
-    { icon: '🎯', title: 'Goals & Projects', desc: 'Set goals that connect to your daily tasks and track real progress.' },
-    { icon: '↑', title: 'Habits & Growth', desc: 'Build routines and watch your Life Score rise automatically.' },
-    { icon: '💰', title: 'Finance & Budget', desc: 'Weekly spending targets, savings goals, and no-spend challenges.' },
-    { icon: '💊', title: 'Health & Wellness', desc: 'Medication logs, sleep tracker, anxiety check-ins, daily routines.' },
-    { icon: '🌍', title: 'Lifestyle Hub', desc: 'Groceries, contacts, trips, brain dump, passwords, birthdays.' },
+    { icon: Cross, title: 'Faith', desc: 'Devotionals, prayer journal, scripture, sermon notes, and Bible reading.' },
+    { icon: CalendarDays, title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
+    { icon: Target, title: 'Goals & Habits', desc: 'Set goals that connect to your days, build routines, and watch your Life Score rise.' },
+    { icon: Wallet, title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
+    { icon: Leaf, title: 'Health & Wellness', desc: 'Mood, sleep, journal, medications, and daily routines.' },
+    { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, a focus timer, and cleaning schedules.' },
+    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes, trips, birthdays, gifts, and workouts.' },
   ]
 
   // ── Welcome screen ──────────────────────────────────────────────────────
   if (step === 'welcome') return (
     <div className="auth-shell" style={{background:'var(--navy)'}}>
       <div style={{maxWidth:460, width:'100%', padding:'0 20px', textAlign:'center'}}>
-        <div style={{fontSize:'3rem', marginBottom:16}}>⚓</div>
-        <p style={{color:'var(--teal)', fontSize:'.8rem', fontWeight:700, letterSpacing:'.15em', textTransform:'uppercase', marginBottom:8}}>The Living Planner</p>
-        <h1 style={{color:'white', fontSize:'2rem', fontFamily:"'DM Serif Display', serif", lineHeight:1.2, marginBottom:16}}>
+        <div style={{marginBottom:22}}><BrandMark size={68} ink="#1C1C1E" /></div>
+        <p style={{color:'var(--brass)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.28em', textTransform:'uppercase', marginBottom:12}}>The Living Planner</p>
+        <h1 style={{color:'white', fontSize:'2.35rem', fontFamily:'var(--serif)', fontWeight:400, letterSpacing:'-.01em', lineHeight:1.12, marginBottom:16}}>
           Plan with clarity.<br/>Live with purpose.
         </h1>
         <p style={{color:'rgba(255,255,255,.80)', fontSize:'.95rem', lineHeight:1.7, marginBottom:32}}>
@@ -1213,7 +1223,7 @@ function AuthPage() {
         </p>
         <div style={{display:'grid', gap:6}}>
           <button onClick={() => setStep('features')}
-            style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
+            style={{background:'linear-gradient(180deg, #C9A86B 0%, var(--brass) 55%, var(--brass2) 100%)', color:'#1C1C1E', border:'none', borderRadius:999, padding:'15px 24px', fontWeight:700, fontSize:'1rem', letterSpacing:'.01em', cursor:'pointer', fontFamily:'inherit', boxShadow:'0 10px 30px rgba(184,150,90,.28)'}}>
             See What's Inside →
           </button>
           <button onClick={() => setStep('signin')}
@@ -1233,12 +1243,12 @@ function AuthPage() {
           style={{background:'none', border:'none', color:'rgba(255,255,255,.4)', cursor:'pointer', fontSize:'.85rem', marginBottom:24, fontFamily:'inherit'}}>
           ← Back
         </button>
-        <p style={{color:'var(--teal)', fontSize:'.75rem', fontWeight:700, letterSpacing:'.15em', textTransform:'uppercase', marginBottom:8}}>Everything in one place</p>
-        <h2 style={{color:'white', fontFamily:"'DM Serif Display', serif", fontSize:'1.6rem', marginBottom:20}}>What's inside your planner</h2>
+        <p style={{color:'var(--brass)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', marginBottom:8}}>Everything in one place</p>
+        <h2 style={{color:'white', fontFamily:'var(--serif)', fontWeight:400, fontSize:'1.9rem', marginBottom:20}}>What's inside your planner</h2>
         <div style={{display:'grid', gap:10, marginBottom:28}}>
           {SECTIONS.map(s => (
             <div key={s.title} style={{background:'rgba(255,255,255,.09)', border:'1px solid rgba(184,150,90,.25)', borderRadius:'var(--radius)', padding:'12px 14px', display:'flex', gap:12, alignItems:'flex-start'}}>
-              <div style={{fontSize:'1.3rem', flexShrink:0}}>{s.icon}</div>
+              <span style={{width:38,height:38,borderRadius:11,flexShrink:0,display:'grid',placeItems:'center',background:'rgba(184,150,90,.12)',border:'1px solid rgba(184,150,90,.3)'}}><s.icon size={19} strokeWidth={1.6} color="var(--brass)" /></span>
               <div>
                 <div style={{fontWeight:700, color:'#FFFFFF', fontSize:'.9rem', marginBottom:3}}>{s.title}</div>
                 <div style={{fontSize:'.78rem', color:'rgba(255,255,255,.70)', lineHeight:1.5}}>{s.desc}</div>
@@ -1248,7 +1258,7 @@ function AuthPage() {
         </div>
         <div style={{display:'grid', gap:6}}>
           <button onClick={() => setStep('signin')}
-            style={{background:'var(--teal)', color:'var(--navy)', border:'none', borderRadius:999, padding:'14px 24px', fontWeight:700, fontSize:'1rem', cursor:'pointer', fontFamily:'inherit'}}>
+            style={{background:'linear-gradient(180deg, #C9A86B 0%, var(--brass) 55%, var(--brass2) 100%)', color:'#1C1C1E', border:'none', borderRadius:999, padding:'15px 24px', fontWeight:700, fontSize:'1rem', letterSpacing:'.01em', cursor:'pointer', fontFamily:'inherit', boxShadow:'0 10px 30px rgba(184,150,90,.28)'}}>
             Get Started →
           </button>
         </div>
@@ -1445,13 +1455,13 @@ function Layout({ children, onQuickAdd, banner, profile }) {
       {!isDesktop ? (
         <button onClick={onQuickAdd} style={{
           position:'fixed', bottom:'calc(env(safe-area-inset-bottom) + 84px)', right:20, zIndex:110,
-          width:52, height:52, borderRadius:'50%',
-          background:'var(--brass)', color:'var(--warm-white)',
-          border:'none', fontSize:'1.6rem', fontWeight:300,
+          width:54, height:54, borderRadius:'50%',
+          background:'linear-gradient(160deg, #C9A86B 0%, var(--brass) 50%, var(--brass2) 100%)', color:'#1C1C1E',
+          border:'1px solid rgba(255,255,255,.35)',
           cursor:'pointer', display:'grid', placeItems:'center',
-          boxShadow:'0 4px 20px var(--brass-glow)',
+          boxShadow:'0 10px 26px rgba(184,150,90,.38), 0 2px 6px rgba(28,28,30,.18)',
           lineHeight:1
-        }}>+</button>
+        }} aria-label="Quick add"><Plus size={24} strokeWidth={2.2} /></button>
       ) : null}
     </div>
   )
@@ -1682,7 +1692,8 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const suggestions = getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitLogs })
   const completionSeries = getWeekCompletionSeries(tasks)
 
-  const firstName = profile?.displayName?.split(' ')[0] || 'there'
+  const rawFirst = (profile?.displayName || '').trim().split(' ')[0]
+  const firstName = rawFirst && rawFirst.toLowerCase() !== 'planner' ? rawFirst : ''
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const focusCopy = openTasks.filter(t => isToday(t.date) && !t.completed).slice(0, 2).map(t => t.title)
@@ -1707,7 +1718,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       {/* ── Personal greeting hero ─────────────────────────────────── */}
       <div className="hero-focus-card">
         <p className="eyebrow">{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})}</p>
-        <h2 style={{fontSize:'1.5rem', marginBottom:6}}>{greeting}, {firstName}</h2>
+        <h2 style={{fontSize:'1.5rem', marginBottom:6}}>{greeting}{firstName ? `, ${firstName}` : '.'}</h2>
         <p className="muted" style={{fontSize:'.9rem', lineHeight:1.5}}>
           {focusCopy.length > 0
             ? `Today: ${focusCopy.join(' · ')}`
@@ -1883,7 +1894,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1rem', opacity:.5}}>🔁</div>
+                  <div style={{display:'grid', opacity:.6}}><Repeat size={16} strokeWidth={1.8} color="var(--brass)" /></div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
@@ -1899,7 +1910,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   border:'1px solid rgba(255,255,255,.1)',
                   textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1rem'}}>🎯</div>
+                  <div style={{display:'grid'}}><Target size={16} strokeWidth={1.8} color="var(--brass)" /></div>
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontSize:'.58rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
                     <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
@@ -1913,7 +1924,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{fontSize:'1rem', opacity:.5}}>🎯</div>
+                  <div style={{display:'grid', opacity:.6}}><Target size={16} strokeWidth={1.8} color="var(--brass)" /></div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
@@ -2188,11 +2199,12 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
 
   return (
     <div className="screen-stack">
+      <PageHeader icon={SquareCheck} title="Tasks" subtitle="Capture it. Schedule it. Finish it." />
       {/* Compact header */}
       <section className="card" style={{padding:'12px 14px'}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
           <div>
-            <p className="eyebrow">Tasks</p>
+            <p className="eyebrow">Your list</p>
             <div style={{display:'flex', gap:10, marginTop:2}}>
               <span style={{fontSize:'.78rem', color:'var(--text2)', fontWeight:600}}>{openCount} open</span>
               <span style={{fontSize:'.78rem', color:'var(--muted)'}}>{doneCount} done</span>
@@ -2209,18 +2221,30 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
             style={{padding:'8px 10px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.83rem', background:'var(--surface)', color:'var(--text)'}} />
           <select value={category} onChange={(e) => setCategory(e.target.value)}
             style={{padding:'8px 6px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', background:'var(--surface)', color:'var(--text2)'}}>
-            <option>All</option>
+            <option value="All">Category</option>
             {categories.map((item) => <option key={item}>{item}</option>)}
           </select>
           <select value={status} onChange={(e) => setStatus(e.target.value)}
             style={{padding:'8px 6px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.8rem', background:'var(--surface)', color:'var(--text2)'}}>
-            <option>All</option>
+            <option value="All">Status</option>
             <option>Open</option>
             <option>Done</option>
           </select>
         </div>
       </section>
 
+      {Object.values(groups).every(g => g.length === 0) && (
+        <section className="card">
+          <EmptyState icon={ListTodo}
+            title={(tasks || []).length ? 'Nothing matches those filters' : 'A clear list — for now'}
+            message={(tasks || []).length ? 'Try another category or status, or clear your search.' : 'Add the first thing on your mind. One task is how momentum starts.'} />
+          {!(tasks || []).length && (
+            <div style={{display:'flex', justifyContent:'center', marginTop:-16, paddingBottom:8}}>
+              <button className="primary-btn" onClick={() => onQuickCreate('task')}>+ Add your first task</button>
+            </div>
+          )}
+        </section>
+      )}
       {Object.entries(groups).map(([label, items]) => {
         if (items.length === 0) return null
         return (
@@ -2340,9 +2364,9 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
             <button key={v} onClick={() => setView(v)} style={{
               flex:1, padding:'6px 4px', borderRadius:'999px', border:'1.5px solid', fontSize:'.78rem',
               fontWeight:600, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize',
-              borderColor: view===v ? 'var(--teal)' : 'var(--border2)',
-              background: view===v ? 'var(--teal)' : 'var(--surface)',
-              color: view===v ? 'var(--navy)' : 'var(--text2)'}}>
+              borderColor: view===v ? 'var(--ink)' : 'var(--border2)',
+              background: view===v ? 'var(--ink)' : 'var(--surface)',
+              color: view===v ? 'var(--warm-white)' : 'var(--text2)'}}>
               {v}
             </button>
           ))}
@@ -2371,12 +2395,12 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               const items = dayScheduled.filter((item) => item.startTime?.slice(0, 2) === hour.slice(0, 2))
               return (
                 <div className="timeline-row" key={hour}>
-                  <div className="timeline-hour">{hour}</div>
+                  <div className="timeline-hour">{(() => { const h = Number(hour.slice(0, 2)); return `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}` })()}</div>
                   <div className="timeline-slot"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}>
                     {items.length === 0
-                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}>{prefersTouch ? 'Tap to add' : 'Add here'}</button>
+                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {hour}</span></button>
                       : items.map((item) => (
                         <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable
                           onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
@@ -2644,15 +2668,15 @@ function PageNav() {
             padding: '9px 16px', borderRadius: 999,
             border: '1.5px solid var(--border2)', background: 'var(--stone)',
             color: 'var(--ink2)', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
-          }}>← {prev.label}</button>
+          }}>← {stripEmoji(prev.label)}</button>
         : <div />}
       {next
         ? <button onClick={() => nav(next.path)} style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '9px 16px', borderRadius: 999,
-            border: '1.5px solid var(--teal)', background: 'var(--teal)',
-            color: 'white', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
-          }}>{next.label} →</button>
+            border: '1px solid var(--ink)', background: 'var(--ink)',
+            color: 'var(--warm-white)', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
+          }}>{stripEmoji(next.label)} →</button>
         : <div />}
     </div>
   )
@@ -2930,16 +2954,25 @@ function TrialBanner({ daysLeft, onUpgrade }) {
 
 
 // ── Empty State Component ─────────────────────────────────────────────────
+const EMPTY_ICON_MAP = {
+  '✈': Plane, '✝': Cross, '🍳': ChefHat, '🎁': Gift, '🎂': Cake, '🎯': Target, '💊': Pill, '💪': Dumbbell,
+  '💳': CreditCard, '💵': Banknote, '📁': Folder, '📈': TrendingUp, '📉': TrendingDown, '📖': BookOpen,
+  '📚': BookMarked, '📝': PenLine, '🔁': Repeat, '🧾': Receipt,
+}
 function EmptyState({ icon, title, message, action, onAction }) {
+  const Ic = typeof icon === 'string' ? EMPTY_ICON_MAP[icon.replace(/\uFE0F/g, '')] : icon
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '40px 24px', textAlign: 'center',
     }}>
       <div style={{
-        fontSize: '2.8rem', marginBottom: 16, opacity: .7,
-        filter: 'grayscale(20%)',
-      }}>{icon}</div>
+        width: 68, height: 68, borderRadius: '50%', marginBottom: 16,
+        display: 'grid', placeItems: 'center',
+        background: 'radial-gradient(circle at 30% 25%, #FBF6EC 0%, var(--brass-dim) 100%)',
+        border: '1px solid var(--brass-glow)',
+        boxShadow: '0 8px 22px rgba(184,150,90,.14)',
+      }}>{Ic ? <Ic size={28} strokeWidth={1.5} color="var(--brass2)" /> : <span style={{ fontSize: '1.8rem' }}>{icon}</span>}</div>
       <div style={{
         fontWeight: 700, fontSize: '1rem', color: 'var(--ink)',
         marginBottom: 8,
@@ -3087,8 +3120,9 @@ function OnboardingWalkthrough({ onComplete }) {
 
 // ── Add to Home Screen (PWA install instructions) ────────────────
 const A2HS_PLATFORMS = [
-  { os: '🍎 iPhone / iPad (Safari)', steps: ['Tap the Share button ⎙ at the bottom of Safari', 'Scroll down and tap "Add to Home Screen"', 'Tap "Add" — done ✓'] },
-  { os: '🤖 Android (Chrome)', steps: ['Tap the three-dot menu ⋮ at the top right', 'Tap "Add to Home Screen" or "Install App"', 'Tap "Add" — done ✓'] },
+  { os: 'iPhone & iPad · Safari', steps: ['Tap the Share button (square with an arrow) — bottom of the screen on iPhone, top on iPad', 'Scroll down and tap "Add to Home Screen"', 'Tap "Add" — then open the planner from that icon'] },
+  { os: 'iPhone & iPad · Chrome', steps: ['Tap the Share button in the address bar', 'Tap "Add to Home Screen"', 'Tap "Add" — then open the planner from that icon'] },
+  { os: 'Android · Chrome', steps: ['Tap the three-dot menu ⋮ at the top right', 'Tap "Add to Home screen" or "Install app"', 'Tap "Add" — then open the planner from that icon'] },
 ]
 
 function isStandalone() {
@@ -3105,10 +3139,10 @@ function A2HSInstructions() {
       </p>
       {A2HS_PLATFORMS.map(p => (
         <div key={p.os} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: '.82rem', fontWeight: 700, color: 'var(--teal,#2A9D8F)', marginBottom: 8 }}>{p.os}</div>
+          <div style={{ fontSize: '.64rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--brass2)', marginBottom: 8 }}>{p.os}</div>
           {p.steps.map((step, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 6, alignItems: 'flex-start' }}>
-              <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, background: 'var(--teal,#2A9D8F)', color: 'white', fontSize: '.72rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
+              <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, background: 'var(--ink)', color: 'var(--brass)', fontSize: '.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
               <span style={{ fontSize: '.86rem', color: 'var(--ink2,#4B5563)', lineHeight: 1.5 }}>{step}</span>
             </div>
           ))}
@@ -3123,11 +3157,11 @@ function A2HSModal({ onClose }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(10,18,30,.92)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--warm-white,white)', borderRadius: 24, padding: '36px 28px', maxWidth: 400, width: '100%', boxShadow: '0 32px 80px rgba(0,0,0,.4)', maxHeight: '88vh', overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 18 }}>
-          <div style={{ fontSize: '2.6rem', marginBottom: 8 }}>📱</div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--ink,#1A2332)', margin: 0 }}>Add to Your Home Screen</h2>
+          <div style={{ marginBottom: 12 }}><BrandMark size={48} ink="#FDFCFA" /></div>
+          <h2 style={{ fontFamily: 'var(--serif)', fontSize: '1.6rem', fontWeight: 500, color: 'var(--ink)', margin: 0 }}>Add to Your Home Screen</h2>
         </div>
         <A2HSInstructions />
-        <button onClick={onClose} style={{ width: '100%', padding: '13px', marginTop: 8, background: 'var(--teal,#2A9D8F)', color: 'white', border: 'none', borderRadius: 12, fontSize: '1rem', fontWeight: 700, cursor: 'pointer' }}>Got it</button>
+        <button onClick={onClose} style={{ width: '100%', padding: '13px', marginTop: 8, background: 'var(--ink)', color: 'var(--warm-white)', border: 'none', borderRadius: 999, fontSize: '1rem', fontWeight: 700, cursor: 'pointer' }}>Got it</button>
       </div>
     </div>
   )
@@ -3135,7 +3169,59 @@ function A2HSModal({ onClose }) {
 
 
 // ── Quick Access Grid — shown at top of each page ─────────────────────────
-function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = false }) {
+// ── Icon system — one consistent line-icon set instead of platform emoji ─
+const SECTION_ICONS = {
+  // Finance
+  overview: LayoutDashboard, income: Banknote, expenses: CreditCard, savings: PiggyBank, debt: TrendingDown,
+  donations: HeartHandshake, budget: ClipboardList, nospend: CircleSlash,
+  // Wellness
+  mood: Smile, sleep: Moon, journal: PenLine, routine: Sunrise, reading: BookOpen, meds: Pill,
+  metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield,
+  // Productivity
+  tasks: SquareCheck, braindump: Brain, notes: StickyNote, checklists: ListChecks, focus: Timer, cleaning: Sparkles, tips: Lightbulb,
+  // Lifestyle
+  groceries: ShoppingCart, recipes: ChefHat, trips: Plane, birthdays: Cake, gifts: Gift, workout: Dumbbell,
+  // Faith
+  devotional: BookOpen, prayer: HandHeart, scripture: ScrollText, gratitude: Flower2, fasting: Hourglass, sermons: Mic, goals: Target,
+}
+const FAITH_ICON_OVERRIDES = { reading: BookMarked }
+// Labels in the TABS arrays still start with an emoji — strip it for display
+const stripEmoji = (label = '') => String(label).replace(/^[^\p{L}\p{N}]+\s*/u, '')
+
+// Brand mark — brass circle, diamond and cross (matches the printable planner)
+function BrandMark({ size = 56, color = 'var(--brass)', ink = 'var(--ink)' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" style={{ display: 'block', margin: '0 auto' }}>
+      <circle cx="32" cy="32" r="29" fill="none" stroke={color} strokeWidth="1.6" />
+      <circle cx="32" cy="32" r="24.5" fill="none" stroke={color} strokeWidth=".6" opacity=".55" />
+      <path d="M32 15 L49 32 L32 49 L15 32 Z" fill={color} />
+      <path d="M32 23.5 V40.5 M26 31 H38" stroke={ink} strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// Page header — a real title instead of a tiny emoji eyebrow
+function PageHeader({ icon: Icon, eyebrow, title, subtitle }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '4px 2px 6px' }}>
+      <div style={{
+        width: 46, height: 46, borderRadius: 14, flexShrink: 0,
+        background: 'linear-gradient(145deg, var(--ink) 0%, #2C2C2E 100%)',
+        display: 'grid', placeItems: 'center',
+        boxShadow: '0 6px 18px rgba(28,28,30,.18), inset 0 0 0 1px rgba(184,150,90,.28)',
+      }}>
+        {Icon && <Icon size={22} strokeWidth={1.6} color="var(--brass)" />}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        {eyebrow && <p style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--brass)', margin: '0 0 2px' }}>{eyebrow}</p>}
+        <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '1.85rem', lineHeight: 1.05, letterSpacing: '-.015em', color: 'var(--ink)', margin: 0 }}>{title}</h1>
+        {subtitle && <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: '3px 0 0', lineHeight: 1.35 }}>{subtitle}</p>}
+      </div>
+    </div>
+  )
+}
+
+function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = false, iconOverrides = {} }) {
   return (
     <div style={{
       display: 'grid',
@@ -3146,29 +3232,38 @@ function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = fals
       {tabs.map(t => {
         const active = activeTab === t.id
         const isLocked = !isPro && proTabs.includes(t.id)
-        // Split emoji from label
-        const parts = t.label.match(/^(\S+)\s(.+)$/)
-        const icon = isLocked ? '🔒' : (parts ? parts[1] : t.label[0])
-        const name = parts ? parts[2] : t.label
+        const name = stripEmoji(t.label)
+        const Icon = iconOverrides[t.id] || SECTION_ICONS[t.id]
+        const fallback = (t.label.match(/^(\S+)\s/) || [])[1] || t.label[0]
         return (
-          <button key={t.id} onClick={() => onSelect(t.id)} style={{
+          <button key={t.id} onClick={() => onSelect(t.id)} aria-pressed={active} style={{
+            position: 'relative',
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 4,
-            padding: '10px 4px',
-            borderRadius: 12,
-            border: active ? '2px solid var(--teal)' : '1.5px solid var(--border2)',
-            background: active ? 'var(--teal)' : 'var(--stone)',
+            justifyContent: 'center', gap: 6,
+            padding: '12px 4px 10px',
+            borderRadius: 14,
+            border: active ? '1px solid var(--ink)' : '1px solid var(--border)',
+            background: active ? 'linear-gradient(160deg, var(--ink) 0%, #2C2C2E 100%)' : 'var(--warm-white)',
+            boxShadow: active ? '0 8px 20px rgba(28,28,30,.22), inset 0 0 0 1px rgba(184,150,90,.25)' : '0 1px 2px rgba(28,28,30,.04)',
             cursor: 'pointer',
-            transition: 'all .15s ease',
-            minHeight: 68,
+            transition: 'all .18s ease',
+            minHeight: 70,
+            opacity: isLocked ? .62 : 1,
           }}>
-            <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{icon}</span>
+            {Icon
+              ? <Icon size={21} strokeWidth={1.6} color={active ? 'var(--brass)' : 'var(--ink2)'} />
+              : <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{fallback}</span>}
             <span style={{
-              fontSize: '.68rem', fontWeight: 600,
-              color: active ? 'white' : 'var(--ink2)',
+              fontSize: '.66rem', fontWeight: 600,
+              color: active ? 'var(--warm-white)' : 'var(--ink2)',
               textAlign: 'center', lineHeight: 1.2,
               letterSpacing: '.02em',
             }}>{name}</span>
+            {isLocked && (
+              <span style={{ position: 'absolute', top: 6, right: 6, display: 'grid', placeItems: 'center' }}>
+                <Lock size={11} strokeWidth={2} color="var(--brass2)" />
+              </span>
+            )}
           </button>
         )
       })}
@@ -3197,24 +3292,24 @@ function TabNav({ tabs, activeTab, onSelect }) {
           color: 'var(--ink2)', fontSize: '.82rem', fontWeight: 600,
           cursor: 'pointer', transition: 'all .15s',
         }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--teal)'; e.currentTarget.style.color = 'var(--teal)' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brass)'; e.currentTarget.style.color = 'var(--brass2)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--ink2)' }}
         >
-          ← {prev.label}
+          ← {stripEmoji(prev.label)}
         </button>
       ) : <div />}
       {next ? (
         <button onClick={() => onSelect(next.id)} style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '9px 16px', borderRadius: 999,
-          border: '1.5px solid var(--teal)', background: 'var(--teal)',
-          color: 'white', fontSize: '.82rem', fontWeight: 600,
+          border: '1px solid var(--ink)', background: 'var(--ink)',
+          color: 'var(--warm-white)', fontSize: '.82rem', fontWeight: 600,
           cursor: 'pointer', transition: 'all .15s',
         }}
           onMouseEnter={e => { e.currentTarget.style.opacity = '.85' }}
           onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
         >
-          {next.label} →
+          {stripEmoji(next.label)} →
         </button>
       ) : <div />}
     </div>
@@ -3475,10 +3570,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>💰</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Finance</p>
-      </div>
+      <PageHeader icon={Wallet} title="Finance" subtitle="Steward what you've been given" />
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
@@ -4718,10 +4810,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>🌿</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Health & Wellness</p>
-      </div>
+      <PageHeader icon={Leaf} title="Health & Wellness" subtitle="Care for the whole person" />
 
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
 
@@ -5563,10 +5652,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 
   return (
     <div className="screen-stack">
-      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
-        <span style={{fontSize:"1.1rem"}}>⚡</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Productivity</p>
-      </div>
+      <PageHeader icon={Zap} title="Productivity" subtitle="Do the work that matters" />
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
 
       {tab === 'tasks' && (
@@ -6043,10 +6129,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
 
   return (
     <div className="screen-stack">
-      <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
-        <span style={{fontSize:"1.1rem"}}>🌍</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Lifestyle</p>
-      </div>
+      <PageHeader icon={Compass} title="Lifestyle" subtitle="Home, table, and the people you love" />
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
 
 
@@ -6111,8 +6194,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
               { cat:'⚡ Misc Items', color:'#f5f5f5', items:['Batteries','Charcoal','Greeting Cards','Light Bulbs'] },
             ].map(({ cat, color, items }) => (
               <div key={cat} style={{marginBottom:16}}>
-                <div style={{background:color,borderRadius:8,padding:'8px 12px',marginBottom:8}}>
-                  <strong style={{fontSize:'.82rem'}}>{cat}</strong>
+                <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 10px'}}>
+                  <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass2)'}}>{stripEmoji(cat)}</span>
+                  <span style={{flex:1,height:1,background:'var(--border2)'}} />
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {items.map(item => {
@@ -6514,10 +6598,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>🔁</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Habits</p>
-      </div>
+      <PageHeader icon={Repeat} title="Habits" subtitle="Small disciplines, kept daily" />
 
       {/* Active habits */}
       <section className="card">
@@ -6702,10 +6783,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>🎯</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Goals</p>
-      </div>
+      <PageHeader icon={Target} title="Goals" subtitle="Aim with intention" />
 
       {/* SMART goals guide */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
@@ -6915,10 +6993,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>↑</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Growth</p>
-      </div>
+      <PageHeader icon={TrendingUp} title="Growth" subtitle="See who you're becoming" />
 
       {/* ── Life Score ──────────────────────────────────────────────────── */}
       <section className="card premium-card">
@@ -7620,7 +7695,7 @@ function PlannerApp() {
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
-          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get access to bank linking, income tracking, savings goals, debt payoff, and no-spend challenges.")} />} />
+          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, and passwords.")} />} />
@@ -7861,27 +7936,24 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
 
   return (
     <div className="screen-stack">
-      <div style={{display:'flex',alignItems:'center',gap:8,paddingBottom:2}}>
-        <span style={{fontSize:'1.1rem'}}>✝</span>
-        <p style={{fontSize:'.58rem',fontWeight:700,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--brass)',margin:0}}>Faith</p>
-      </div>
+      <PageHeader icon={Cross} title="Faith" subtitle="Abide. Pray. Grow." />
 
       {/* Stats strip */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:4}}>
         {[
-          ['🙏', prayers.filter(p=>!p.answered).length, 'Active Prayers', 'var(--brass)'],
-          ['✅', answeredPrayers, 'Answered', 'var(--success)'],
-          ['🌸', todayGratitude.length, 'Gratitude Today', 'var(--teal)'],
-        ].map(([icon,val,label,color]) => (
-          <div key={label} style={{background:'var(--stone)',borderRadius:12,padding:'12px 8px',textAlign:'center',border:'1px solid var(--border)'}}>
-            <div style={{fontSize:'1.2rem',marginBottom:4}}>{icon}</div>
+          [HandHeart, prayers.filter(p=>!p.answered).length, 'Active Prayers', 'var(--brass2)'],
+          [CircleCheck, answeredPrayers, 'Answered', 'var(--success)'],
+          [Flower2, todayGratitude.length, 'Gratitude Today', 'var(--brass2)'],
+        ].map(([Ic,val,label,color]) => (
+          <div key={label} style={{background:'var(--warm-white)',borderRadius:14,padding:'14px 8px 12px',textAlign:'center',border:'1px solid var(--border)',boxShadow:'0 1px 2px rgba(28,28,30,.04)'}}>
+            <div style={{display:'grid',placeItems:'center',marginBottom:6}}><Ic size={20} strokeWidth={1.6} color={color} /></div>
             <div style={{fontWeight:800,fontSize:'1.2rem',color,lineHeight:1,marginBottom:2}}>{val}</div>
             <div style={{fontSize:'.65rem',color:'var(--muted)',fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>{label}</div>
           </div>
         ))}
       </div>
 
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} />
+      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} iconOverrides={FAITH_ICON_OVERRIDES} />
 
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
       {tab === 'devotional' && (
