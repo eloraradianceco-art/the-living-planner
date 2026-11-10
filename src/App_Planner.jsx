@@ -3229,7 +3229,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   // Generic Supabase sync for FinancePage state
   const syncPageData = React.useCallback(async (key, value) => {
-    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    try { localStorage.setItem('planner.f.' + key, JSON.stringify(value)) } catch {}
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
@@ -3286,8 +3286,27 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   // ── Shared state (linked across tabs) ─────────────────────────────────
   const [incomes, setIncomes] = useState(() => lsGet('incomes', []))
-  const [newIncome, setNewIncome] = useState({ label: '', amount: '', category: 'Primary', period: 'monthly' })
   const saveIncomes = (v) => { setIncomes(v); syncPageData('incomes', v) }
+
+  // ── Income is logged per month: each month starts fresh ───────────────
+  const CUR_MONTH = TODAY.slice(0, 7)
+  const ymOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  // Older entries have no month saved — place them in the month they were added (id is a timestamp)
+  const incomeMonthOf = (inc) => inc.month || (inc.date ? String(inc.date).slice(0, 7)
+    : (inc.id && !isNaN(Number(inc.id)) ? ymOf(new Date(Number(inc.id))) : CUR_MONTH))
+  const monthLabel = (mk, opts = { month: 'long', year: 'numeric' }) => new Date(`${mk}-01T12:00:00`).toLocaleDateString('en-US', opts)
+  const shiftMonth = (mk, n) => { const d = new Date(`${mk}-01T12:00:00`); d.setMonth(d.getMonth() + n); return ymOf(d) }
+  // Entries made under the old "income source" form were recurring (weekly/quarterly/etc.) — count their monthly equivalent
+  const INCOME_MULT = { weekly: 1, biweekly: 2, monthly: 4.33, quarterly: 13, yearly: 52 }
+  const incomeInMonth = (inc) => inc.period && INCOME_MULT[inc.period] && inc.period !== 'monthly'
+    ? Number(inc.amount || 0) / INCOME_MULT[inc.period] * 4.33
+    : Number(inc.amount || 0)
+  const incomesForMonth = (mk) => incomes.filter(inc => incomeMonthOf(inc) === mk)
+  const incomeTotalForMonth = (mk) => incomesForMonth(mk).reduce((s, inc) => s + incomeInMonth(inc), 0)
+  const [incomeView, setIncomeView] = useState(CUR_MONTH)
+  const defaultIncomeDate = (mk) => mk === CUR_MONTH ? TODAY : `${mk}-01`
+  const [newIncome, setNewIncome] = useState({ label: '', amount: '', category: 'Primary', date: TODAY })
+  React.useEffect(() => { setNewIncome(p => ({ ...p, date: defaultIncomeDate(incomeView) })) }, [incomeView])
 
   const [bills, setBills] = useState(() => lsGet('bills', []))
   const [newBill, setNewBill] = useState({ label: '', amount: '', category: 'Need', frequency: 'monthly' })
@@ -3335,9 +3354,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   // ── Shared computations (linked across all tabs) ───────────────────────
   const PERIOD_MULT = { weekly: 1, monthly: 4.33, quarterly: 13, yearly: 52 }
-  const totalWeeklyIncome = incomes.reduce((s, inc) => {
-    return s + Number(inc.amount || 0) / (PERIOD_MULT[inc.period] || 4.33)
-  }, 0)
+  // Everything else on the Finance page (overview, budget plan, cash flow, savings ETA) uses this month's logged income
+  const totalWeeklyIncome = incomeTotalForMonth(CUR_MONTH) / 4.33
+  const incomeLabel = period === 'monthly' ? `Income (${monthLabel(CUR_MONTH, { month: 'long' })})` : `Income (${period}, from ${monthLabel(CUR_MONTH, { month: 'short' })})`
   const getIncomeForPeriod = (p) => totalWeeklyIncome * (PERIOD_MULT[p] || 4.33)
   const totalIncomeForPeriod = getIncomeForPeriod(period)
 
@@ -3528,7 +3547,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           <h3 style={{ margin: '4px 0 14px' }}>Your Money at a Glance</h3>
           <PeriodPills />
           {[
-            ['Total Income', fmt(totalIncomeForPeriod), 'var(--success)'],
+            [incomeLabel, fmt(totalIncomeForPeriod), 'var(--success)'],
             ['Total Bills', fmt(totalBillsForPeriod), 'var(--danger)'],
             ['Expenses (tracked)', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)'],
             ['Debt Min Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)'],
@@ -3546,7 +3565,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           {/* 50/30/20 */}
           <div style={{marginTop:18,background:'var(--stone)',borderRadius:12,padding:'16px'}}>
             <p className="eyebrow" style={{marginBottom:6}}>50 / 30 / 20 Rule</p>
-            <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on your {period} income of {fmt(totalIncomeForPeriod)}</p>
+            <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of {fmt(totalIncomeForPeriod)}</p>
             {[
               ['50% Needs', needs50, '#4CAF50', 'Rent, utilities, groceries, insurance, min debt payments'],
               ['30% Wants', wants30, '#FF9800', 'Dining, shopping, subscriptions, gym, travel'],
@@ -3694,57 +3713,83 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Income Tracker</p>
-          <h3 style={{ margin: '4px 0 14px' }}>Your Income Sources</h3>
-          <PeriodPills />
-          <div style={{background:'var(--stone)',borderRadius:10,padding:'14px',marginBottom:16,display:'flex',justifyContent:'space-between'}}>
-            <div>
-              <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>Total {period} income</p>
-              <strong style={{fontSize:'1.4rem',color:'var(--success)'}}>{fmt(totalIncomeForPeriod)}</strong>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>Weekly average</p>
-              <strong style={{fontSize:'1rem'}}>{fmt(totalWeeklyIncome)}</strong>
-            </div>
-          </div>
-          {incomes.length === 0 && <p className="muted" style={{textAlign:'center',padding:'16px 0'}}><EmptyState icon="💵" title="Track every blessing" message="Every dollar has a name. Begin by naming where they come from." /></p>}
-          {incomes.map((inc, i) => (
-            <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-              <div>
-                <div style={{fontWeight:600,fontSize:'.9rem'}}>{inc.label}</div>
-                <div className="muted" style={{fontSize:'.75rem'}}>{inc.category} · {inc.period}</div>
+          {(() => {
+            const mk = incomeView
+            const list = incomesForMonth(mk).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+            const total = incomeTotalForMonth(mk)
+            const prevMk = shiftMonth(mk, -1)
+            const prevTotal = incomeTotalForMonth(prevMk)
+            // Most recent earlier month that has income — used for "copy forward"
+            const lastWithIncome = [...new Set(incomes.map(incomeMonthOf))].filter(m => m < mk).sort().pop()
+            const inputStyle = {padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}
+            const navBtn = {background:'var(--stone)',border:'1px solid var(--border2)',borderRadius:999,width:36,height:36,fontSize:'1.1rem',cursor:'pointer',color:'var(--ink)'}
+            return (<>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,margin:'4px 0 14px'}}>
+                <button aria-label="Previous month" style={navBtn} onClick={() => setIncomeView(shiftMonth(mk, -1))}>‹</button>
+                <div style={{textAlign:'center'}}>
+                  <h3 style={{margin:0}}>{monthLabel(mk)}</h3>
+                  {mk !== CUR_MONTH && <button onClick={() => setIncomeView(CUR_MONTH)} style={{background:'none',border:'none',color:'var(--brass)',fontSize:'.75rem',fontWeight:600,cursor:'pointer',padding:'2px 0'}}>Back to this month</button>}
+                </div>
+                <button aria-label="Next month" style={navBtn} onClick={() => setIncomeView(shiftMonth(mk, 1))}>›</button>
               </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontWeight:700,color:'var(--success)'}}>{fmt(Number(inc.amount||0) / (PERIOD_MULT[inc.period]||4.33) * (PERIOD_MULT[period]||4.33))}</div>
-                <div className="muted" style={{fontSize:'.72rem'}}>{fmt(inc.amount)} / {inc.period}</div>
+              <div style={{background:'var(--stone)',borderRadius:10,padding:'14px',marginBottom:16,display:'flex',justifyContent:'space-between',gap:12}}>
+                <div>
+                  <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>{mk === CUR_MONTH ? 'Received so far this month' : `Total for ${monthLabel(mk, { month: 'long' })}`}</p>
+                  <strong style={{fontSize:'1.4rem',color:'var(--success)'}}>{fmt(total)}</strong>
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <p className="muted" style={{fontSize:'.75rem',margin:'0 0 2px'}}>{monthLabel(prevMk, { month: 'long' })}</p>
+                  <strong style={{fontSize:'1rem'}}>{fmt(prevTotal)}</strong>
+                  {prevTotal > 0 && total > 0 && <div style={{fontSize:'.72rem',fontWeight:600,color: total >= prevTotal ? 'var(--success)' : 'var(--danger)'}}>{total >= prevTotal ? '▲' : '▼'} {fmt(Math.abs(total - prevTotal))}</div>}
+                </div>
               </div>
-              <button onClick={() => saveIncomes(incomes.filter((_,j)=>j!==i))}
-                style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',marginLeft:8}}>✕</button>
-            </div>
-          ))}
-          <div style={{marginTop:16,display:'grid',gap:8}}>
-            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add Income Source</p>
-            <input placeholder="Label (e.g. Salary, Freelance)" value={newIncome.label}
-              onChange={e=>setNewIncome(p=>({...p,label:e.target.value}))}
-              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-              <input placeholder="Amount ($)" type="number" value={newIncome.amount}
-                onChange={e=>setNewIncome(p=>({...p,amount:e.target.value}))}
-                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-              <select value={newIncome.period} onChange={e=>setNewIncome(p=>({...p,period:e.target.value}))}
-                style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
-                {['weekly','monthly','quarterly','yearly'].map(o=><option key={o} value={o}>{o.charAt(0).toUpperCase()+o.slice(1)}</option>)}
-              </select>
-            </div>
-            <select value={newIncome.category} onChange={e=>setNewIncome(p=>({...p,category:e.target.value}))}
-              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
-              {['Primary','Side Hustle','Passive','Investment','Business','Other'].map(c=><option key={c}>{c}</option>)}
-            </select>
-            <button className="primary-btn" onClick={() => {
-              if (!newIncome.label || !newIncome.amount) return
-              saveIncomes([...incomes, { ...newIncome, id: Date.now() }])
-              setNewIncome({ label: '', amount: '', category: 'Primary', period: 'monthly' })
-            }}>+ Add Income</button>
-          </div>
+              {list.length === 0 && (
+                <div style={{textAlign:'center',padding:'8px 0 12px'}}>
+                  <EmptyState icon="💵" title={`No income logged for ${monthLabel(mk, { month: 'long' })} yet`} message="Add each paycheck or payment as it comes in." />
+                  {lastWithIncome && (
+                    <button className="ghost-btn" style={{marginTop:6}} onClick={() => {
+                      const copies = incomesForMonth(lastWithIncome).map((inc, k) => ({
+                        id: Date.now() + k, label: inc.label, category: inc.category || 'Primary',
+                        amount: String(Math.round(incomeInMonth(inc) * 100) / 100), date: defaultIncomeDate(mk), month: mk,
+                      }))
+                      saveIncomes([...incomes, ...copies])
+                    }}>Copy {incomesForMonth(lastWithIncome).length} from {monthLabel(lastWithIncome, { month: 'long' })}</button>
+                  )}
+                </div>
+              )}
+              {list.map((inc) => (
+                <div key={inc.id || inc.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)',gap:8}}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontWeight:600,fontSize:'.9rem'}}>{inc.label}</div>
+                    <div className="muted" style={{fontSize:'.75rem'}}>{inc.category}{inc.date ? ` · ${new Date(`${inc.date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{inc.period && inc.period !== 'monthly' && INCOME_MULT[inc.period] ? ` · ${inc.period}` : ''}</div>
+                  </div>
+                  <div style={{fontWeight:700,color:'var(--success)',whiteSpace:'nowrap'}}>{fmt(incomeInMonth(inc))}</div>
+                  <button aria-label={`Delete ${inc.label}`} onClick={() => { if (window.confirm(`Delete "${inc.label}"?`)) saveIncomes(incomes.filter(x => x !== inc)) }}
+                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',padding:'4px 8px'}}>✕</button>
+                </div>
+              ))}
+              <div style={{marginTop:16,display:'grid',gap:8}}>
+                <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add income to {monthLabel(mk, { month: 'long' })}</p>
+                <input placeholder="Label (e.g. Paycheck, Client session)" value={newIncome.label}
+                  onChange={e=>setNewIncome(p=>({...p,label:e.target.value}))} style={inputStyle} />
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  <input placeholder="Amount ($)" type="number" inputMode="decimal" value={newIncome.amount}
+                    onChange={e=>setNewIncome(p=>({...p,amount:e.target.value}))} style={inputStyle} />
+                  <input type="date" value={newIncome.date} onChange={e=>setNewIncome(p=>({...p,date:e.target.value}))} style={inputStyle} />
+                </div>
+                <select value={newIncome.category} onChange={e=>setNewIncome(p=>({...p,category:e.target.value}))} style={inputStyle}>
+                  {['Primary','Side Hustle','Passive','Investment','Business','Other'].map(c=><option key={c}>{c}</option>)}
+                </select>
+                <button className="primary-btn" onClick={() => {
+                  if (!newIncome.label || !newIncome.amount) return
+                  const date = newIncome.date || defaultIncomeDate(mk)
+                  saveIncomes([...incomes, { id: Date.now(), label: newIncome.label, amount: newIncome.amount, category: newIncome.category, date, month: date.slice(0, 7) }])
+                  if (date.slice(0, 7) !== mk) setIncomeView(date.slice(0, 7))
+                  setNewIncome({ label: '', amount: '', category: newIncome.category, date: defaultIncomeDate(date.slice(0, 7)) })
+                }}>+ Add Income</button>
+              </div>
+            </>)
+          })()}
         </section>
       </ProTabGate>)}
 
@@ -4374,7 +4419,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <h3 style={{ margin: '4px 0 14px' }}>Monthly Cash Flow</h3>
             <PeriodPills />
             {[
-              ['Total Income', fmt(totalIncomeForPeriod), 'var(--success)', '+'],
+              [incomeLabel, fmt(totalIncomeForPeriod), 'var(--success)', '+'],
               ['Fixed Bills', fmt(totalBillsForPeriod), 'var(--danger)', '-'],
               ['Min Debt Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)', '-'],
               ['Variable Expenses', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)', '-'],
@@ -4399,7 +4444,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           <section className="card">
             <p className="eyebrow">Spending Allocation</p>
             <h3 style={{ margin: '4px 0 12px' }}>Where Should Your Money Go?</h3>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Based on your {period} income of <strong>{fmt(totalIncomeForPeriod)}</strong></p>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of <strong>{fmt(totalIncomeForPeriod)}</strong></p>
             {[
               ['50% — Needs', needs50, totalBillsForPeriod, '#4CAF50', 'Fixed bills, utilities, groceries, insurance'],
               ['30% — Wants', wants30, fpWeekSpend*(PERIOD_MULT[period]||4.33), '#FF9800', 'Dining, shopping, subscriptions, entertainment'],
