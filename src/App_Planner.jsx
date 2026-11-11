@@ -11,6 +11,7 @@ import {
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
+  House, Ellipsis,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -1461,10 +1462,83 @@ const tabs = [
 // Additional routes not in bottom nav
 const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects', '/faith']
 
+// Every section of the planner — drives the iPad/desktop side nav and Home's Quick Access.
+const NAV_GROUPS = [
+  { label: 'Plan', items: [
+    { to: '/',          label: 'Home',      icon: House },
+    { to: '/tasks',     label: 'Tasks',     icon: SquareCheck },
+    { to: '/calendar',  label: 'Calendar',  icon: CalendarDays },
+    { to: '/projects',  label: 'Projects',  icon: Folder },
+  ]},
+  { label: 'Grow', items: [
+    { to: '/habits',    label: 'Habits',    icon: Repeat },
+    { to: '/goals',     label: 'Goals',     icon: Target },
+    { to: '/growth',    label: 'Growth',    icon: TrendingUp },
+  ]},
+  { label: 'Life', items: [
+    { to: '/finance',      label: 'Finance',           icon: Wallet },
+    { to: '/wellness',     label: 'Health & Wellness', icon: Leaf, also: ['/health'] },
+    { to: '/productivity', label: 'Productivity',      icon: Zap },
+    { to: '/lifestyle',    label: 'Lifestyle',         icon: Compass },
+    { to: '/faith',        label: 'Faith',             icon: Cross },
+  ]},
+]
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+const isNavActive = (item, path) => item.to === '/'
+  ? path === '/'
+  : path === item.to || path.startsWith(item.to + '/') || (item.also || []).includes(path)
+
+function SideNav({ onQuickAdd }) {
+  const { pathname } = useLocation()
+  return (
+    <aside className="side-nav" aria-label="Planner sections">
+      <button className="side-quick-add" onClick={onQuickAdd}>
+        <Plus size={18} strokeWidth={2.2} /> Quick Add
+      </button>
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label} className="side-group">
+          <p className="side-group-label">{group.label}</p>
+          {group.items.map((item) => {
+            const active = isNavActive(item, pathname)
+            const Icon = item.icon
+            return (
+              <Link key={item.to} to={item.to} className={'side-link' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
+                <Icon size={18} strokeWidth={active ? 2 : 1.7} />
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      ))}
+      <div className="side-group side-foot">
+        <Link to="/more" className={'side-link' + (pathname === '/more' ? ' active' : '')} aria-current={pathname === '/more' ? 'page' : undefined}>
+          <Ellipsis size={18} strokeWidth={1.7} />
+          <span>More &amp; Settings</span>
+        </Link>
+      </div>
+    </aside>
+  )
+}
+
 function Layout({ children, onQuickAdd, banner, profile }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
+  const showSideNav = !isMobile   // iPad (portrait + landscape) and desktop
+
+  // Keep the side nav pinned just below the sticky topbar, whatever its height
+  // (it grows with the iOS safe-area inset).
+  const topbarRef = React.useRef(null)
+  React.useEffect(() => {
+    const el = topbarRef.current
+    if (!el) return
+    const setH = () => document.documentElement.style.setProperty('--topbar-h', el.offsetHeight + 'px')
+    setH()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(setH) : null
+    ro?.observe(el)
+    window.addEventListener('resize', setH)
+    return () => { ro?.disconnect(); window.removeEventListener('resize', setH) }
+  }, [])
 
   // ── iOS PWA safe-area fix — keeps topbar below the status bar ────────────
   React.useEffect(() => {
@@ -1518,7 +1592,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
   return (
     <div className="app-shell premium-shell living-planner-shell">
-      <header className="topbar premium-topbar living-planner-topbar">
+      <header ref={topbarRef} className="topbar premium-topbar living-planner-topbar">
         <Link to="/" className="topbar-copy" style={{textDecoration:'none'}}>
           <p className="eyebrow">The Living Planner</p>
           <p style={{color:"rgba(255,255,255,.38)",fontSize:".72rem",marginTop:1}}>{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
@@ -1537,36 +1611,12 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
       {banner}
 
-      <div className={isDesktop ? 'app-frame desktop-frame' : isMobile ? 'app-frame mobile-frame' : 'app-frame tablet-frame'}>
-        {isDesktop ? (
-          <aside className="side-nav premium-card">
-            <div className="side-nav-header">
-              <p className="eyebrow">Navigate</p>
-              <strong>Plan with clarity</strong>
-            </div>
-            <nav className="side-nav-links">
-              {tabs.map((tab) => (
-                <Link
-                  key={tab.to}
-                  to={tab.to}
-                  className={location.pathname === tab.to ? 'side-nav-link active' : 'side-nav-link'} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:'var(--radius-sm)',color:location.pathname===tab.to?'var(--brass)':'var(--text2)',fontWeight:location.pathname===tab.to?700:400,textDecoration:'none',background:location.pathname===tab.to?'var(--brass-dim)':'transparent'}}
-                >
-                  <span className="nav-icon">{tab.icon}</span>
-                  {tab.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="desktop-quick-card">
-              <span className="muted">Capture something fast?</span>
-              <button className="primary-btn premium-btn" onClick={onQuickAdd}>Quick Add</button>
-            </div>
-          </aside>
-        ) : null}
-
+      <div className={(showSideNav ? 'app-frame with-side-nav ' : 'app-frame ') + (isDesktop ? 'desktop-frame' : isMobile ? 'mobile-frame' : 'tablet-frame')}>
+        {showSideNav ? <SideNav onQuickAdd={onQuickAdd} /> : null}
         <main className="content">{children}</main>
       </div>
 
-      {!isDesktop ? (
+      {!showSideNav ? (
         <nav className="bottom-nav premium-nav">
           {tabs.map((tab) => (
             <Link
@@ -1581,7 +1631,7 @@ function Layout({ children, onQuickAdd, banner, profile }) {
         </nav>
       ) : null}
 
-      {!isDesktop ? (
+      {!showSideNav ? (
         <button onClick={onQuickAdd} style={{
           position:'fixed', bottom:'calc(env(safe-area-inset-bottom) + 84px)', right:20, zIndex:110,
           width:54, height:54, borderRadius:'50%',
@@ -1831,16 +1881,15 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const topGoals = goals.filter((g) => !g.completed).slice(0, 3)
 
   const SECTIONS = [
-    { to:'/tasks',        icon:'✓',  label:'Tasks',        color:'var(--teal)',   count: openTasks.length || null },
-    { to:'/calendar',     icon:'◷',  label:'Calendar',     color:'var(--slate)',  count: todaySchedule.length || null },
-    { to:'/habits',       icon:'🔁', label:'Habits',       color:'var(--brass)',  count: habits.length || null },
-    { to:'/goals',        icon:'🎯', label:'Goals',        color:'var(--brass)',  count: goals.length || null },
-    { to:'/finance',      icon:'💰', label:'Finance',      color:'#22C55E',       count: null },
-    { to:'/growth',       icon:'↑',  label:'Growth',       color:'var(--teal)',   count: null },
-    { to:'/wellness',     icon:'🌿', label:'Health & Wellness', color:'#22C55E', count: null },
-    { to:'/productivity', icon:'⚡', label:'Productivity', color:'#F0B429',       count: null },
-    { to:'/lifestyle',    icon:'🌍', label:'Lifestyle',    color:'var(--slate)',   count: null },
-    { to:'/faith',        icon:'✝',  label:'Faith',        color:'var(--brass)',   count: null },
+    ...NAV_ITEMS.filter((n) => n.to !== '/').map((n) => ({
+      ...n,
+      count: n.to === '/tasks' ? (openTasks.length || null)
+        : n.to === '/calendar' ? (todaySchedule.length || null)
+        : n.to === '/projects' ? (projects.filter((p) => p.status !== 'Completed').length || null)
+        : n.to === '/habits' ? (habits.length || null)
+        : n.to === '/goals' ? (goals.filter((g) => !g.completed).length || null)
+        : null,
+    })),
   ]
 
   return (
@@ -2085,20 +2134,12 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <div className="section-title-row" style={{marginBottom:12}}>
           <div><p className="eyebrow">Your Planner</p><h3>Quick Access</h3></div>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:8}}>
+        <div className="home-quick-grid">
           {SECTIONS.map(s => (
-            <Link key={s.to} to={s.to} style={{
-              display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-              padding:'10px 4px 8px', borderRadius:'var(--radius-sm)', background:'var(--stone)',
-              border:'1px solid var(--border)', textDecoration:'none', position:'relative'
-            }}>
-              {s.count > 0 && (
-                <div style={{position:'absolute', top:4, right:4, background:s.color, color:'white', fontSize:'.55rem', fontWeight:700, borderRadius:999, minWidth:14, height:14, display:'grid', placeItems:'center', padding:'0 3px', lineHeight:1}}>
-                  {s.count}
-                </div>
-              )}
-              <span style={{fontSize:'1rem', lineHeight:1}}>{s.icon}</span>
-              <span style={{fontSize:'.65rem', fontWeight:600, color:'var(--text2)', textAlign:'center', lineHeight:1.2}}>{s.label}</span>
+            <Link key={s.to} to={s.to} className="home-quick-tile">
+              {s.count > 0 && <span className="home-quick-count">{s.count}</span>}
+              <s.icon size={20} strokeWidth={1.6} color="var(--brass2)" />
+              <span className="home-quick-label">{s.label}</span>
             </Link>
           ))}
         </div>
