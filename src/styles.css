@@ -1247,3 +1247,93 @@ html { scroll-behavior: smooth; }
 .nav-item .nav-label { letter-spacing: .1em; }
 /* Avatar letter: `.profile-pill span` was painting it brass on a brass circle */
 .profile-pill .profile-avatar { color: #1C1C1E; font-family: var(--serif); font-size: 1.05rem; font-weight: 600; }
+
+/* ── Steps checklist (goals & projects) ───────────────────────────────── */
+.steps { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.steps-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.steps-label { font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--brass2); }
+.steps-count { font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.step-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; }
+.step-check {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; margin-top: 1px; padding: 0;
+  border: 1.5px solid var(--border2); background: var(--warm-white);
+  display: grid; place-items: center; cursor: pointer;
+  transition: background .15s, border-color .15s, box-shadow .15s, transform .1s;
+}
+.step-check:active { transform: scale(.9); }
+.step-check.done { background: var(--ink); border-color: var(--ink); }
+.step-check.next { border-color: var(--brass); box-shadow: 0 0 0 3px var(--brass-dim); }
+.step-text {
+  flex: 1; min-width: 0; padding: 3px 0; border: none; background: none; cursor: text;
+  font: inherit; font-size: .9rem; line-height: 1.4; color: var(--text); text-align: left; word-break: break-word;
+}
+.step-row.done .step-text { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border2); }
+.step-next-tag {
+  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; vertical-align: 2px;
+  font-size: .58rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  background: var(--brass-dim); color: var(--brass2);
+}
+.step-edit { flex: 1; min-width: 0; display: grid; gap: 8px; }
+.step-edit input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 7px 10px;
+  border: 1.5px solid var(--brass); border-radius: 10px; background: var(--warm-white); color: var(--text); outline: none;
+}
+.step-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.step-tool {
+  height: 32px; min-width: 32px; padding: 0 8px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border2); background: var(--stone); color: var(--ink2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  font: inherit; font-size: .78rem; font-weight: 600;
+}
+.step-tool:disabled { opacity: .35; cursor: default; }
+.step-tool.danger { color: var(--danger); }
+.step-tool.primary { margin-left: auto; padding: 0 14px; background: var(--ink); border-color: var(--ink); color: var(--warm-white); }
+.steps-more {
+  border: none; background: none; padding: 4px 0 2px 34px; cursor: pointer;
+  font: inherit; font-size: .76rem; font-weight: 600; color: var(--muted);
+}
+.steps-complete {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 2px;
+  padding: 10px 12px; border-radius: 12px; background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.22);
+  font-size: .82rem; color: var(--ink2);
+}
+.steps-complete span { flex: 1; min-width: 140px; }
+.steps-complete-btn {
+  border: none; border-radius: 999px; padding: 7px 14px; cursor: pointer;
+  background: var(--ink); color: var(--warm-white); font: inherit; font-size: .78rem; font-weight: 600;
+}
+.step-add {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px;
+  padding: 2px 4px 2px 6px; border: 1px dashed var(--border2); border-radius: 12px; background: transparent;
+}
+.step-add:focus-within { border-style: solid; border-color: var(--brass); background: var(--warm-white); }
+.step-add input {
+  flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+  font: inherit; font-size: 16px; padding: 8px 0; color: var(--text);
+}
+.step-add input::placeholder { color: var(--muted); }
+.step-add button {
+  border: none; border-radius: 9px; padding: 6px 12px; cursor: pointer;
+  background: var(--ink); color: var(--warm-white); font: inherit; font-size: .78rem; font-weight: 600;
+}
+.steps-hint { margin-top: 6px; font-size: .72rem; color: var(--muted); }
+.modal-sheet .steps { margin-top: 2px; }
+.home-next-step {
+  margin-top: 6px; font-size: .78rem; color: var(--ink2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.home-next-step span {
+  margin-right: 6px; font-size: .58rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--brass2);
+}
+
+/* ── Toast layout: title + message left, dismiss right ───────────────── */
+.toast { display: flex; align-items: flex-start; gap: 10px; }
+.toast > div { flex: 1; min-width: 0; }
+.toast p { margin: 2px 0 0; color: rgba(255,255,255,.55); font-size: .78rem; line-height: 1.4; }
+.toast-dismiss {
+  flex-shrink: 0; width: 26px; height: 26px; margin: -3px -6px 0 0; padding: 0;
+  border: none; border-radius: 50%; background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.6); font-size: 1rem; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+}
+.toast-dismiss:hover { background: rgba(255,255,255,.16); color: var(--warm-white); }

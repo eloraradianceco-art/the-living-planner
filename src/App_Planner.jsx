@@ -10,6 +10,7 @@ import {
   HandHeart, ScrollText, BookMarked, Flower2, Hourglass, Mic, Target, Lock,
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
+  ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -285,22 +286,67 @@ function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
   }
 }
 
-function getGoalProgress(goalId, tasks, projects) {
-  const relatedTasks = tasks.filter((task) => task.linkedGoalId === goalId)
-  const relatedProjects = projects.filter((project) => project.goalId === goalId)
-  const totalItems = relatedTasks.length + relatedProjects.length
-  if (totalItems === 0) return 0
-  const completedTasks = relatedTasks.filter((task) => task.completed).length
-  const completedProjects = relatedProjects.filter((project) => project.status === 'Completed').length
-  return Math.round(((completedTasks + completedProjects) / totalItems) * 100)
+// ── Steps (checklists on goals & projects) ───────────────────────────────
+// Shape: [{ id, text, done, doneAt }] stored in the jsonb `steps` column.
+const newStepId = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+function normalizeSteps(steps) {
+  if (!Array.isArray(steps)) return []
+  return steps
+    .filter((st) => st && typeof st.text === 'string' && st.text.trim())
+    .map((st) => ({ id: st.id || newStepId(), text: st.text.trim(), done: !!st.done, doneAt: st.doneAt || null }))
+}
+// Accepts pasted lists: "- item", "1. item", "[ ] item", bullets, blank lines.
+const parseStepLines = (text) => String(text || '').split(/\r?\n/)
+  .map((l) => l.replace(/^\s*(?:[-*\u2022\u25A2\u2610\u25A1]|\[\s?[xX ]?\]|\d+[.)])\s*/, '').trim())
+  .filter(Boolean)
+
+function getProjectProgress(project, tasks) {
+  if (!project) return 0
+  const p = typeof project === 'object' ? project : null
+  const id = p ? p.id : project
+  if (p?.status === 'Completed') return 100
+  const relatedTasks = tasks.filter((task) => task.linkedProjectId === id)
+  const steps = normalizeSteps(p?.steps)
+  const total = relatedTasks.length + steps.length
+  if (!total) return 0
+  const done = relatedTasks.filter((task) => task.completed).length + steps.filter((st) => st.done).length
+  return Math.round((done / total) * 100)
 }
 
-function getProjectProgress(projectId, tasks) {
-  const relatedTasks = tasks.filter((task) => task.linkedProjectId === projectId)
-  if (relatedTasks.length === 0) return 0
-  const completed = relatedTasks.filter((task) => task.completed).length
-  return Math.round((completed / relatedTasks.length) * 100)
+// Goal progress = its own steps + linked tasks + linked projects (each project
+// counts as one unit, credited by its own progress so steps inside it move the goal).
+function getGoalProgress(goal, tasks, projects) {
+  const g = typeof goal === 'object' ? goal : null
+  const id = g ? g.id : goal
+  if (g?.completed) return 100
+  const relatedTasks = tasks.filter((task) => task.linkedGoalId === id)
+  const relatedProjects = projects.filter((project) => project.goalId === id)
+  const steps = normalizeSteps(g?.steps)
+  const total = relatedTasks.length + relatedProjects.length + steps.length
+  if (!total) return 0
+  const done = relatedTasks.filter((task) => task.completed).length
+    + steps.filter((st) => st.done).length
+    + relatedProjects.reduce((sum, project) => sum + getProjectProgress(project, tasks) / 100, 0)
+  return Math.round((done / total) * 100)
 }
+
+// The next unchecked step for a goal — its own first, then its active projects'.
+function nextStepFor(goal, projects = []) {
+  if (!goal) return null
+  const own = normalizeSteps(goal.steps).find((st) => !st.done)
+  if (own) return own.text
+  for (const project of projects.filter((pr) => pr.goalId === goal.id && pr.status !== 'Completed')) {
+    const st = normalizeSteps(project.steps).find((x) => !x.done)
+    if (st) return st.text
+  }
+  return null
+}
+
+const shortDate = (d) => d ? formatDateLabel(d, { month: 'short', day: 'numeric' }) : ''
+
+const upsertById = (list, item) => list.some((x) => x.id === item.id)
+  ? list.map((x) => x.id === item.id ? item : x)
+  : [...list, item]
 
 
 // ── Charts ────────────────────────────────────────────────────────────────
@@ -553,6 +599,7 @@ function normalizePayload(type, payload, userId) {
 
   if (type === 'goal') {
     if ('targetDate' in raw) { raw.target_date = raw.targetDate || null; delete raw.targetDate }
+    if ('steps' in raw) raw.steps = normalizeSteps(raw.steps)
     delete raw.linkedType; delete raw.linkedId; delete raw.linkedGoalId; delete raw.linkedProjectId
     return raw
   }
@@ -560,6 +607,7 @@ function normalizePayload(type, payload, userId) {
   if (type === 'project') {
     if ('goalId' in raw) { raw.goal_id = raw.goalId ? String(raw.goalId) : null; delete raw.goalId }
     if ('dueDate' in raw) { raw.due_date = raw.dueDate || null; delete raw.dueDate }
+    if ('steps' in raw) raw.steps = normalizeSteps(raw.steps)
     delete raw.linkedType; delete raw.linkedId
     return raw
   }
@@ -625,8 +673,8 @@ function mapDbRow(type, row) {
           : type
   if (t === 'habits')     { r.title = r.name; delete r.name }
   if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id }
-  if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date }
-  if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date }
+  if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date; r.steps = normalizeSteps(r.steps) }
+  if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date; r.steps = normalizeSteps(r.steps) }
   if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time }
   if (t === 'expenses')   { r.note = r.description }
   if (t === 'habit_logs') { r.habitId = r.habit_id; delete r.habit_id }
@@ -957,6 +1005,9 @@ function usePlannerData() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
+  const pendingRef = React.useRef({})      // "table:id" → writes in flight (ignore their realtime echoes)
+  const stepsQueueRef = React.useRef({})   // "table:id" → promise chain so step saves land in order
+  const lastLoadRef = React.useRef(0)
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -965,11 +1016,50 @@ function usePlannerData() {
     let active = true
     setLoading(true); setError('')
     plannerService.loadAll(user.id)
-      .then((data) => { if (active) setCollections(data) })
+      .then((data) => { if (active) { setCollections(data); lastLoadRef.current = Date.now() } })
       .catch((err) => { if (active) setError(err.message || 'Failed to load data.') })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [isAuthenticated, user?.id, mode])
+
+  // Live sync — changes made on another device show up here without a reload.
+  useEffect(() => {
+    if (!isAuthenticated || !user || !hasSupabaseEnv) return
+    const LIVE = [['tasks', 'tasks'], ['goals', 'goals'], ['projects', 'projects'], ['events', 'events'],
+      ['notes', 'notes'], ['expenses', 'expenses'], ['habits', 'habits']]
+    let channel = supabase.channel('planner_core_' + user.id)
+    LIVE.forEach(([table, key]) => {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table, filter: `user_id=eq.${user.id}` }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const id = payload.old?.id
+          if (id) setCollections((c) => ({ ...c, [key]: (c[key] || []).filter((x) => x.id !== id) }))
+          return
+        }
+        const row = payload.new
+        if (!row?.id || pendingRef.current[`${table}:${row.id}`]) return
+        const mapped = mapDbRow(table, row)
+        setCollections((c) => ({ ...c, [key]: upsertById(c[key] || [], mapped) }))
+      })
+    })
+    channel.subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [isAuthenticated, user?.id])
+
+  // Coming back to the app (phone unlocked, tab switched) — pull a fresh copy
+  // in case the live connection slept while it was in the background.
+  useEffect(() => {
+    if (!isAuthenticated || !user) return
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastLoadRef.current < 15000) return
+      if (Object.keys(pendingRef.current).length) return
+      lastLoadRef.current = Date.now()
+      plannerService.loadAll(user.id).then((data) => setCollections(data)).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('pageshow', refresh)
+    return () => { document.removeEventListener('visibilitychange', refresh); window.removeEventListener('pageshow', refresh) }
+  }, [isAuthenticated, user?.id])
 
   const scores = useMemo(() => computeScores(collections), [collections])
   const [scoreHistory, setScoreHistory] = useState([])
@@ -1022,7 +1112,7 @@ function usePlannerData() {
         const key = plannerService.collectionName(type)
         if (modeArg === 'edit' && payload.id)
           return { ...current, [key]: current[key].map((item) => item.id === payload.id ? saved : item) }
-        return { ...current, [key]: [...current[key], saved] }
+        return { ...current, [key]: upsertById(current[key], saved) }
       })
       return saved
     } catch (err) {
@@ -1054,7 +1144,7 @@ function usePlannerData() {
       const { updatedTask, extraTask } = await plannerService.toggleTask(task, user.id)
       setCollections((current) => ({
         ...current,
-        tasks: [...current.tasks.map((item) => item.id === taskId ? updatedTask : item), ...(extraTask ? [extraTask] : [])]
+        tasks: (extraTask ? upsertById(current.tasks, extraTask) : current.tasks).map((item) => item.id === taskId ? updatedTask : item)
           .sort((a, b) => `${a.date}-${a.time || ''}`.localeCompare(`${b.date}-${b.time || ''}`)),
       }))
     } catch (err) {
@@ -1098,6 +1188,45 @@ function usePlannerData() {
     } finally { setSyncing(false) }
   }
 
+  // Check off / add / reorder steps on a goal or project. Updates the screen
+  // instantly, then saves in order; reverts if the save fails.
+  const saveSteps = (type, itemId, steps) => {
+    if (!user) return
+    const meta = tableMap[type]
+    if (!meta) return
+    const key = meta.collection
+    const clean = normalizeSteps(steps)
+    const before = (collections[key] || []).find((x) => x.id === itemId)?.steps || []
+    setCollections((c) => ({ ...c, [key]: c[key].map((x) => x.id === itemId ? { ...x, steps: clean } : x) }))
+    const pk = `${meta.table}:${itemId}`
+    pendingRef.current[pk] = (pendingRef.current[pk] || 0) + 1
+    const write = async () => {
+      if (!hasSupabaseEnv) {
+        const current = readLocal(localKeys[key], defaultData[key])
+        writeLocal(localKeys[key], current.map((x) => x.id === itemId ? { ...x, steps: clean } : x))
+        return
+      }
+      const { error: err } = await supabase.from(meta.table)
+        .update({ steps: clean, updated_at: new Date().toISOString() })
+        .eq('id', itemId).eq('user_id', user.id)
+      if (err) throw err
+    }
+    const run = (stepsQueueRef.current[pk] || Promise.resolve())
+      .then(write)
+      .catch((err) => {
+        setError(err.message || 'Could not save steps.')
+        setCollections((c) => ({ ...c, [key]: c[key].map((x) => x.id === itemId ? { ...x, steps: before } : x) }))
+      })
+      .finally(() => {
+        window.setTimeout(() => {
+          pendingRef.current[pk] = (pendingRef.current[pk] || 1) - 1
+          if (pendingRef.current[pk] <= 0) delete pendingRef.current[pk]
+        }, 1500)
+      })
+    stepsQueueRef.current[pk] = run
+    return run
+  }
+
   const updateBudget = async (nextBudget) => {
     if (!user) return
     setSyncing(true); setError('')
@@ -1129,7 +1258,7 @@ function usePlannerData() {
 
   return {
     ...collections, scores, scoreHistory, loading, syncing, error,
-    saveItem, deleteItem, toggleTask, toggleHabit,
+    saveItem, deleteItem, toggleTask, toggleHabit, saveSteps,
     updateBudget, updateProfile, updateSettings,
   }
 }
@@ -1202,7 +1331,7 @@ function AuthPage() {
   const SECTIONS = [
     { icon: Cross, title: 'Faith', desc: 'Devotionals, prayer journal, scripture, sermon notes, and Bible reading.' },
     { icon: CalendarDays, title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
-    { icon: Target, title: 'Goals & Habits', desc: 'Set goals that connect to your days, build routines, and watch your Life Score rise.' },
+    { icon: Target, title: 'Goals & Habits', desc: 'Break goals and projects into steps you check off, build routines, and watch your Life Score rise.' },
     { icon: Wallet, title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
     { icon: Leaf, title: 'Health & Wellness', desc: 'Mood, sleep, journal, medications, and daily routines.' },
     { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, a focus timer, and cleaning schedules.' },
@@ -1510,8 +1639,8 @@ const baseForms = {
   event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
-  goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr' },
-  project: { title: '', goalId: '', dueDate: addDays(TODAY, 45), status: 'Active', description: '' },
+  goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr', steps: [] },
+  project: { title: '', goalId: '', dueDate: addDays(TODAY, 45), status: 'Active', description: '', steps: [] },
   habit: { title: '', category: 'Health' },
 }
 
@@ -1599,13 +1728,15 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Target Date<input type="date" value={form.targetDate} onChange={(e) => setForm({ ...form, targetDate: e.target.value })} /></label>
             <label className="full-span">Why<textarea rows="4" value={form.why || ''} onChange={(e) => setForm({ ...form, why: e.target.value })} /></label>
+            <div className="full-span"><StepsChecklist steps={form.steps} onChange={(steps) => setForm((f) => ({ ...f, steps }))} hint="Type a step and press Return. Paste a list to add several." /></div>
           </>)}
 
           {selectedType === 'project' && (<>
             <label>Goal<select value={form.goalId || ''} onChange={(e) => setForm({ ...form, goalId: e.target.value })}><option value="">None</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label>
             <label>Due Date<input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} /></label>
-            <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Active</option><option>On Hold</option><option>Completed</option></select></label>
-            <label className="full-span">Description<textarea rows="5" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+            <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option>Active</option><option>In Progress</option><option>On Hold</option><option>Completed</option></select></label>
+            <label className="full-span">Description<textarea rows="4" value={form.description || ''} onChange={(e) => setForm({ ...form, description: e.target.value })} /></label>
+            <div className="full-span"><StepsChecklist steps={form.steps} onChange={(steps) => setForm((f) => ({ ...f, steps }))} hint="Type a step and press Return. Paste a list to add several." /></div>
           </>)}
 
           {selectedType === 'habit' && <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>}
@@ -1697,7 +1828,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const focusCopy = openTasks.filter(t => isToday(t.date) && !t.completed).slice(0, 2).map(t => t.title)
-  const topGoals = goals.slice(0, 3)
+  const topGoals = goals.filter((g) => !g.completed).slice(0, 3)
 
   const SECTIONS = [
     { to:'/tasks',        icon:'✓',  label:'Tasks',        color:'var(--teal)',   count: openTasks.length || null },
@@ -1916,6 +2047,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                     <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topGoal.title}
                     </div>
+                    {nextStepFor(topGoal, projects) && (
+                      <div style={{fontSize:'.7rem', color:'rgba(255,255,255,.62)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                        Next: {nextStepFor(topGoal, projects)}
+                      </div>
+                    )}
                   </div>
                 </Link>
               ) : (
@@ -2026,17 +2162,22 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <section className="card">
           <div className="section-title-row">
             <div><p className="eyebrow">Goals</p><h3>In Progress</h3></div>
-            <Link className="ghost-btn" to="/more" style={{fontSize:'.8rem'}}>All →</Link>
+            <Link className="ghost-btn" to="/goals" style={{fontSize:'.8rem'}}>All →</Link>
           </div>
-          {topGoals.map((goal) => (
-            <div key={goal.id} className="progress-block">
-              <div className="metric-row compact-row" style={{padding:'5px 0'}}>
-                <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{goal.title}</span>
-                <strong style={{color:'var(--brass)', fontSize:'.88rem'}}>{getGoalProgress(goal.id, tasks, projects)}%</strong>
-              </div>
-              <div className="mini-progress"><div style={{ width: `${getGoalProgress(goal.id, tasks, projects)}%` }} /></div>
-            </div>
-          ))}
+          {topGoals.map((goal) => {
+            const pct = getGoalProgress(goal, tasks, projects)
+            const next = nextStepFor(goal, projects)
+            return (
+              <Link key={goal.id} to="/goals" className="progress-block" style={{display:'block', textDecoration:'none', color:'inherit'}}>
+                <div className="metric-row compact-row" style={{padding:'5px 0'}}>
+                  <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{goal.title}</span>
+                  <strong style={{color:'var(--brass)', fontSize:'.88rem'}}>{pct}%</strong>
+                </div>
+                <div className="mini-progress"><div style={{ width: `${pct}%` }} /></div>
+                {next && <div className="home-next-step"><span>Next</span>{next}</div>}
+              </Link>
+            )
+          })}
         </section>
       )}
 
@@ -2486,28 +2627,29 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
 }
 
 
-function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate }) {
+function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate, onStepsChange, onUpdate, onToggle }) {
   const [filter, setFilter] = useState('All')
   const [expandedId, setExpandedId] = useState(null)
 
   const STATUS_ORDER = ['Active', 'In Progress', 'On Hold', 'Completed']
-  const STATUS_COLOR = {
-    Active: 'var(--teal)',
-    'In Progress': 'var(--warning)',
-    'On Hold': 'var(--muted)',
-    Completed: 'var(--success)',
+  const STATUS_STYLE = {
+    Active:        { color: 'var(--brass2)',  bg: 'var(--brass-dim)' },
+    'In Progress': { color: '#B26B12',        bg: 'rgba(233,149,42,.14)' },
+    'On Hold':     { color: 'var(--muted)',   bg: 'var(--stone2)' },
+    Completed:     { color: 'var(--success)', bg: 'rgba(34,197,94,.12)' },
   }
-
-  const filtered = filter === 'All' ? projects : projects.filter(p => p.status === filter)
+  const rank = (p) => { const i = STATUS_ORDER.indexOf(p.status); return i < 0 ? 0 : i }
+  const filtered = (filter === 'All' ? projects : projects.filter(p => p.status === filter))
+    .slice().sort((a, b) => rank(a) - rank(b))
 
   return (
     <div className="screen-stack">
+      <PageHeader icon={Folder} title="Projects" subtitle="Big things, one step at a time." />
 
-      {/* ── Header ──────────────────────────────────────────────── */}
       <section className="card" style={{padding:'12px 14px'}}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10}}>
           <div>
-            <p className="eyebrow">Projects</p>
+            <p className="eyebrow">Your projects</p>
             <div style={{fontSize:'.78rem', color:'var(--muted)', marginTop:2}}>
               {projects.filter(p=>p.status!=='Completed').length} active · {projects.filter(p=>p.status==='Completed').length} done
             </div>
@@ -2519,45 +2661,45 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
             <button key={s} onClick={() => setFilter(s)} style={{
               padding:'5px 12px', borderRadius:999, border:'1.5px solid', fontSize:'.78rem',
               cursor:'pointer', fontFamily:'inherit', fontWeight:600,
-              borderColor: filter===s ? 'var(--teal)' : 'var(--border2)',
-              background: filter===s ? 'var(--teal-dim)' : 'transparent',
-              color: filter===s ? 'var(--teal)' : 'var(--muted)'
+              borderColor: filter===s ? 'var(--brass)' : 'var(--border2)',
+              background: filter===s ? 'var(--brass-dim)' : 'transparent',
+              color: filter===s ? 'var(--brass2)' : 'var(--muted)'
             }}>{s}</button>
           ))}
         </div>
       </section>
 
-      {/* ── Empty state ─────────────────────────────────────────── */}
       {filtered.length === 0 && (
-        <section className="card" style={{textAlign:'center', padding:'32px 20px'}}>
-          <div style={{fontSize:'2rem', marginBottom:12}}>📁</div>
-          <EmptyState icon="📁" title="Build something meaningful" message="Goals become real when broken into projects with clear next steps." action="+ Add Project" onAction={onQuickCreate} />
-          <p className="muted" style={{fontSize:'.85rem', marginBottom:16}}>Projects connect your tasks and goals into focused workstreams.</p>
-          <button className="primary-btn" onClick={() => onQuickCreate('project')}>Create your first project</button>
+        <section className="card">
+          <EmptyState icon={Folder}
+            title={projects.length ? `No ${filter.toLowerCase()} projects` : 'Build something meaningful'}
+            message={projects.length ? 'Try another filter.' : 'Name the project, then list the steps. Check them off as you go.'}
+            action={projects.length ? null : '+ Add your first project'} onAction={() => onQuickCreate('project')} />
         </section>
       )}
 
-      {/* ── Project cards ────────────────────────────────────────── */}
       {filtered.map((project) => {
         const linkedGoal = goals.find(g => g.id === project.goalId)
         const projectTasks = tasks.filter(t => t.linkedProjectId === project.id)
         const completedTasks = projectTasks.filter(t => t.completed).length
-        const progress = getProjectProgress(project.id, tasks)
+        const steps = normalizeSteps(project.steps)
+        const stepsDone = steps.filter(st => st.done).length
+        const progress = getProjectProgress(project, tasks)
         const isExpanded = expandedId === project.id
         const overdueTasks = projectTasks.filter(t => !t.completed && isOverdue(t.date))
+        const st = STATUS_STYLE[project.status] || STATUS_STYLE['On Hold']
+        const summary = [
+          steps.length ? `${stepsDone}/${steps.length} steps` : null,
+          projectTasks.length ? `${completedTasks}/${projectTasks.length} tasks` : null,
+        ].filter(Boolean).join(' · ') || 'No steps yet'
 
         return (
-          <section key={project.id} className="card" style={{padding:'14px'}}>
-            {/* Project header */}
+          <section key={project.id} className="card" style={{padding:'16px'}}>
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8}}>
               <div style={{flex:1, minWidth:0}}>
-                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4}}>
+                <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap'}}>
                   <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)'}}>{project.title}</div>
-                  <span style={{
-                    fontSize:'.68rem', padding:'2px 8px', borderRadius:999, fontWeight:700,
-                    background: (STATUS_COLOR[project.status]||'var(--muted)')+'20',
-                    color: STATUS_COLOR[project.status]||'var(--muted)'
-                  }}>{project.status}</span>
+                  <span style={{fontSize:'.68rem', padding:'2px 8px', borderRadius:999, fontWeight:700, background: st.bg, color: st.color}}>{project.status}</span>
                 </div>
                 {project.description && (
                   <div style={{fontSize:'.82rem', color:'var(--muted)', lineHeight:1.5, marginBottom:6}}>{project.description}</div>
@@ -2565,64 +2707,69 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate 
               </div>
               <div style={{display:'flex', gap:6, flexShrink:0, marginLeft:8}}>
                 <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onEdit('project', project)}>Edit</button>
-                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('project', project.id)}>✕</button>
+                <button style={{background:'none', border:'none', color:'var(--muted)', cursor:'pointer'}} onClick={() => onDelete('project', project.id)} aria-label="Delete project">✕</button>
               </div>
             </div>
 
-            {/* Progress bar */}
             <div style={{marginBottom:8}}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4}}>
                 <span style={{fontSize:'.75rem', color:'var(--muted)'}}>
-                  {`${completedTasks}/${projectTasks.length} tasks · Due ${project.dueDate}`}
+                  {summary}{project.dueDate ? ` · Due ${shortDate(project.dueDate)}` : ''}
                 </span>
-                <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--teal)'}}>{progress}%</span>
+                <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--brass2)'}}>{progress}%</span>
               </div>
-              <div style={{height:6, borderRadius:999, background:'var(--surface)', overflow:'hidden'}}>
+              <div style={{height:6, borderRadius:999, background:'var(--stone2)', overflow:'hidden'}}>
                 <div style={{
-                  height:'100%', borderRadius:999,
-                  width:`${progress}%`,
-                  background: progress >= 100 ? 'var(--success)' : progress >= 60 ? 'var(--teal)' : progress >= 30 ? 'var(--warning)' : 'var(--danger)',
+                  height:'100%', borderRadius:999, width:`${progress}%`,
+                  background: progress >= 100 ? 'var(--success)' : 'linear-gradient(90deg, var(--brass2), var(--brass))',
                   transition:'width .4s'
                 }} />
               </div>
             </div>
 
-            {/* Meta row */}
-            <div style={{display:'flex', gap:12, fontSize:'.75rem', color:'var(--muted)', marginBottom:8, flexWrap:'wrap'}}>
-              {linkedGoal && <span>🎯 {linkedGoal.title}</span>}
-              {overdueTasks.length > 0 && <span style={{color:'var(--danger)', fontWeight:600}}>⚠ {overdueTasks.length} overdue</span>}
-            </div>
-
-            {/* Task list toggle */}
-            {projectTasks.length > 0 && (
-              <button onClick={() => setExpandedId(isExpanded ? null : project.id)}
-                style={{background:'none', border:'none', color:'var(--teal)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0, marginBottom: isExpanded ? 10 : 0}}>
-                {isExpanded ? '▲ Hide tasks' : `▼ Show ${projectTasks.length} task${projectTasks.length!==1?'s':''}`}
-              </button>
+            {(linkedGoal || overdueTasks.length > 0) && (
+              <div style={{display:'flex', gap:12, fontSize:'.75rem', color:'var(--muted)', flexWrap:'wrap', alignItems:'center'}}>
+                {linkedGoal && <span style={{display:'inline-flex', alignItems:'center', gap:5}}><Target size={13} color="var(--brass)" /> {linkedGoal.title}</span>}
+                {overdueTasks.length > 0 && <span style={{color:'var(--danger)', fontWeight:600}}>⚠ {overdueTasks.length} overdue</span>}
+              </div>
             )}
 
-            {/* Expanded task list */}
+            <StepsChecklist
+              steps={steps}
+              onChange={(next) => onStepsChange && onStepsChange(project.id, next)}
+              onSchedule={(step) => onQuickCreate('task', { title: step.text, linkedProjectId: project.id, linkedGoalId: project.goalId || '' })}
+              completeSlot={project.status !== 'Completed' && onUpdate && (
+                <button type="button" className="steps-complete-btn" onClick={() => onUpdate('project', { ...project, status: 'Completed' }, 'edit')}>Mark project complete</button>
+              )} />
+
+            <div style={{display:'flex', gap:12, alignItems:'center', marginTop:12, flexWrap:'wrap'}}>
+              {projectTasks.length > 0 && (
+                <button onClick={() => setExpandedId(isExpanded ? null : project.id)}
+                  style={{background:'none', border:'none', color:'var(--ink2)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>
+                  {isExpanded ? '▲ Hide tasks' : `▼ Show ${projectTasks.length} scheduled task${projectTasks.length!==1?'s':''}`}
+                </button>
+              )}
+              <button onClick={() => onQuickCreate('task', { linkedProjectId: project.id, linkedGoalId: project.goalId || '' })}
+                style={{background:'none', border:'none', color:'var(--brass2)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>
+                + Schedule a task
+              </button>
+            </div>
+
             {isExpanded && (
-              <div style={{borderTop:'1px solid var(--surface)', paddingTop:10}}>
+              <div style={{borderTop:'1px solid var(--border)', paddingTop:8, marginTop:10}}>
                 {projectTasks.map(task => (
-                  <div key={task.id} style={{display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--surface)'}}>
-                    <div style={{
-                      width:18, height:18, borderRadius:'50%', border:'2px solid', flexShrink:0,
-                      borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
-                      background: task.completed ? 'var(--success)' : 'transparent',
-                      display:'grid', placeItems:'center'
-                    }}>
-                      {task.completed && <span style={{color:'white', fontSize:'.6rem', fontWeight:700}}>✓</span>}
-                    </div>
+                  <div key={task.id} style={{display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid var(--border)'}}>
+                    <button type="button" onClick={() => onToggle && onToggle(task.id)}
+                      aria-label={task.completed ? 'Mark task not done' : 'Mark task done'}
+                      className={'step-check' + (task.completed ? ' done' : '')}>
+                      {task.completed && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+                    </button>
                     <div style={{flex:1, minWidth:0}}>
                       <div style={{fontSize:'.88rem', color: task.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: task.completed ? 'line-through' : 'none'}}>{task.title}</div>
-                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{task.date}</div>}
+                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{shortDate(task.date)}{task.time ? ` · ${task.time}` : ''}</div>}
                     </div>
                   </div>
                 ))}
-                <button className="ghost-btn" style={{fontSize:'.78rem', padding:'6px 12px', marginTop:8}} onClick={() => onQuickCreate('task', {linkedProjectId: project.id})}>
-                  + Add task to this project
-                </button>
               </div>
             )}
           </section>
@@ -2954,6 +3101,110 @@ function TrialBanner({ daysLeft, onUpgrade }) {
 
 
 // ── Empty State Component ─────────────────────────────────────────────────
+function StepsChecklist({ steps, onChange, onSchedule, completeSlot, label = 'Steps', hint }) {
+  const list = normalizeSteps(steps)
+  const [draft, setDraft] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [showDone, setShowDone] = useState(false)
+  const doneCount = list.filter((st) => st.done).length
+  const nextId = list.length > 1 ? list.find((st) => !st.done)?.id : null
+  const collapseDone = doneCount > 3 && !showDone
+  const visible = collapseDone ? list.filter((st) => !st.done) : list
+
+  const addLines = (lines) => { if (lines.length) onChange([...list, ...lines.map((text) => ({ id: newStepId(), text, done: false, doneAt: null }))]) }
+  const addDraft = () => { addLines(parseStepLines(draft)); setDraft('') }
+  const toggle = (id) => onChange(list.map((st) => st.id === id ? { ...st, done: !st.done, doneAt: st.done ? null : new Date().toISOString() } : st))
+  const remove = (id) => { onChange(list.filter((st) => st.id !== id)); setEditingId(null) }
+  const move = (id, dir) => {
+    const i = list.findIndex((st) => st.id === id), j = i + dir
+    if (i < 0 || j < 0 || j >= list.length) return
+    const next = [...list]; [next[i], next[j]] = [next[j], next[i]]; onChange(next)
+  }
+  const startEdit = (st) => { setEditingId(st.id); setEditText(st.text) }
+  const saveEdit = () => {
+    const text = editText.trim()
+    const cur = list.find((st) => st.id === editingId)
+    if (text && cur && text !== cur.text) onChange(list.map((st) => st.id === editingId ? { ...st, text } : st))
+    setEditingId(null)
+  }
+
+  return (
+    <div className="steps">
+      <div className="steps-head">
+        <span className="steps-label">{label}</span>
+        {list.length > 0 && <span className="steps-count">{doneCount}/{list.length} done</span>}
+      </div>
+
+      {visible.map((st) => {
+        const idx = list.findIndex((x) => x.id === st.id)
+        const editing = editingId === st.id
+        return (
+          <div key={st.id} className={'step-row' + (st.done ? ' done' : '')}>
+            <button type="button" className={'step-check' + (st.done ? ' done' : st.id === nextId ? ' next' : '')}
+              onClick={() => toggle(st.id)} aria-label={st.done ? `Uncheck ${st.text}` : `Check off ${st.text}`} aria-pressed={st.done}>
+              {st.done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+            </button>
+            {editing ? (
+              <div className="step-edit">
+                <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)} aria-label="Edit step"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); saveEdit() }
+                    if (e.key === 'Escape') { e.preventDefault(); setEditingId(null) }
+                  }} />
+                <div className="step-tools">
+                  <button type="button" className="step-tool" onClick={() => move(st.id, -1)} disabled={idx === 0} aria-label="Move up"><ChevronUp size={16} /></button>
+                  <button type="button" className="step-tool" onClick={() => move(st.id, 1)} disabled={idx === list.length - 1} aria-label="Move down"><ChevronDown size={16} /></button>
+                  {onSchedule && (
+                    <button type="button" className="step-tool wide" onClick={() => { setEditingId(null); onSchedule({ ...st, text: editText.trim() || st.text }) }}>
+                      <CalendarPlus size={15} /> Schedule
+                    </button>
+                  )}
+                  <button type="button" className="step-tool danger" onClick={() => remove(st.id)} aria-label="Delete step"><Trash2 size={15} /></button>
+                  <button type="button" className="step-tool primary" onClick={saveEdit}>Done</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="step-text" onClick={() => startEdit(st)} title="Tap to edit">
+                {st.text}
+                {st.id === nextId && <span className="step-next-tag">Next</span>}
+              </button>
+            )}
+          </div>
+        )
+      })}
+
+      {doneCount > 3 && (
+        <button type="button" className="steps-more" onClick={() => setShowDone((v) => !v)}>
+          {showDone ? 'Hide completed' : `Show ${doneCount} completed`}
+        </button>
+      )}
+
+      {list.length > 0 && doneCount === list.length && (
+        <div className="steps-complete">
+          <Flag size={15} color="var(--success)" />
+          <span>Every step is checked off.</span>
+          {completeSlot}
+        </div>
+      )}
+
+      <div className="step-add">
+        <Plus size={16} color="var(--brass2)" />
+        <input value={draft} placeholder={list.length ? 'Add another step' : 'Add the first step'}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addDraft() } }}
+          onPaste={(e) => {
+            const text = e.clipboardData?.getData('text') || ''
+            if (/\r?\n/.test(text.trim())) { e.preventDefault(); addLines(parseStepLines(draft + text)); setDraft('') }
+          }}
+          aria-label="New step" enterKeyHint="done" />
+        {draft.trim() && <button type="button" onClick={addDraft}>Add</button>}
+      </div>
+      {hint && <div className="steps-hint">{hint}</div>}
+    </div>
+  )
+}
+
 const EMPTY_ICON_MAP = {
   '✈': Plane, '✝': Cross, '🍳': ChefHat, '🎁': Gift, '🎂': Cake, '🎯': Target, '💊': Pill, '💪': Dumbbell,
   '💳': CreditCard, '💵': Banknote, '📁': Folder, '📈': TrendingUp, '📉': TrendingDown, '📖': BookOpen,
@@ -2984,7 +3235,7 @@ function EmptyState({ icon, title, message, action, onAction }) {
       {action && (
         <button onClick={onAction} style={{
           padding: '10px 22px', borderRadius: 999,
-          background: 'var(--teal)', color: 'white',
+          background: 'var(--ink)', color: 'var(--warm-white)',
           border: 'none', fontSize: '.88rem', fontWeight: 600,
           cursor: 'pointer', transition: 'opacity .15s',
         }}
@@ -6730,7 +6981,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
   )
 }
 
-function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) {
+function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, onStepsChange, onUpdate }) {
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
@@ -6827,54 +7078,86 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate }) 
       </section>
 
       {filtered.length === 0 && (
-        <section className="card" style={{textAlign:'center',padding:'28px 20px'}}>
-          <div style={{fontSize:'2rem',marginBottom:10}}>🎯</div>
-          <EmptyState icon="🎯" title="Aim at something" message="A life without aim drifts. Set one goal and pursue it." action="+ Add Goal" onAction={onQuickCreate} />
-          <p className="muted" style={{fontSize:'.85rem',marginBottom:14}}>Use the SMART framework above to set your first goal.</p>
-          <button className="primary-btn" onClick={() => onQuickCreate('goal')}>Set Your First Goal</button>
+        <section className="card">
+          <EmptyState icon={Target}
+            title={goals.length ? 'No goals in this timeframe' : 'Aim at something'}
+            message={goals.length ? 'Pick another timeframe above.' : 'Set one goal using the SMART framework above, then break it into steps.'}
+            action={goals.length ? null : '+ Set your first goal'} onAction={() => onQuickCreate('goal')} />
         </section>
       )}
 
-      {filtered.map(goal => {
-        const progress = getGoalProgress(goal.id, tasks, projects)
-        const completedLinked = tasks.filter(t => t.linkedGoalId === goal.id && t.completed).length
+      {filtered.slice().sort((a, b) => Number(!!a.completed) - Number(!!b.completed)).map(goal => {
+        const progress = getGoalProgress(goal, tasks, projects)
         const linkedProjects = projects.filter(p => p.goalId === goal.id)
-        const completedLinkedProjects = linkedProjects.filter(p => p.status === 'Completed').length
         const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
+        const completedLinked = linkedTasks.filter(t => t.completed).length
+        const steps = normalizeSteps(goal.steps)
+        const stepsDone = steps.filter(st => st.done).length
         const tf = TIMEFRAMES.find(t => t.id === goal.timeframe)
+        const summary = [
+          steps.length ? `${stepsDone}/${steps.length} steps` : null,
+          linkedTasks.length ? `${completedLinked}/${linkedTasks.length} tasks` : null,
+          linkedProjects.length ? `${linkedProjects.length} project${linkedProjects.length !== 1 ? 's' : ''}` : null,
+        ].filter(Boolean).join(' · ') || 'No steps yet'
         return (
-          <section key={goal.id} className="card">
+          <section key={goal.id} className="card" style={goal.completed ? {opacity:.78} : undefined}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
                   <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>{goal.title}</div>
                   {tf && tf.id !== 'all' && (
-                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass)',fontWeight:700}}>{tf.label}</span>
+                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass2)',fontWeight:700}}>{tf.label}</span>
+                  )}
+                  {goal.completed && (
+                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'rgba(34,197,94,.12)',color:'var(--success)',fontWeight:700}}>Achieved</span>
                   )}
                 </div>
                 {goal.description && <div style={{fontSize:'.82rem',color:'var(--muted)',lineHeight:1.5,marginBottom:6}}>{goal.description}</div>}
-                <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{goal.category} · Due {goal.targetDate}</div>
+                {goal.why && <div style={{fontFamily:'var(--serif)',fontStyle:'italic',fontSize:'.86rem',color:'var(--ink2)',lineHeight:1.5,marginBottom:6}}>“{goal.why}”</div>}
+                <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{[goal.category, goal.targetDate ? `Due ${shortDate(goal.targetDate)}` : null].filter(Boolean).join(' · ')}</div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0,marginLeft:8}}>
-                <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px',color:'var(--teal)',borderColor:'var(--teal)'}}
-                  onClick={() => onQuickCreate('task', { linkedGoalId: goal.id, category: goal.category || 'Productivity' })}>+ Task</button>
                 <button className="ghost-btn" style={{fontSize:'.72rem',padding:'4px 8px'}} onClick={() => onEdit('goal',goal)}>Edit</button>
-                <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}} onClick={() => onDelete('goal',goal.id)}>✕</button>
+                <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}} onClick={() => onDelete('goal',goal.id)} aria-label="Delete goal">✕</button>
               </div>
             </div>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
-              <span style={{color:'var(--muted)'}}>
-                {linkedTasks.length === 0 && linkedProjects.length === 0 
-                  ? 'No linked tasks yet' 
-                  : `${completedLinked + completedLinkedProjects}/${linkedTasks.length + linkedProjects.length} completed`}
-              </span>
-              <strong style={{color: progress>=100?'var(--success)':'var(--brass)'}}>{progress}%</strong>
-      
-      
-
-      </div>
+              <span style={{color:'var(--muted)'}}>{summary}</span>
+              <strong style={{color: progress>=100?'var(--success)':'var(--brass2)'}}>{progress}%</strong>
+            </div>
             <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${progress}%`,background:progress>=100?'var(--success)':'var(--brass)',borderRadius:999,transition:'width .4s'}} />
+              <div style={{height:'100%',width:`${progress}%`,background:progress>=100?'var(--success)':'linear-gradient(90deg, var(--brass2), var(--brass))',borderRadius:999,transition:'width .4s'}} />
+            </div>
+
+            {linkedProjects.length > 0 && (
+              <div style={{display:'grid',gap:4,marginTop:10}}>
+                {linkedProjects.map(p => (
+                  <Link key={p.id} to="/projects" style={{display:'flex',alignItems:'center',gap:8,fontSize:'.78rem',color:'var(--ink2)',textDecoration:'none'}}>
+                    <Folder size={13} color="var(--brass)" />
+                    <span style={{flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</span>
+                    <span style={{color:'var(--muted)',fontVariantNumeric:'tabular-nums'}}>{getProjectProgress(p, tasks)}%</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            <StepsChecklist
+              steps={steps}
+              onChange={(next) => onStepsChange && onStepsChange(goal.id, next)}
+              onSchedule={(step) => onQuickCreate('task', { title: step.text, linkedGoalId: goal.id, category: goal.category || 'Productivity' })}
+              completeSlot={!goal.completed && onUpdate && (
+                <button type="button" className="steps-complete-btn" onClick={() => onUpdate('goal', { ...goal, completed: true }, 'edit')}>Mark goal achieved</button>
+              )} />
+
+            <div style={{display:'flex',gap:14,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
+              <button onClick={() => onQuickCreate('task', { linkedGoalId: goal.id, category: goal.category || 'Productivity' })}
+                style={{background:'none',border:'none',color:'var(--brass2)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Schedule a task</button>
+              <button onClick={() => onQuickCreate('project', { goalId: goal.id })}
+                style={{background:'none',border:'none',color:'var(--ink2)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Project for this goal</button>
+              {goal.completed && onUpdate && (
+                <button onClick={() => onUpdate('goal', { ...goal, completed: false }, 'edit')}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>Reopen goal</button>
+              )}
             </div>
           </section>
         )
@@ -7624,7 +7907,7 @@ function ScrollToTop() {
 }
 
 function PlannerApp() {
-  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
   // Subscription
   const subscription = useSubscription(user)
@@ -7691,9 +7974,9 @@ function PlannerApp() {
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
-          <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
+          <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
+            <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
@@ -7713,11 +7996,11 @@ function PlannerApp() {
           projects={projects}
           onSave={async (type, payload, modeArg) => {
             await saveItem(type, payload, modeArg)
-            pushToast(modeArg === 'edit' ? `${type} updated` : `${type} added`, 'Your planner synced the change.', 'success')
+            pushToast(`${labels[type] || type} ${modeArg === 'edit' ? 'updated' : 'added'}`, 'Synced across your devices.', 'success')
           }}
           onDelete={async (type, id) => {
             await deleteItem(type, id)
-            pushToast(`${type} deleted`, '', 'success')
+            pushToast(`${labels[type] || type} deleted`, '', 'success')
           }}
         />
       </Layout>
