@@ -1621,3 +1621,19 @@ button.profile-pill:active { transform: scale(.97); }
 .readiness-bar-fill.tone-low { background: #C9533F; }
 .readiness-bar-val { font-size: .7rem; font-weight: 700; color: var(--ink2); font-variant-numeric: tabular-nums; }
 .readiness-bar-day { font-size: .62rem; color: var(--muted); text-transform: uppercase; }
+
+/* ── Wellness: Nutrition & Care ─────────────────────────────────────── */
+.nut-protein { display: grid; gap: 6px; }
+.nut-protein-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .86rem; color: var(--ink2); }
+.nut-protein-top strong { font-family: var(--serif); font-size: 1.5rem; font-weight: 400; color: var(--ink); }
+.nut-protein-top .muted { font-size: .76rem; }
+.nut-bar { height: 8px; border-radius: 999px; background: var(--stone2); overflow: hidden; }
+.nut-bar > div { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brass2), var(--brass)); transition: width .4s; }
+.nut-bar > div.hit { background: #2E9A5B; }
+.nut-mini { display: flex; flex-wrap: wrap; gap: 6px; }
+.nut-mini span { font-size: .72rem; padding: 3px 9px; border-radius: 999px; background: var(--stone); color: var(--ink2); }
+.pain-chip.sel { background: var(--ink); border-color: var(--ink); color: var(--warm-white); }
+.home-protein { display: grid; gap: 6px; margin-top: 12px; padding: 10px 12px; border-radius: 14px; background: var(--stone); border: 1px solid var(--border); text-decoration: none; color: inherit; }
+.home-protein .nut-protein-top strong { font-size: 1.2rem; }
+.care-check { display: flex !important; align-items: center; gap: 8px; font-weight: 500 !important; }
+.care-check input { width: 18px !important; height: 18px; accent-color: var(--ink); }
