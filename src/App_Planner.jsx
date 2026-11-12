@@ -8789,7 +8789,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                   </div>
                 </div>
                 {isPro ? (
-                  <a href="mailto:support@thelivingplanner.app?subject=Manage%20My%20Subscription"
+                  <a href="mailto:support@eloraradiance.com?subject=Manage%20My%20Subscription"
                      style={{
                        padding:'8px 18px', borderRadius:999, background:'var(--stone)',
                        color:'var(--ink)', textDecoration:'none', border:'1.5px solid var(--border2)',
@@ -8806,8 +8806,8 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           })()}
           <p className="muted" style={{fontSize:'.72rem',marginTop:12,marginBottom:0,lineHeight:1.5}}>
             To cancel or update payment, email{' '}
-            <a href="mailto:support@thelivingplanner.app" style={{color:'var(--teal)'}}>support@thelivingplanner.app</a>{' '}
-            or visit your Stripe receipt email and follow the cancellation link.
+            <a href="mailto:support@eloraradiance.com" style={{color:'var(--teal)'}}>support@eloraradiance.com</a>.
+            You keep Pro until the end of the period you've paid for.
           </p>
         </section>
 
@@ -8973,7 +8973,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         <p className="eyebrow" style={{color:'var(--brass)'}}>Support</p>
         <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px'}}>We're here to help</h3>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          <a href="mailto:support@thelivingplanner.app" style={{
+          <a href="mailto:support@eloraradiance.com" style={{
             display:'flex',alignItems:'center',gap:12,padding:'14px',
             background:'rgba(255,255,255,.06)',borderRadius:10,
             border:'1px solid rgba(184,150,90,.2)',textDecoration:'none'
@@ -8981,7 +8981,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>✉</div>
             <div>
               <div style={{color:'var(--warm-white)',fontWeight:600,fontSize:'.9rem'}}>Email Support</div>
-              <div style={{color:'var(--brass)',fontSize:'.8rem',marginTop:2}}>support@thelivingplanner.app</div>
+              <div style={{color:'var(--brass)',fontSize:'.8rem',marginTop:2}}>support@eloraradiance.com</div>
               <div style={{color:'rgba(255,255,255,.4)',fontSize:'.72rem',marginTop:2}}>We respond within 24 hours</div>
             </div>
           </a>
@@ -8989,6 +8989,16 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{color:'rgba(255,255,255,.5)',fontSize:'.78rem',lineHeight:1.6}}>
               For bugs, feature requests, billing questions, or anything else — reach out anytime. Built with care by a real person who wants this to work for you.
             </div>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:'6px 16px',paddingTop:2}}>
+            {[
+              ['Help & Support', 'https://eloraradiance.com/support.html'],
+              ['Privacy Policy', 'https://eloraradiance.com/privacy.html'],
+              ['Terms of Service', 'https://eloraradiance.com/terms.html'],
+            ].map(([label, href]) => (
+              <a key={href} href={href} target="_blank" rel="noopener noreferrer"
+                 style={{color:'rgba(255,255,255,.72)',fontSize:'.78rem',textDecoration:'underline',textUnderlineOffset:3}}>{label}</a>
+            ))}
           </div>
         </div>
       </section>
