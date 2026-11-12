@@ -11,7 +11,7 @@ import {
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
-  House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge, Utensils, Stethoscope,
+  House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge, Utensils, Stethoscope, Search, Download,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -1639,6 +1639,152 @@ function MenuSheet({ open, onClose, onQuickAdd }) {
   )
 }
 
+// Lets any link open a page on a specific tab: /faith?tab=sermons
+function useUrlTab(initial) {
+  const location = useLocation()
+  const urlTab = new URLSearchParams(location.search).get('tab')
+  const [tab, setTab] = useState(urlTab || initial)
+  useEffect(() => { if (urlTab) setTab(urlTab) }, [urlTab, location.key])
+  return [tab, setTab]
+}
+
+// ── Search everything ────────────────────────────────────────────────────
+// Stored lists that live in page_data / faith_data: [source, key, label, route]
+const SEARCH_SOURCES = [
+  ['wellness', 'journalEntries', 'Journal', '/wellness?tab=journal'],
+  ['wellness', 'appointments', 'Appointment', '/wellness?tab=care'],
+  ['wellness', 'labs', 'Lab result', '/wellness?tab=care'],
+  ['wellness', 'meds', 'Medication', '/wellness?tab=meds'],
+  ['wellness', 'workouts', 'Workout', '/wellness?tab=training'],
+  ['wellness', 'books', 'Book', '/growth'],
+  ['lifestyle', 'recipes', 'Recipe', '/lifestyle?tab=recipes'],
+  ['lifestyle', 'trips', 'Trip', '/lifestyle?tab=trips'],
+  ['lifestyle', 'birthdays', 'Birthday', '/lifestyle?tab=birthdays'],
+  ['lifestyle', 'gifts', 'Gift idea', '/lifestyle?tab=gifts'],
+  ['productivity', 'checklists', 'Checklist', '/productivity?tab=checklists'],
+  ['productivity', 'brainDump', 'Brain dump', '/productivity?tab=braindump'],
+  ['faith', 'sermons', 'Sermon', '/faith?tab=sermons'],
+  ['faith', 'prayers', 'Prayer', '/faith?tab=prayer'],
+  ['faith', 'scriptures', 'Scripture', '/faith?tab=scripture'],
+  ['faith', 'gratitude', 'Gratitude', '/faith?tab=gratitude'],
+]
+const LOCAL_PREFIX = { wellness: 'planner.hw.', lifestyle: 'planner.l.', productivity: 'planner.p.', faith: 'planner.faith.' }
+const TITLE_FIELDS = ['title', 'name', 'who', 'test', 'reference', 'text', 'request', 'label', 'type', 'verse']
+function textOf(v, depth = 0) {
+  if (v == null || depth > 3) return ''
+  if (typeof v === 'string') return v
+  if (typeof v === 'number') return ''
+  if (Array.isArray(v)) return v.map((x) => textOf(x, depth + 1)).join(' ')
+  if (typeof v === 'object') return Object.entries(v).filter(([k]) => !/^(id|date|at|created|updated|done|completed|color)/i.test(k)).map(([, x]) => textOf(x, depth + 1)).join(' ')
+  return ''
+}
+function titleOf(o) {
+  if (typeof o === 'string') return o.split('\n')[0].slice(0, 80)
+  for (const f of TITLE_FIELDS) if (o && typeof o[f] === 'string' && o[f].trim()) return o[f].trim().slice(0, 80)
+  return textOf(o).trim().slice(0, 80)
+}
+function snippet(hay, q) {
+  const i = hay.toLowerCase().indexOf(q)
+  if (i < 0) return ''
+  const a = Math.max(0, i - 30), b = Math.min(hay.length, i + q.length + 50)
+  return (a > 0 ? '…' : '') + hay.slice(a, b).replace(/\s+/g, ' ').trim() + (b < hay.length ? '…' : '')
+}
+
+function SearchSheet({ open, onClose, data, onOpenItem }) {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  const [stored, setStored] = useState([])
+  const inputRef = React.useRef(null)
+
+  // Load the lists that live outside the main tables each time search opens
+  useEffect(() => {
+    if (!open) return
+    setTimeout(() => inputRef.current?.focus(), 80)
+    const fromLocal = () => SEARCH_SOURCES.map(([page, key]) => {
+      try { const v = localStorage.getItem(LOCAL_PREFIX[page] + key) ?? localStorage.getItem(key); return { page, key, value: v ? JSON.parse(v) : null } } catch { return { page, key, value: null } }
+    })
+    if (!user || !hasSupabaseEnv) { setStored(fromLocal()); return }
+    const pageKeys = SEARCH_SOURCES.filter(([pg]) => pg !== 'faith').map(([, k]) => k)
+    const faithKeys = SEARCH_SOURCES.filter(([pg]) => pg === 'faith').map(([, k]) => k)
+    Promise.all([
+      supabase.from('page_data').select('page,data_key,data_value').eq('user_id', user.id).in('data_key', pageKeys),
+      supabase.from('faith_data').select('data_key,data_value').eq('user_id', user.id).in('data_key', faithKeys),
+    ]).then(([pd, fd]) => {
+      const rows = [
+        ...(pd.data || []).map((r) => ({ page: r.page, key: r.data_key, value: r.data_value })),
+        ...(fd.data || []).map((r) => ({ page: 'faith', key: r.data_key, value: r.data_value })),
+      ]
+      setStored(rows.length ? rows : fromLocal())
+    }).catch(() => setStored(fromLocal()))
+  }, [open, user?.id])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+
+  const results = useMemo(() => {
+    const query = q.trim().toLowerCase()
+    if (query.length < 2) return []
+    const out = []
+    const add = (group, title, hay, go, sub) => {
+      const h = `${title} ${hay}`.toLowerCase()
+      if (!h.includes(query)) return
+      const inTitle = title.toLowerCase().includes(query)
+      out.push({ group, title, sub: inTitle ? (sub || '') : [sub, snippet(hay, query)].filter(Boolean).join(' · '), go, rank: inTitle ? 0 : 1 })
+    }
+    for (const t of data.tasks || []) add('Tasks', t.title || '', t.notes || '', () => onOpenItem('task', t), [t.date ? shortDate(t.date) : '', t.time ? fmt12(t.time) : '', t.completed ? 'Done' : ''].filter(Boolean).join(' · '))
+    for (const e of data.events || []) add('Events', e.title || '', `${e.location || ''} ${e.notes || ''}`, () => onOpenItem('event', e), [e.date ? shortDate(e.date) : '', e.startTime ? fmt12(e.startTime) : '', e.recurrence && e.recurrence !== 'none' ? `↻ ${repeatLabel(e.recurrence)}` : ''].filter(Boolean).join(' · '))
+    for (const g of data.goals || []) add('Goals', g.title || '', `${g.why || ''} ${g.description || ''} ${(g.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('goal', g), g.category)
+    for (const pr of data.projects || []) add('Projects', pr.title || '', `${pr.description || ''} ${(pr.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('project', pr), pr.status)
+    for (const n of data.notes || []) add('Notes', n.title || titleOf(n.content || ''), n.content || '', () => onOpenItem('note', n))
+    for (const h of data.habits || []) add('Habits', h.title || '', '', () => { navigate('/habits'); onClose() })
+    for (const src of SEARCH_SOURCES) {
+      const [page, key, label, route] = src
+      const row = stored.find((r) => r.page === page && r.key === key)
+      if (!row || row.value == null) continue
+      const go = () => { navigate(route); onClose() }
+      if (typeof row.value === 'string') { add(label, label, row.value, go); continue }
+      const items = Array.isArray(row.value) ? row.value : Object.values(row.value).flat()
+      for (const it of items) if (it) add(label, titleOf(it), textOf(it), go, it.date ? shortDate(it.date) : '')
+    }
+    return out.sort((a, b) => a.rank - b.rank).slice(0, 60)
+  }, [q, data, stored])
+
+  const groups = results.reduce((m, r) => { (m[r.group] = m[r.group] || []).push(r); return m }, {})
+
+  return (
+    <div className={'menu-sheet-root' + (open ? ' open' : '')} aria-hidden={!open}>
+      <div className="menu-backdrop" onClick={onClose} />
+      <div className="menu-sheet search-sheet" role="dialog" aria-modal="true" aria-label="Search">
+        <div className="search-bar">
+          <Search size={18} />
+          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tasks, notes, sermons, goals…" aria-label="Search everything" enterKeyHint="search" />
+          <button className="menu-close" onClick={() => { setQ(''); onClose() }} aria-label="Close search"><X size={18} /></button>
+        </div>
+        {q.trim().length < 2 ? (
+          <p className="muted search-hint">Search across tasks, events, goals, projects, notes, journal, sermons, prayers, scripture, recipes, trips, birthdays, books and more.</p>
+        ) : results.length === 0 ? (
+          <p className="muted search-hint">Nothing matches "{q.trim()}".</p>
+        ) : Object.entries(groups).map(([g, rows]) => (
+          <div key={g} className="search-group">
+            <p className="side-group-label">{g}</p>
+            {rows.map((r, i) => (
+              <button key={g + i} className="search-result" onClick={() => { r.go(); onClose() }}>
+                <strong>{r.title || g}</strong>
+                {r.sub && <small>{r.sub}</small>}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function SideNav({ onQuickAdd }) {
   const { pathname } = useLocation()
   return (
@@ -1671,13 +1817,19 @@ function SideNav({ onQuickAdd }) {
   )
 }
 
-function Layout({ children, onQuickAdd, banner, profile, onModeChange }) {
+function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchData, onOpenItem }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
   const showSideNav = !isMobile   // iPad (portrait + landscape) and desktop
   const [menuOpen, setMenuOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  useEffect(() => {
+    const onKey = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen(true) } }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const onTabRoute = tabs.some((t) => t.to === location.pathname)
 
   // Keep the side nav pinned just below the sticky topbar, whatever its height
@@ -1753,6 +1905,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange }) {
         </Link>
 
         <div className="topbar-actions">
+          <button type="button" className="topbar-search" onClick={() => setSearchOpen(true)} aria-label="Search everything"><Search size={19} /></button>
           <button type="button" className="profile-pill" onClick={() => setModeOpen(true)} aria-label={`Planner mode: ${modeOf(profile).id}. Change mode`}>
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
             <div style={{display:'flex',flexDirection:'column',gap:1,textAlign:'left'}}>
@@ -1789,6 +1942,9 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange }) {
           </button>
         </nav>
       ) : null}
+
+      <SearchSheet open={searchOpen} onClose={() => setSearchOpen(false)} data={searchData || {}}
+        onOpenItem={(type, item) => { setSearchOpen(false); onOpenItem && onOpenItem(type, item) }} />
 
       <ModeSheet open={modeOpen} current={modeOf(profile).id} onClose={() => setModeOpen(false)}
         onPick={(id) => { setModeOpen(false); if (onModeChange && id !== modeOf(profile).id) onModeChange(id) }} />
@@ -4007,7 +4163,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab] = useUrlTab('overview')
   const [period, setPeriod] = useState('monthly')
 
   // ── Shared state (linked across tabs) ─────────────────────────────────
@@ -5981,10 +6137,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
 
 
   // ── Health state ────────────────────────────────────────────────────────
-  const location = useLocation()
-  const urlTab = new URLSearchParams(location.search).get('tab')
-  const [tab, setTab] = useState(urlTab || 'mood')
-  useEffect(() => { if (urlTab) setTab(urlTab) }, [urlTab])
+  const [tab, setTab] = useUrlTab('mood')
   
   
 
@@ -6148,19 +6301,19 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           </section>
 
           <section className="card">
-            <p className="eyebrow">Energy Level</p>
-            <h3 style={{margin:'4px 0 12px'}}>Rate your energy today</h3>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                <button key={n} onClick={() => logWellness('energy', n)} style={{
-                  width:36,height:36,borderRadius:'var(--radius-sm)',border:'1.5px solid',cursor:'pointer',
-                  fontWeight:700,fontSize:'.85rem',fontFamily:'var(--sans)',
-                  borderColor: todayWellness.energy===n ? 'var(--brass)' : 'var(--border2)',
-                  background: todayWellness.energy===n ? 'var(--brass)' : 'var(--stone)',
-                  color: todayWellness.energy===n ? 'white' : 'var(--ink2)'
-                }}>{n}</button>
-              ))}
-            </div>
+            <p className="eyebrow">Energy & Readiness</p>
+            {recovery[TODAY] ? (
+              <button className={'readiness-hero compact tone-' + (readinessBand(readinessOf(recovery[TODAY]))?.tone || 'mid')} onClick={() => setTab('recovery')} style={{ width: '100%', textAlign: 'left', cursor: 'pointer', font: 'inherit' }}>
+                <div className="readiness-num">{readinessOf(recovery[TODAY])}</div>
+                <div><strong>Energy {recovery[TODAY].energy}/5 · {readinessBand(readinessOf(recovery[TODAY])).label}</strong><p>From today's check-in. Tap to update.</p></div>
+              </button>
+            ) : (
+              <button className="readiness-cta" onClick={() => setTab('recovery')} style={{ width: '100%', border: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
+                <Gauge size={20} />
+                <div><strong>Rate your energy</strong><span>Part of the 20-second daily check-in</span></div>
+                <span aria-hidden="true">→</span>
+              </button>
+            )}
           </section>
 
           <section className="card">
@@ -6795,7 +6948,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('braindump')
+  const [tab, setTab] = useUrlTab('braindump')
   const [noteQuery, setNoteQuery] = useState('')
   const notes = propNotes || []
   // notes now come from Supabase via props - use saveItem
@@ -7227,11 +7380,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
         data.forEach(row => {
           if (row.data_key === 'trips') setTrips(row.data_value || [])
           if (row.data_key === 'birthdays') setBirthdays(row.data_value || [])
-          if (row.data_key === 'contacts') setContacts(row.data_value || [])
           if (row.data_key === 'groceries') setGroceries(row.data_value || [])
           if (row.data_key === 'recipes') setRecipes(row.data_value || [])
           if (row.data_key === 'gifts') setGifts(row.data_value || [])
-          if (row.data_key === 'passwords') setPasswords(row.data_value || [])
         })
       })
   }, [user?.id])
@@ -7239,14 +7390,13 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('groceries')
+  const [tab, setTab] = useUrlTab('groceries')
   const [trips, setTrips] = useState(() => { try { const v = localStorage.getItem('planner.l.trips'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', notes: '', packing: '' })
   const [birthdays, setBirthdays] = useState(() => { try { const v = localStorage.getItem('planner.l.birthdays'); return v ? JSON.parse(v) : [] } catch { return [] } })
   const [newBirthday, setNewBirthday] = useState({ name: '', date: '', relationship: '', notes: '' })
   const saveTrips = (t) => { setTrips(t); syncPageData('trips', t) }
   const saveBirthdays = (b) => { setBirthdays(b); syncPageData('birthdays', b) }
-  const [passwords, setPasswords] = useState(() => lsGet('passwords', []))
   const [recipes, setRecipes] = useState(() => lsGet('recipes', []))
   const saveRecipes = (r) => { setRecipes(r); syncPageData('recipes', r) }
   const [newRecipe, setNewRecipe] = useState({title:'',url:'',category:'Dinner',favorite:false,notes:''})
@@ -7254,7 +7404,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const saveGifts = (g) => { setGifts(g); syncPageData('gifts', g) }
   const [newGift, setNewGift] = useState({recipient:'',occasion:'Birthday',idea:'',amount:'',purchased:false,year:new Date().getFullYear()+''})
   const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
-  const [contacts, setContacts] = useState(() => lsGet('contacts', []))
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
   const [recipeFilter, setRecipeFilter] = useState('All')
   const [form, setForm] = useState({})
@@ -7557,42 +7706,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
         </section>
         </ProTabGate>
       )}
-
-      {tab === 'contacts' && (
-        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <section className="card">
-          <p className="eyebrow">Contacts</p>
-          <h3 style={{ margin: '4px 0 12px' }}>Key People</h3>
-          <SimpleList items={contacts} onDelete={i => save('contacts', setContacts, contacts.filter((_, j) => j !== i))}
-            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.name}</div><div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>{item.phone}{item.email ? ' · ' + item.email : ''}{item.notes ? ' · ' + item.notes : ''}</div></>)} />
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            {[['Name', 'cName', 'text'], ['Phone', 'cPhone', 'tel'], ['Email', 'cEmail', 'email'], ['Notes', 'cNotes', 'text']].map(([lbl, key, type]) => (
-              <input key={key} type={type} placeholder={lbl} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            ))}
-            <button className="primary-btn" onClick={() => { if (!form.cName) return; save('contacts', setContacts, [...contacts, { name: form.cName, phone: form.cPhone, email: form.cEmail, notes: form.cNotes }]); setForm(p => ({ ...p, cName: '', cPhone: '', cEmail: '', cNotes: '' })) }}>Add Contact</button>
-          </div>
-        </section>
-      </ProTabGate>)}
-
-
-      {tab === 'passwords' && (
-        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <section className="card">
-          <div style={{ background: 'rgba(240,180,41,.1)', border: '1px solid rgba(240,180,41,.3)', borderRadius: 'var(--radius-sm)', padding: 10, marginBottom: 14, fontSize: '.82rem', color: 'var(--warning)' }}>
-            ⚠️ Stored locally on this device only. Do not store critical passwords here without a backup.
-          </div>
-          <SimpleList items={passwords} onDelete={i => save('passwords', setPasswords, passwords.filter((_, j) => j !== i))}
-            renderItem={item => (<><div style={{ fontWeight: 600, fontSize: '.9rem' }}>{item.service}</div><div style={{ fontSize: '.78rem', color: 'var(--muted)', fontFamily: 'monospace' }}>{item.username} · {'•'.repeat(8)}</div></>)} />
-          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-            {[['Service/Website', 'pwSrv', 'text'], ['Username/Email', 'pwUser', 'text'], ['Password', 'pwPass', 'password']].map(([lbl, key, type]) => (
-              <input key={key} type={type} placeholder={lbl} value={form[key] || ''} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            ))}
-            <button className="primary-btn" onClick={() => { if (!form.pwSrv) return; save('passwords', setPasswords, [...passwords, { service: form.pwSrv, username: form.pwUser, password: form.pwPass }]); setForm(p => ({ ...p, pwSrv: '', pwUser: '', pwPass: '' })) }}>Save</button>
-          </div>
-        </section>
-      </ProTabGate>)}
 
       {tab === 'trips' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -8603,6 +8716,58 @@ function NotificationSettings({ settings, updateSettings }) {
 }
 
 
+// ── Backup: everything the user has saved, as one JSON file ─────────────
+const BACKUP_TABLES = ['profiles', 'planner_settings', 'budgets', 'tasks', 'events', 'goals', 'projects', 'notes', 'habits', 'habit_logs', 'expenses', 'score_history', 'page_data', 'faith_data']
+async function buildBackup(user) {
+  const out = { app: 'The Living Planner', version: 1, exportedAt: new Date().toISOString(), data: {} }
+  if (user && hasSupabaseEnv) {
+    for (const t of BACKUP_TABLES) {
+      const { data, error } = await supabase.from(t).select('*').eq('user_id', user.id)
+      out.data[t] = error ? { error: error.message } : data
+    }
+  } else {
+    const local = {}
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith('planner') || k.includes('mock.user')) continue
+      try { local[k] = JSON.parse(localStorage.getItem(k)) } catch { local[k] = localStorage.getItem(k) }
+    }
+    out.data.local = local
+  }
+  return out
+}
+async function downloadBackup(user) {
+  const backup = await buildBackup(user)
+  const name = `living-planner-backup-${TODAY}.json`
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+  const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/json' }) : null
+  // iPhone/iPad Home Screen apps can't download directly — hand the file to the share sheet (Save to Files)
+  if (file && navigator.canShare?.({ files: [file] }) && /iPad|iPhone|iPod/.test(navigator.userAgent || '')) {
+    try { await navigator.share({ files: [file], title: 'Living Planner backup' }); return 'shared' } catch (e) { if (e?.name === 'AbortError') return 'cancelled' }
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = name
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 2000)
+  return 'downloaded'
+}
+function BackupButton() {
+  const { user } = useAuth()
+  const [state, setState] = useState('')
+  return (
+    <div className="backup-row">
+      <div>
+        <strong>Download my data</strong>
+        <small>{state === 'done' ? 'Backup saved.' : state === 'working' ? 'Preparing your backup…' : state === 'error' ? 'Could not create the backup. Try again.' : 'Everything you have saved, in one file. Keep it somewhere safe.'}</small>
+      </div>
+      <button className="secondary-btn" disabled={state === 'working'} onClick={async () => {
+        setState('working')
+        try { const r = await downloadBackup(user); setState(r === 'cancelled' ? '' : 'done') } catch { setState('error') }
+      }}><Download size={16} /> Backup</button>
+    </div>
+  )
+}
+
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut, user } = useAuth()
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
@@ -8741,6 +8906,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{hasSupabaseEnv ? 'Tasks, goals, habits, faith, finance, wellness, and more — all in the cloud.' : 'Contact support to enable cross-device sync.'}</div>
           </div>
         </div>
+        <BackupButton />
         {hasSupabaseEnv && (
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
             {[
@@ -8908,6 +9074,7 @@ function PlannerApp() {
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <ScrollToTop />
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}
+        searchData={{ tasks, events, goals, projects, notes, habits }} onOpenItem={openEdit}
         onModeChange={async (id) => { await updateProfile({ ...profile, plannerMode: id }); pushToast(`${id} mode`, 'Home is arranged for this season.', 'success') }}>
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
@@ -9103,7 +9270,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.faith.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('devotional')
+  const [tab, setTab] = useUrlTab('devotional')
 
   // Prayer journal state
   const [prayers, setPrayers] = useState(() => lsGet('prayers', []))
