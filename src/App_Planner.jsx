@@ -1512,6 +1512,58 @@ const NAV_GROUPS = [
   ]},
 ]
 const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+
+// Planner modes reorder Home around a season's priority. Nothing is hidden,
+// and the Life Score is calculated the same way in every mode.
+const PLANNER_MODES = [
+  { id: 'Balanced',  icon: Compass,    line: 'Everything in its place: today, faith, goals and your score in balance.' },
+  { id: 'Execution', icon: Zap,        line: 'Leads with your schedule, anything overdue, and the next step on every project.' },
+  { id: 'Wellness',  icon: Leaf,       line: "Leads with today's habits and your body: training, sleep, recovery." },
+  { id: 'Growth',    icon: TrendingUp, line: 'Leads with your goals, their next steps, and your weekly review.' },
+]
+const modeOf = (profile) => PLANNER_MODES.find((m) => m.id === profile?.plannerMode) || PLANNER_MODES[0]
+
+const HOME_ORDER = {
+  Balanced:  ['hero', 'focus', 'faith', 'woty', 'metrics', 'quick', 'schedule', 'suggestions', 'overdue', 'goals', 'score', 'execution', 'tomorrow'],
+  Execution: ['hero', 'overdue', 'schedule', 'focus', 'nextSteps', 'faith', 'metrics', 'execution', 'tomorrow', 'suggestions', 'goals', 'quick', 'score', 'woty'],
+  Wellness:  ['hero', 'body', 'faith', 'focus', 'schedule', 'metrics', 'score', 'suggestions', 'goals', 'quick', 'overdue', 'execution', 'tomorrow', 'woty'],
+  Growth:    ['hero', 'woty', 'goals', 'nextSteps', 'review', 'faith', 'focus', 'score', 'metrics', 'schedule', 'overdue', 'quick', 'suggestions', 'execution', 'tomorrow'],
+}
+
+function ModeSheet({ open, current, onPick, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+  return (
+    <div className={'menu-sheet-root' + (open ? ' open' : '')} aria-hidden={!open}>
+      <div className="menu-backdrop" onClick={onClose} />
+      <div className="menu-sheet" role="dialog" aria-modal="true" aria-label="Planner mode">
+        <div className="menu-grabber" />
+        <div className="menu-head">
+          <span>Planner mode</span>
+          <button className="menu-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
+        </div>
+        <p className="mode-sheet-sub">Changes what Home shows first. Nothing is hidden, and your Life Score is measured the same way.</p>
+        <div className="mode-options">
+          {PLANNER_MODES.map((m) => {
+            const Icon = m.icon
+            const active = m.id === current
+            return (
+              <button key={m.id} className={'mode-option' + (active ? ' active' : '')} onClick={() => onPick(m.id)} aria-pressed={active}>
+                <span className="mode-option-icon"><Icon size={20} strokeWidth={1.7} /></span>
+                <span className="mode-option-text"><strong>{m.id}</strong><small>{m.line}</small></span>
+                {active && <Check size={18} strokeWidth={2.4} className="mode-option-check" />}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
 const isNavActive = (item, path) => item.to === '/'
   ? path === '/'
   : path === item.to || path.startsWith(item.to + '/') || (item.also || []).includes(path)
@@ -1624,12 +1676,13 @@ function SideNav({ onQuickAdd }) {
   )
 }
 
-function Layout({ children, onQuickAdd, banner, profile }) {
+function Layout({ children, onQuickAdd, banner, profile, onModeChange }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
   const showSideNav = !isMobile   // iPad (portrait + landscape) and desktop
   const [menuOpen, setMenuOpen] = useState(false)
+  const [modeOpen, setModeOpen] = useState(false)
   const onTabRoute = tabs.some((t) => t.to === location.pathname)
 
   // Keep the side nav pinned just below the sticky topbar, whatever its height
@@ -1705,13 +1758,13 @@ function Layout({ children, onQuickAdd, banner, profile }) {
         </Link>
 
         <div className="topbar-actions">
-          <div className="profile-pill">
+          <button type="button" className="profile-pill" onClick={() => setModeOpen(true)} aria-label={`Planner mode: ${modeOf(profile).id}. Change mode`}>
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
-            <div style={{display:'flex',flexDirection:'column',gap:1}}>
+            <div style={{display:'flex',flexDirection:'column',gap:1,textAlign:'left'}}>
               <strong style={{lineHeight:1.1}}>{displayName}</strong>
-              <span style={{fontSize:'.58rem',opacity:.7}}>{profile?.plannerMode || 'Balanced'} mode</span>
+              <span style={{fontSize:'.58rem',opacity:.7}}>{modeOf(profile).id} mode ▾</span>
             </div>
-          </div>
+          </button>
         </div>
       </header>
 
@@ -1741,6 +1794,9 @@ function Layout({ children, onQuickAdd, banner, profile }) {
           </button>
         </nav>
       ) : null}
+
+      <ModeSheet open={modeOpen} current={modeOf(profile).id} onClose={() => setModeOpen(false)}
+        onPick={(id) => { setModeOpen(false); if (onModeChange && id !== modeOf(profile).id) onModeChange(id) }} />
 
       {!showSideNav ? <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onQuickAdd={onQuickAdd} /> : null}
 
@@ -1971,7 +2027,7 @@ function MiniLineChart({ data }) {
 }
 
 
-function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit }) {
+function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
   const openTasks = tasks.filter(t => !t.completed)
@@ -2005,9 +2061,8 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     })),
   ]
 
-  return (
-    <div className="home-stack">
-
+  const B_hero = (
+    <>
       {/* ── Personal greeting hero ─────────────────────────────────── */}
       <div className="hero-focus-card">
         <p className="eyebrow">{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})}</p>
@@ -2046,7 +2101,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           )
         })()}
       </div>
+    </>
+  )
 
+  const B_woty = (
+    <>
       {/* ── Word of the Year ──────────────────────────────── */}
       {/* ── Word of the Year ──────────────────────────────── */}
       {(() => {
@@ -2088,7 +2147,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           </section>
         )
       })()}
+    </>
+  )
 
+  const B_focus = (
+    <>
       {/* ── Today's Focus 3 — top priorities ─────────────────────── */}
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
@@ -2233,7 +2296,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           )
         })()}
       </section>
+    </>
+  )
 
+  const B_metrics = (
+    <>
       {/* ── 4 key metrics ─────────────────────────────────────────── */}
       <div className="home-metrics-strip">
         <MetricTile label="Tasks Open" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : '✓ on track'} />
@@ -2241,7 +2308,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         <MetricTile label="Budget Left" value={`$${Math.max(0, budget.weeklyTarget - weekSpend).toFixed(0)}`} helper="this week" />
         <MetricTile label="Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} habits`} />
       </div>
+    </>
+  )
 
+  const B_quick = (
+    <>
       {/* ── Quick access to all sections ──────────────────────────── */}
       <section className="card">
         <div className="section-title-row" style={{marginBottom:12}}>
@@ -2257,7 +2328,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           ))}
         </div>
       </section>
+    </>
+  )
 
+  const B_schedule = (
+    <>
       {/* ── Today's schedule ──────────────────────────────────────── */}
       <section className="card">
         <div className="section-title-row">
@@ -2275,7 +2350,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             </button>
           ))}
       </section>
+    </>
+  )
 
+  const B_suggestions = (
+    <>
       {/* ── Smart suggestions ─────────────────────────────────────── */}
       {suggestions.length > 0 && (
         <section className="card">
@@ -2293,7 +2372,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           </div>
         </section>
       )}
+    </>
+  )
 
+  const B_overdue = (
+    <>
       {/* ── Overdue watchlist ─────────────────────────────────────── */}
       {overdueTasks.length > 0 && (
         <section className="card" style={{borderLeft:'3px solid var(--danger)', background:'rgba(217,79,61,.03)'}}>
@@ -2310,7 +2393,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           ))}
         </section>
       )}
+    </>
+  )
 
+  const B_goals = (
+    <>
       {/* ── Top goals ─────────────────────────────────────────────── */}
       {topGoals.length > 0 && (
         <section className="card">
@@ -2334,7 +2421,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           })}
         </section>
       )}
+    </>
+  )
 
+  const B_score = (
+    <>
       {/* ── Life score strip ──────────────────────────────────────── */}
       <section className="card">
         <div className="section-title-row" style={{marginBottom:10}}>
@@ -2353,7 +2444,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           ))}
         </div>
       </section>
+    </>
+  )
 
+  const B_execution = (
+    <>
       {/* ── Weekly execution chart ────────────────────────────────── */}
       <section className="card">
         <div className="section-title-row" style={{marginBottom:8}}>
@@ -2361,7 +2456,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         </div>
         <MiniBarChart data={completionSeries} dataKey="completed" maxKey="total" />
       </section>
+    </>
+  )
 
+  const B_tomorrow = (
+    <>
       {/* ── Tomorrow's Top 3 (evening prompt) ──────────────────────────── */}
       {(() => {
         const hour = new Date().getHours()
@@ -2404,7 +2503,113 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           </section>
         )
       })()}
+    </>
+  )
 
+  // ── Mode cards ─────────────────────────────────────────────────────────
+  const mode = modeOf(profile)
+  const vod = getVerseOfDay()
+  const B_faith = (
+    <Link to="/faith" className="card home-faith-card">
+      <div className="home-faith-icon"><Cross size={16} strokeWidth={1.8} /></div>
+      <div style={{flex:1, minWidth:0}}>
+        <p className="eyebrow" style={{margin:'0 0 4px'}}>Today's Word</p>
+        <p className="home-faith-verse">"{vod.v}"</p>
+        <p className="home-faith-ref">{vod.r}</p>
+      </div>
+    </Link>
+  )
+
+  const stepRows = [
+    ...projects.filter((p) => p.status !== 'Completed').map((p) => ({ type: 'project', item: p, step: normalizeSteps(p.steps).find((st) => !st.done) })),
+    ...goals.filter((g) => !g.completed).map((g) => ({ type: 'goal', item: g, step: normalizeSteps(g.steps).find((st) => !st.done) })),
+  ].filter((r) => r.step).slice(0, 5)
+  const checkStep = ({ type, item, step }) => {
+    if (!onSaveSteps) return
+    onSaveSteps(type, item.id, normalizeSteps(item.steps).map((st) => st.id === step.id ? { ...st, done: true, doneAt: new Date().toISOString() } : st))
+  }
+  const B_nextSteps = (
+    <section className="card">
+      <div className="section-title-row" style={{marginBottom:6}}>
+        <div><p className="eyebrow">Next Steps</p><h3>Move each one forward</h3></div>
+        <Link className="ghost-btn" to="/projects" style={{fontSize:'.8rem'}}>Projects →</Link>
+      </div>
+      {stepRows.length === 0 ? (
+        <p className="muted" style={{fontSize:'.85rem', margin:'4px 0 0'}}>No open steps. Break a goal or project into steps and the next one shows up here.</p>
+      ) : stepRows.map((r) => (
+        <div key={r.type + r.item.id} className="step-row">
+          <button type="button" className="step-check next" onClick={() => checkStep(r)} aria-label={`Check off ${r.step.text}`} />
+          <Link to={r.type === 'goal' ? '/goals' : '/projects'} className="home-step-link">
+            <span className="home-step-text">{r.step.text}</span>
+            <span className="home-step-sub">{r.type === 'goal' ? 'Goal' : 'Project'} · {r.item.title}</span>
+          </Link>
+        </div>
+      ))}
+    </section>
+  )
+
+  const habitDone = (h) => habitLogs.some((l) => l.habitId === h.id && l.date === TODAY && l.completed)
+  const habitsToday = habits.slice().sort((a, b) => Number(habitDone(a)) - Number(habitDone(b)))
+  const habitsDoneCount = habits.filter(habitDone).length
+  const B_body = (
+    <section className="card">
+      <div className="section-title-row" style={{marginBottom:6}}>
+        <div><p className="eyebrow">Body & Recovery</p><h3>Today's habits</h3></div>
+        <span className="status-pill" style={{fontSize:'.72rem'}}>{habitsDoneCount}/{habits.length} done</span>
+      </div>
+      {habits.length === 0 ? (
+        <p className="muted" style={{fontSize:'.85rem', margin:'4px 0 0'}}>No habits yet. Add a few to build your daily rhythm.</p>
+      ) : habitsToday.slice(0, 6).map((h) => {
+        const done = habitDone(h)
+        return (
+          <div key={h.id} className={'step-row' + (done ? ' done' : '')}>
+            <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggleHabit && onToggleHabit(h.id)}
+              aria-label={done ? `Undo ${h.title}` : `Mark ${h.title} done`} aria-pressed={done}>
+              {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+            </button>
+            <Link to="/habits" className="step-text" style={{textDecoration:'none'}}>{h.title}</Link>
+          </div>
+        )
+      })}
+      <div className="home-chip-row">
+        <Link to="/wellness" className="home-chip"><Dumbbell size={15} /> Log training</Link>
+        <Link to="/wellness" className="home-chip"><Moon size={15} /> Sleep &amp; mood</Link>
+        <Link to="/habits" className="home-chip"><Repeat size={15} /> All habits</Link>
+      </div>
+    </section>
+  )
+
+  const weekStart = startOfWeek(TODAY)
+  const doneThisWeek = tasks.filter((t) => t.completed && t.date >= weekStart && t.date <= TODAY).length
+  const stepsThisWeek = [...goals, ...projects].reduce((n, x) => n + normalizeSteps(x.steps).filter((st) => st.done && st.doneAt && st.doneAt.slice(0, 10) >= weekStart).length, 0)
+  const B_review = (
+    <section className="card home-review-card">
+      <p className="eyebrow" style={{margin:'0 0 4px'}}>Weekly Review</p>
+      <h3 style={{margin:'0 0 10px'}}>Look back. Aim forward.</h3>
+      <div className="home-review-stats">
+        <div><strong>{doneThisWeek}</strong><span>tasks done</span></div>
+        <div><strong>{stepsThisWeek}</strong><span>steps checked</span></div>
+        <div><strong>{insights.completionRate}%</strong><span>completion</span></div>
+      </div>
+      <ul className="home-review-prompts">
+        <li>What moved forward this week, and what did God teach you in it?</li>
+        <li>What will you stop, start, or keep?</li>
+        <li>What is the one thing that makes next week a win?</li>
+      </ul>
+      <Link to="/growth" className="primary-btn" style={{display:'inline-block', textDecoration:'none', marginTop:4}}>Open weekly review</Link>
+    </section>
+  )
+
+  const blocks = {
+    hero: B_hero, woty: B_woty, focus: B_focus, metrics: B_metrics, quick: B_quick, schedule: B_schedule,
+    suggestions: B_suggestions, overdue: B_overdue, goals: B_goals, score: B_score, execution: B_execution,
+    tomorrow: B_tomorrow, faith: B_faith, nextSteps: B_nextSteps, body: B_body, review: B_review,
+  }
+  const order = HOME_ORDER[mode.id] || HOME_ORDER.Balanced
+
+  return (
+    <div className="home-stack" data-mode={mode.id}>
+      {order.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
 
       <PageNav />
     </div>
@@ -7859,11 +8064,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             Planner Mode
             <select value={profile.plannerMode || 'Balanced'} onChange={(e) => updateProfile({ ...profile, plannerMode: e.target.value })}
               style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}}>
-              <option>Balanced</option>
-              <option>Execution</option>
-              <option>Wellness</option>
-              <option>Growth</option>
+              {PLANNER_MODES.map((m) => <option key={m.id}>{m.id}</option>)}
             </select>
+            <span style={{fontSize:'.76rem', fontWeight:400, color:'var(--muted)', lineHeight:1.45}}>{modeOf(profile).line}</span>
           </label>
         </div>
       </section>
@@ -8098,9 +8301,10 @@ function PlannerApp() {
       {showA2HS && !showWelcomePro && <A2HSModal onClose={dismissA2HS} />}
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <ScrollToTop />
-      <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}>
+      <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}
+        onModeChange={async (id) => { await updateProfile({ ...profile, plannerMode: id }); pushToast(`${id} mode`, 'Home is arranged for this season.', 'success') }}>
         <Routes>
-          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} />} />
+          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
