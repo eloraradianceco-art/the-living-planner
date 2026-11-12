@@ -39,9 +39,10 @@ function getTodayString() {
   return `${map.year}-${map.month}-${map.day}`
 }
 
-// ── Push Notification System ─────────────────────────────────────────────────
-const VAPID_PUBLIC_KEY = 'YI0UW1Ky1eXea1RFPVhDrHjkSV6se1QHcOX9JmztAa_M4GT9rnHJCq-LcrBgJR4GFNohKQDz9sSKo2xwLlwSKQ'
-
+// ── Push Notification System ───────────────
+// Reminders are sent by the Supabase function `push-reminders` every 5 minutes,
+// so they arrive even when the planner is closed. This client only asks for
+// permission and registers the device.
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - base64String.length % 4) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -50,20 +51,22 @@ function urlBase64ToUint8Array(base64String) {
   for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i)
   return outputArray
 }
+const bufToB64Url = (buf) => {
+  if (!buf) return ''
+  const bytes = new Uint8Array(buf); let str = ''
+  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i])
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+const isIOS = () => typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
 const PlannerPush = {
   async isSupported() {
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
   },
 
-  async getPermission() {
-    return Notification.permission // 'default' | 'granted' | 'denied'
-  },
-
   async requestPermission() {
     if (!(await this.isSupported())) return 'unsupported'
-    const result = await Notification.requestPermission()
-    return result
+    return Notification.requestPermission()
   },
 
   async registerSW() {
@@ -72,124 +75,66 @@ const PlannerPush = {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' })
       await navigator.serviceWorker.ready
       return reg
-    } catch(e) {
-      console.warn('SW registration failed:', e)
-      return null
-    }
+    } catch (e) { console.warn('SW registration failed:', e); return null }
   },
 
+  async publicKey() {
+    try { const c = localStorage.getItem('planner.vapidPub'); if (c) return c } catch {}
+    if (!hasSupabaseEnv) return null
+    let key = null
+    const { data } = await supabase.from('app_config').select('value').eq('key', 'vapid_public_key').maybeSingle()
+    key = data?.value || null
+    if (!key) {
+      const { data: init } = await supabase.functions.invoke('push-reminders', { body: { action: 'init' } })
+      key = init?.publicKey || null
+    }
+    if (key) { try { localStorage.setItem('planner.vapidPub', key) } catch {} }
+    return key
+  },
+
+  // Subscribe this device (or refresh it) and save it to the user's account.
   async subscribe() {
+    if (!hasSupabaseEnv) return null
     const reg = await this.registerSW()
     if (!reg) return null
+    const key = await this.publicKey()
+    if (!key) return null
     try {
-      const existing = await reg.pushManager.getSubscription()
-      if (existing) return existing
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      let sub = await reg.pushManager.getSubscription()
+      const current = sub?.options?.applicationServerKey ? bufToB64Url(sub.options.applicationServerKey) : null
+      if (sub && current && current !== key) { await sub.unsubscribe(); sub = null } // made with an old key
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) })
+      const j = sub.toJSON()
+      const { error } = await supabase.rpc('register_push_subscription', {
+        p_endpoint: j.endpoint, p_p256dh: j.keys?.p256dh, p_auth: j.keys?.auth, p_user_agent: navigator.userAgent.slice(0, 200),
       })
-      // Save subscription to localStorage for use when scheduling
-      localStorage.setItem('planner.pushSub', JSON.stringify(subscription))
-      return subscription
-    } catch(e) {
-      console.warn('Push subscribe failed:', e)
-      return null
-    }
+      if (error) throw error
+      try { localStorage.removeItem('planner.pushSub') } catch {}
+      return sub
+    } catch (e) { console.warn('Push subscribe failed:', e); return null }
   },
 
   async unsubscribe() {
     const reg = await navigator.serviceWorker.getRegistration('/sw.js')
-    if (!reg) return
-    const sub = await reg.pushManager.getSubscription()
-    if (sub) await sub.unsubscribe()
-    localStorage.removeItem('planner.pushSub')
+    const sub = reg && await reg.pushManager.getSubscription()
+    if (sub) {
+      if (hasSupabaseEnv) await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
+      await sub.unsubscribe()
+    }
   },
 
-  async sendLocal(title, body, options = {}) {
-    // Send a local notification (no server needed) for immediate alerts
-    if (Notification.permission !== 'granted') return
-    const reg = await navigator.serviceWorker.ready
-    reg.showNotification(title, {
-      body,
-      icon: '/planner-icon.png',
-      badge: '/planner-icon.png',
-      vibrate: [100, 50, 100],
-      ...options
-    })
+  async deviceConnected() {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js')
+      return Boolean(reg && await reg.pushManager.getSubscription())
+    } catch { return false }
   },
 
-  scheduleCheck(tasks, habits, goals, settings) {
-    // Run on app load — check what needs notifying today
-    if (Notification.permission !== 'granted') return
-    const now = new Date()
-    const today = now.toISOString().slice(0, 10)
-    const hour = now.getHours()
-
-    const notifSettings = settings?.notifications || {}
-
-    // Morning habit reminder (8am)
-    if (notifSettings.habits && hour >= 8 && hour < 9) {
-      const todayKey = 'planner.notif.habits.' + today
-      if (!localStorage.getItem(todayKey)) {
-        const pendingHabits = habits.filter(h => h.title || h.name)
-        if (pendingHabits.length > 0) {
-          this.sendLocal('🔁 Habit Check-In', `You have ${pendingHabits.length} habits to complete today.`, { tag: 'habits-' + today, data: { url: '/habits' } })
-          localStorage.setItem(todayKey, '1')
-        }
-      }
-    }
-
-    // Task reminders (9am)
-    if (notifSettings.tasks && hour >= 9 && hour < 10) {
-      const todayKey = 'planner.notif.tasks.' + today
-      if (!localStorage.getItem(todayKey)) {
-        const dueTasks = tasks.filter(t => t.date === today && !t.completed)
-        if (dueTasks.length > 0) {
-          this.sendLocal('✓ Tasks Due Today', `${dueTasks.length} task${dueTasks.length > 1 ? 's' : ''} due: ${dueTasks[0].title}${dueTasks.length > 1 ? ` +${dueTasks.length-1} more` : ''}`, { tag: 'tasks-' + today, data: { url: '/tasks' } })
-          localStorage.setItem(todayKey, '1')
-        }
-      }
-    }
-
-    // Evening reflection (7pm)
-    if (notifSettings.reflection && hour >= 19 && hour < 20) {
-      const todayKey = 'planner.notif.reflect.' + today
-      if (!localStorage.getItem(todayKey)) {
-        this.sendLocal('📖 Evening Reflection', 'Take 5 minutes to journal and plan tomorrow.', { tag: 'reflect-' + today, data: { url: '/growth' } })
-        localStorage.setItem(todayKey, '1')
-      }
-    }
-
-    // Overdue tasks (anytime)
-    if (notifSettings.overdue) {
-      const overdue = tasks.filter(t => t.date && t.date < today && !t.completed)
-      if (overdue.length > 0) {
-        const overdueKey = 'planner.notif.overdue.' + today
-        if (!localStorage.getItem(overdueKey)) {
-          this.sendLocal('⚠ Overdue Tasks', `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''} need your attention.`, { tag: 'overdue-' + today, data: { url: '/tasks' } })
-          localStorage.setItem(overdueKey, '1')
-        }
-      }
-    }
-
-    // Faith morning reminder (6am)
-    if (notifSettings.faith && hour >= 6 && hour < 7) {
-      const todayKey = 'planner.notif.faith.' + today
-      if (!localStorage.getItem(todayKey)) {
-        this.sendLocal('✝ Morning Devotional', 'Start your day in the Word. Your devotional is waiting.', { tag: 'faith-' + today, data: { url: '/faith' } })
-        localStorage.setItem(todayKey, '1')
-      }
-    }
-
-    // Birthday reminders (8am)
-    if (notifSettings.birthdays) {
-      const todayKey = 'planner.notif.bday.' + today
-      if (!localStorage.getItem(todayKey) && hour >= 8 && hour < 9) {
-        // Birthday check done in app with actual birthday data
-        localStorage.setItem(todayKey + '.checked', '1')
-      }
-    }
-  }
+  async sendTest() {
+    const { data, error } = await supabase.functions.invoke('push-reminders', { body: { action: 'test' } })
+    if (error) throw error
+    return data
+  },
 }
 
 
@@ -8476,115 +8421,111 @@ function OnboardingChecklist({ settings, profile, tasks, goals, projects, update
   )
 }
 
+const REMINDER_TYPES = [
+  { key: 'tasks',      icon: SquareCheck, label: 'Tasks, events & appointments', desc: 'Before anything with a time, a 7:30 AM rundown, and appointments the evening before' },
+  { key: 'faith',      icon: Cross,       label: 'Morning devotional',  desc: 'Daily at 6:00 AM' },
+  { key: 'habits',     icon: Repeat,      label: 'Habit check-in',      desc: 'Daily at 8:00 AM, only if habits are left' },
+  { key: 'birthdays',  icon: Cake,        label: 'Birthdays',           desc: 'Day-of at 8:00 AM' },
+  { key: 'overdue',    icon: CircleSlash, label: 'Overdue tasks',       desc: 'Daily at 9:00 AM, only if something is past due' },
+  { key: 'reflection', icon: PenLine,     label: 'Evening reflection',  desc: 'Daily at 7:00 PM' },
+  { key: 'goals',      icon: Target,      label: 'Weekly goal review',  desc: 'Sundays at 5:00 PM with your next step' },
+  { key: 'finance',    icon: Wallet,      label: 'Weekly spending',     desc: 'Sundays at 6:00 PM vs your weekly target' },
+]
+const REMINDER_DEFAULTS = { tasks: true, habits: true, goals: true, faith: true, reflection: true, birthdays: true, overdue: true, finance: false, leadMinutes: 15 }
+
 function NotificationSettings({ settings, updateSettings }) {
   const [permission, setPermission] = useState(() => { try { return (typeof Notification !== 'undefined' ? Notification.permission : 'default') } catch { return 'default' } })
-  const [supported, setSupported] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const notifSettings = settings?.notifications || {}
+  const [supported, setSupported] = useState(true)
+  const [connected, setConnected] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const n = { ...REMINDER_DEFAULTS, ...(settings?.notifications || {}) }
+  const needsInstall = isIOS() && !isStandalone()
 
   useEffect(() => {
     PlannerPush.isSupported().then(setSupported)
-    if ('Notification' in window) setPermission(Notification.permission)
+    PlannerPush.deviceConnected().then(setConnected)
   }, [])
 
+  const save = (patch) => updateSettings({ ...settings, notifications: { ...n, ...patch } })
+
   const enable = async () => {
-    setLoading(true)
+    setBusy(true); setMsg('')
     const perm = await PlannerPush.requestPermission()
     setPermission(perm)
     if (perm === 'granted') {
-      await PlannerPush.subscribe()
-      // Enable all notifications by default
-      updateSettings({ ...settings, notifications: {
-        tasks: true, habits: true, goals: true, faith: true,
-        reflection: true, birthdays: true, overdue: true, finance: false
-      }})
+      const sub = await PlannerPush.subscribe()
+      setConnected(Boolean(sub))
+      if (!settings?.notifications || !Object.keys(settings.notifications).length) save({})
+      setMsg(sub ? 'This device will get reminders.' : 'Permission granted, but this device could not be registered. Try again.')
     }
-    setLoading(false)
+    setBusy(false)
   }
-
-  const toggle = (key) => {
-    updateSettings({ ...settings, notifications: { ...notifSettings, [key]: !notifSettings[key] }})
+  const test = async () => {
+    setBusy(true); setMsg('')
+    try {
+      if (!connected) { const sub = await PlannerPush.subscribe(); setConnected(Boolean(sub)) }
+      const r = await PlannerPush.sendTest()
+      setMsg(r?.sent ? `Sent to ${r.sent} device${r.sent > 1 ? 's' : ''}. It should arrive in a few seconds.` : 'No devices are registered yet.')
+    } catch (e) { setMsg('Could not send a test right now.') }
+    setBusy(false)
   }
-
-  const CATEGORIES = [
-    { key: 'tasks',      icon: '✓',  label: 'Task Reminders',     desc: 'Due today at 9am' },
-    { key: 'habits',     icon: '🔁', label: 'Habit Check-In',      desc: 'Daily reminder at 8am' },
-    { key: 'goals',      icon: '🎯', label: 'Goal Nudges',         desc: 'Weekly progress reminder' },
-    { key: 'faith',      icon: '✝',  label: 'Morning Devotional',  desc: 'Daily at 6am' },
-    { key: 'reflection', icon: '📖', label: 'Evening Reflection',  desc: 'Daily at 7pm' },
-    { key: 'birthdays',  icon: '🎂', label: 'Birthday Reminders',  desc: 'Day-of at 8am' },
-    { key: 'overdue',    icon: '⚠',  label: 'Overdue Alerts',      desc: 'When tasks are past due' },
-    { key: 'finance',    icon: '💰', label: 'Spending Check',       desc: 'Weekly budget summary' },
-  ]
+  const disable = async () => {
+    setBusy(true)
+    await PlannerPush.unsubscribe()
+    setConnected(false); setMsg('This device will no longer get reminders.')
+    setBusy(false)
+  }
 
   return (
     <section className="card">
-      <p className="eyebrow">Notifications</p>
-      <h3 style={{margin: '4px 0 14px'}}>Stay on Track</h3>
+      <p className="eyebrow">Reminders</p>
+      <h3 style={{ margin: '4px 0 6px' }}>Stay on track</h3>
+      <p className="muted" style={{ fontSize: '.82rem', margin: '0 0 14px', lineHeight: 1.5 }}>Reminders arrive on your phone even when the planner is closed. Times follow your profile's timezone.</p>
 
-      {!supported ? (
-        <div style={{padding:'12px',background:'var(--stone)',borderRadius:10,fontSize:'.85rem',color:'var(--muted)'}}>
-          Push notifications are not supported on this browser.
+      {needsInstall ? (
+        <div className="rem-note">
+          <strong>Add the planner to your Home Screen first</strong>
+          <p>On iPhone and iPad, reminders only work from the Home Screen app. Tap Share, then "Add to Home Screen", then open the planner from that icon and come back here.</p>
         </div>
+      ) : !supported ? (
+        <div className="rem-note"><strong>Not supported here</strong><p>This browser can't receive reminders. Try Safari (Home Screen app) on iPhone/iPad or Chrome on Android/desktop.</p></div>
       ) : permission === 'denied' ? (
-        <div style={{padding:'14px',background:'#fde8e8',borderRadius:10}}>
-          <strong style={{fontSize:'.88rem',color:'var(--danger)'}}>Notifications Blocked</strong>
-          <p style={{fontSize:'.8rem',color:'var(--ink2)',margin:'6px 0 0',lineHeight:1.5}}>
-            You've blocked notifications for this site. To enable them, click the lock icon in your browser's address bar and allow notifications, then refresh.
-          </p>
-        </div>
-      ) : permission === 'default' ? (
-        <div>
-          <p className="muted" style={{fontSize:'.85rem',marginBottom:14,lineHeight:1.6}}>
-            Get reminders for your tasks, habits, devotional, birthdays and more — right on your device.
-          </p>
-          <button className="primary-btn" style={{width:'100%',fontSize:'.9rem'}}
-            onClick={enable} disabled={loading}>
-            {loading ? 'Enabling...' : '🔔 Enable Push Notifications'}
-          </button>
-        </div>
+        <div className="rem-note warn"><strong>Notifications are blocked</strong><p>Allow notifications for this app in your device settings, then reopen the planner.</p></div>
+      ) : permission !== 'granted' || connected === false ? (
+        <button className="primary-btn" style={{ width: '100%' }} onClick={enable} disabled={busy}>{busy ? 'Turning on…' : 'Turn on reminders for this device'}</button>
       ) : (
-        <div>
-          <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 12px',background:'#d5f5e3',borderRadius:8,marginBottom:16}}>
-            <div style={{width:10,height:10,borderRadius:'50%',background:'var(--success)',boxShadow:'0 0 6px var(--success)'}} />
-            <span style={{fontSize:'.85rem',fontWeight:600,color:'var(--success)'}}>Notifications enabled</span>
+        <div className="rem-status"><span className="rem-dot" /> This device gets reminders</div>
+      )}
+
+      {msg && <p className="muted" style={{ fontSize: '.8rem', margin: '10px 0 0' }}>{msg}</p>}
+
+      <div className="rem-lead">
+        <span>Remind me before timed items</span>
+        <select value={n.leadMinutes} onChange={(e) => save({ leadMinutes: Number(e.target.value) })}>
+          {[5, 10, 15, 30, 60, 120].map((m) => <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} hr`}</option>)}
+        </select>
+      </div>
+
+      {REMINDER_TYPES.map((t) => {
+        const Icon = t.icon
+        const onOff = Boolean(n[t.key])
+        return (
+          <div key={t.key} className="rem-row">
+            <span className="rem-icon"><Icon size={17} strokeWidth={1.7} /></span>
+            <div className="rem-text"><strong>{t.label}</strong><small>{t.desc}</small></div>
+            <button type="button" role="switch" aria-checked={onOff} aria-label={t.label} className={'rem-switch' + (onOff ? ' on' : '')} onClick={() => save({ [t.key]: !onOff })}><span /></button>
           </div>
+        )
+      })}
 
-          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>Choose what to receive:</p>
-          {CATEGORIES.map(cat => (
-            <div key={cat.key} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 0',borderBottom:'1px solid var(--border)'}}>
-              <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                <span style={{fontSize:'1.1rem',width:24,textAlign:'center'}}>{cat.icon}</span>
-                <div>
-                  <div style={{fontWeight:600,fontSize:'.88rem'}}>{cat.label}</div>
-                  <div className="muted" style={{fontSize:'.72rem'}}>{cat.desc}</div>
-                </div>
-              </div>
-              <button onClick={() => toggle(cat.key)} style={{
-                width:44,height:24,borderRadius:999,border:'none',cursor:'pointer',
-                background:notifSettings[cat.key] ? 'var(--teal)' : 'var(--border2)',
-                position:'relative',transition:'background .2s',flexShrink:0
-              }}>
-                <div style={{
-                  position:'absolute',top:3,
-                  left:notifSettings[cat.key] ? 23 : 3,
-                  width:18,height:18,borderRadius:'50%',
-                  background:'white',transition:'left .2s',
-                  boxShadow:'0 1px 3px rgba(0,0,0,.2)'
-                }} />
-              </button>
-            </div>
-          ))}
-
-          <button onClick={async()=>{ await PlannerPush.unsubscribe(); setPermission('default'); updateSettings({...settings,notifications:{}})}}
-            style={{marginTop:14,background:'none',border:'1px solid var(--border)',borderRadius:8,padding:'8px 14px',fontSize:'.78rem',color:'var(--muted)',cursor:'pointer',width:'100%'}}>
-            Disable All Notifications
-          </button>
+      {permission === 'granted' && connected && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <button className="secondary-btn" style={{ flex: 1 }} onClick={test} disabled={busy}>Send a test</button>
+          <button className="ghost-btn" style={{ flex: 1 }} onClick={disable} disabled={busy}>Turn off on this device</button>
         </div>
       )}
     </section>
-
-        
   )
 }
 
@@ -8876,14 +8817,13 @@ function PlannerApp() {
   }, [error])
 
 
-  // Check notification schedule on load
+  // Reminders come from the server; just make sure this device is registered.
   useEffect(() => {
-    if (tasks?.length || habits?.length) {
-      setTimeout(() => {
-        PlannerPush.scheduleCheck(tasks || [], habits || [], goals || [], settings || {})
-      }, 2000)
-    }
-  }, [tasks?.length, habits?.length])
+    if (!user || !hasSupabaseEnv) return
+    try { if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return } catch { return }
+    const t = setTimeout(() => { PlannerPush.subscribe() }, 1500)
+    return () => clearTimeout(t)
+  }, [user?.id])
 
   if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 
