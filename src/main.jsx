@@ -4,6 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App_Planner'
 import ResetPassword from './ResetPassword'
 import './styles.css'
+import { setupNativeShell } from './native.js'
+
+// App Store app: status bar style (does nothing on the website).
+setupNativeShell()
 
 const isReset = window.location.pathname === '/reset-password'
 

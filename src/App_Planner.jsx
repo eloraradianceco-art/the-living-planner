@@ -3,6 +3,7 @@ import Reviews from "./Reviews"
 import { createClient } from '@supabase/supabase-js'
 import AccountPrivacy from './AccountPrivacy.jsx'
 import ScriptureCredits from './ScriptureCredits.jsx'
+import { isNative, WEB_ORIGIN, purchasesInApp, nativeAuthStorage, nativeShareFile, NativePush, nativePushSupported, onNativeReminderTap } from './native.js'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Banknote, CreditCard, PiggyBank, TrendingDown, HeartHandshake, ClipboardList, CircleSlash,
@@ -17,12 +18,19 @@ import {
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// The website reads these from Vercel settings. The App Store app is built without them, so it
+// carries the planner's public database address and public (anon) key, which every browser receives anyway.
+const NATIVE_SUPABASE_URL = 'https://pxvgolgwrlqzjykvzzzy.supabase.co'
+const NATIVE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dmdvbGd3cmxxemp5a3Z6enp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjQxODIsImV4cCI6MjA5MjcwMDE4Mn0.MtT8fz4P_V1yZG-T1t1pO-FZeQk4Ua8J404Mvi65ZYI'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (isNative ? NATIVE_SUPABASE_URL : '')
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (isNative ? NATIVE_SUPABASE_ANON_KEY : '')
 const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey)
 const supabase = hasSupabaseEnv
   ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      // In the phone app the sign-in lives in the phone's own storage (iOS can clear web storage).
+      auth: isNative
+        ? { storage: nativeAuthStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        : { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     })
   : null
 
@@ -61,13 +69,22 @@ const bufToB64Url = (buf) => {
 }
 const isIOS = () => typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
+// In the App Store app the same reminders arrive through Apple's notification service (see native.js).
 const PlannerPush = {
   async isSupported() {
+    if (isNative) return nativePushSupported
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  },
+
+  // 'granted' | 'denied' | 'default'
+  async permission() {
+    if (isNative) return NativePush.permission()
+    try { return typeof Notification === 'undefined' ? 'default' : Notification.permission } catch { return 'default' }
   },
 
   async requestPermission() {
     if (!(await this.isSupported())) return 'unsupported'
+    if (isNative) return NativePush.requestPermission()
     return Notification.requestPermission()
   },
 
@@ -97,6 +114,14 @@ const PlannerPush = {
   // Subscribe this device (or refresh it) and save it to the user's account.
   async subscribe() {
     if (!hasSupabaseEnv) return null
+    if (isNative) {
+      const token = await NativePush.register()
+      if (!token) return null
+      const { error } = await supabase.rpc('register_native_push', { p_token: token, p_platform: 'ios', p_user_agent: navigator.userAgent.slice(0, 200) })
+      if (error) { console.warn('Native push register failed:', error.message); return null }
+      await NativePush.rememberToken(token)
+      return { token }
+    }
     const reg = await this.registerSW()
     if (!reg) return null
     const key = await this.publicKey()
@@ -117,6 +142,12 @@ const PlannerPush = {
   },
 
   async unsubscribe() {
+    if (isNative) {
+      const token = await NativePush.savedToken()
+      if (token && hasSupabaseEnv) await supabase.from('push_subscriptions').delete().eq('endpoint', 'apns:' + token.toLowerCase())
+      await NativePush.rememberToken(null)
+      return
+    }
     const reg = await navigator.serviceWorker.getRegistration('/sw.js')
     const sub = reg && await reg.pushManager.getSubscription()
     if (sub) {
@@ -126,6 +157,7 @@ const PlannerPush = {
   },
 
   async deviceConnected() {
+    if (isNative) return Boolean(await NativePush.savedToken()) && (await NativePush.permission()) === 'granted'
     try {
       const reg = await navigator.serviceWorker.getRegistration('/sw.js')
       return Boolean(reg && await reg.pushManager.getSubscription())
@@ -988,7 +1020,7 @@ function AuthProvider({ children }) {
     if (!hasSupabaseEnv) return { data: null, error: new Error('Supabase env vars missing.') }
     return supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin }
+      options: { emailRedirectTo: isNative ? WEB_ORIGIN : window.location.origin }
     })
   }
 
@@ -1460,7 +1492,7 @@ function AuthPage() {
               if (!email) { setError('Enter your email above first.'); return }
               setLoading(true); setError('')
               const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + '/reset-password'
+                redirectTo: (isNative ? WEB_ORIGIN : window.location.origin) + '/reset-password'
               })
               setLoading(false)
               if (resetError) setError(resetError.message)
@@ -3546,17 +3578,19 @@ function ProTabGate({ isPro, onUpgrade, children }) {
       <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white', marginBottom: 8 }}>
         Pro Feature
       </div>
-      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.55)', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 24px' }}>
-        Unlock this and every Pro feature with a 7-day free trial. No commitment required.
+      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.78)', lineHeight: 1.6, maxWidth: 260, margin: purchasesInApp ? '0 auto 24px' : '0 auto' }}>
+        {purchasesInApp
+          ? 'Unlock this and every Pro feature with a 7-day free trial. No commitment required.'
+          : 'This section is part of Living Planner Pro. If you have Pro, sign in with that account and it opens right up.'}
       </p>
-      <button onClick={onUpgrade} style={{
+      {purchasesInApp && <><button onClick={onUpgrade} style={{
         padding: '13px 32px', borderRadius: 999,
         background: 'linear-gradient(135deg, var(--brass) 0%, var(--brass2) 100%)',
         color: 'white', border: 'none',
         fontSize: '.92rem', fontWeight: 700, cursor: 'pointer',
         boxShadow: '0 4px 20px rgba(184,150,90,.35)',
       }}>Start Free Trial →</button>
-      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.3)',marginTop:12}}>7-day free trial · Cancel anytime</p>
+      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.7)',marginTop:12}}>7-day free trial · Cancel anytime</p></>}
     </div>
   )
 }
@@ -3585,6 +3619,11 @@ function UpgradeCard({ title, message, onClose }) {
           {message || 'Unlock unlimited tasks, habits, goals, faith section, finance tools, and all future features.'}
         </p>
 
+        {!purchasesInApp ? (
+          <p style={{ fontSize: '.85rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 20, background: 'var(--stone)', borderRadius: 12, padding: '12px 14px' }}>
+            Pro can't be purchased in the app yet. If you already have Pro, sign in with that account and everything unlocks.
+          </p>
+        ) : (
         <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
           <a href={plannerCheckoutUrl(STRIPE_CONFIG.annualLink, user)} target="_blank" rel="noopener noreferrer" style={{
             display: 'block', padding: '16px', borderRadius: 14,
@@ -3608,11 +3647,12 @@ function UpgradeCard({ title, message, onClose }) {
             <div style={{ fontSize: '.75rem', color: 'var(--ink2)', marginTop: 2 }}>7-day free trial</div>
           </a>
         </div>
+        )}
 
         <button onClick={onClose} style={{
           background: 'none', border: 'none', color: 'var(--muted)',
           fontSize: '.82rem', cursor: 'pointer',
-        }}>Maybe later</button>
+        }}>{purchasesInApp ? 'Maybe later' : 'OK'}</button>
       </div>
     </div>
   )
@@ -3916,6 +3956,7 @@ const A2HS_PLATFORMS = [
 ]
 
 function isStandalone() {
+  if (isNative) return true // the App Store app is already installed
   try {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
   } catch { return false }
@@ -8633,6 +8674,7 @@ function NotificationSettings({ settings, updateSettings }) {
 
   useEffect(() => {
     PlannerPush.isSupported().then(setSupported)
+    PlannerPush.permission().then(setPermission)
     PlannerPush.deviceConnected().then(setConnected)
   }, [])
 
@@ -8655,7 +8697,7 @@ function NotificationSettings({ settings, updateSettings }) {
     try {
       if (!connected) { const sub = await PlannerPush.subscribe(); setConnected(Boolean(sub)) }
       const r = await PlannerPush.sendTest()
-      setMsg(r?.sent ? `Sent to ${r.sent} device${r.sent > 1 ? 's' : ''}. It should arrive in a few seconds.` : 'No devices are registered yet.')
+      setMsg(r?.sent ? `Sent to ${r.sent} device${r.sent > 1 ? 's' : ''}. It should arrive in a few seconds.` : r?.devices ? 'This device is registered, but the test could not be delivered right now. Try again in a minute.' : 'No devices are registered yet.')
     } catch (e) { setMsg('Could not send a test right now.') }
     setBusy(false)
   }
@@ -8743,6 +8785,7 @@ async function downloadBackup(user) {
   const backup = await buildBackup(user)
   const name = `living-planner-backup-${TODAY}.json`
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+  if (isNative) return nativeShareFile(JSON.stringify(backup, null, 2), name, 'Living Planner backup')
   const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/json' }) : null
   // iPhone/iPad Home Screen apps can't download directly — hand the file to the share sheet (Save to Files)
   if (file && navigator.canShare?.({ files: [file] }) && /iPad|iPhone|iPod/.test(navigator.userAgent || '')) {
@@ -8804,7 +8847,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                        color:'var(--ink)', textDecoration:'none', border:'1.5px solid var(--border2)',
                        fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap',
                      }}>Manage</a>
-                ) : (
+                ) : purchasesInApp && (
                   <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited everything plus exclusive features.')} style={{
                     padding:'8px 18px', borderRadius:999, background:'var(--teal)',
                     color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
@@ -8813,11 +8856,12 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
               </div>
             )
           })()}
+          {(purchasesInApp || ['pro', 'trial'].includes((typeof window !== 'undefined' && localStorage.getItem('planner_tier')) || '')) &&
           <p className="muted" style={{fontSize:'.72rem',marginTop:12,marginBottom:0,lineHeight:1.5}}>
             To cancel or update payment, email{' '}
             <a href="mailto:support@eloraradiance.com" style={{color:'var(--teal)'}}>support@eloraradiance.com</a>.
             You keep Pro until the end of the period you've paid for.
-          </p>
+          </p>}
         </section>
 
       <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
@@ -8868,8 +8912,8 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         ))}
       </section>
 
-      {/* ── Add to Home Screen ─────────────────── */}
-      <section className="card">
+      {/* ── Add to Home Screen (website only; the App Store app is already installed) ── */}
+      {!isNative && <section className="card">
         <p className="eyebrow">Quick Access</p>
         <button onClick={() => setA2hsOpen(true)} style={{
           width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
@@ -8883,7 +8927,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           </div>
           <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
         </button>
-      </section>
+      </section>}
 
       {/* ── Ratings & Reviews ─────── */}
       <section className="card">
@@ -9085,10 +9129,16 @@ function PlannerApp() {
   // Reminders come from the server; just make sure this device is registered.
   useEffect(() => {
     if (!user || !hasSupabaseEnv) return
-    try { if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return } catch { return }
-    const t = setTimeout(() => { PlannerPush.subscribe() }, 1500)
-    return () => clearTimeout(t)
+    let cancelled = false
+    const t = setTimeout(async () => {
+      if (!cancelled && (await PlannerPush.permission()) === 'granted') PlannerPush.subscribe()
+    }, 1500)
+    return () => { cancelled = true; clearTimeout(t) }
   }, [user?.id])
+
+  // Phone app: tapping a reminder opens the page it is about.
+  const navigateTo = useNavigate()
+  useEffect(() => onNativeReminderTap(navigateTo), [navigateTo])
 
   if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 
