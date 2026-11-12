@@ -2490,7 +2490,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     dayScheduled.forEach((item) => { const h = Number(String(item.startTime || '').slice(0, 2)); if (!isNaN(h) && h >= 0 && h < 24) set.add(h) })
     return [...set].sort((a, b) => a - b).map((h) => `${String(h).padStart(2, '0')}:00`)
   }, [dayScheduled])
-  const nowHour = selectedDate === TODAY ? String(new Date().getHours()).padStart(2, '0') : null
+  // Each hour is split into :00 and :30 rows so you can tap straight onto 6:30
+  const slots = hours.flatMap((h) => [h, h.slice(0, 2) + ':30'])
+  const slotOf = (t) => { const [hh, mm] = String(t || '').split(':'); return `${hh}:${Number(mm) >= 30 ? '30' : '00'}` }
+  const nowSlot = selectedDate === TODAY ? slotOf(`${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`) : null
   const confirmDelete = (item) => {
     if (window.confirm(`Delete "${item.title}"?`)) onDelete(item.itemType, item.id)
   }
@@ -2562,17 +2565,18 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
             </span>
           </div>
           <div className={settings.compactCalendar ? 'timeline compact-calendar' : 'timeline'}>
-            {hours.map((hour) => {
-              const items = dayScheduled.filter((item) => item.startTime?.slice(0, 2) === hour.slice(0, 2))
-              const isNow = nowHour === hour.slice(0, 2)
+            {slots.map((hour) => {
+              const items = dayScheduled.filter((item) => item.startTime && slotOf(item.startTime) === hour)
+              const isHalf = hour.endsWith(':30')
+              const isNow = nowSlot === hour
               return (
-                <div className={'timeline-row' + (isNow ? ' now' : '')} key={hour}>
-                  <div className="timeline-hour">{hourLabel(hour)}</div>
+                <div className={'timeline-row' + (isHalf ? ' half' : '') + (isNow ? ' now' : '')} key={hour}>
+                  <div className="timeline-hour">{isHalf ? fmt12(hour).replace(/ (AM|PM)$/, '') : hourLabel(hour)}</div>
                   <div className="timeline-slot"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}>
                     {items.length === 0
-                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {hourLabel(hour)}</span></button>
+                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {fmt12(hour)}</span></button>
                       : items.map((item) => {
                         const done = item.itemType === 'task' && item.completed
                         return (

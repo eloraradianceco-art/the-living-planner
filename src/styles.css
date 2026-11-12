@@ -1418,3 +1418,14 @@ html { scroll-behavior: smooth; }
 .compact-calendar .timeline-row { min-height: 40px; padding: 5px 0; }
 /* Empty hour: + sits in the middle of the slot */
 .slot-add-btn { justify-content: center; padding: 0; text-align: center; }
+
+/* ── Half-hour rows: tap 6:30 directly ──────────────────────────────── */
+.timeline-row { min-height: 44px; padding: 4px 0; }
+.timeline-row:not(.half) { border-bottom: 1px dashed rgba(28,28,30,.07); }
+.timeline-row.half { border-bottom: 1px solid rgba(28,28,30,.09); }
+.timeline-row .timeline-hour { padding-top: 11px; }
+.timeline-row.half .timeline-hour { font-size: .62rem; font-weight: 500; color: rgba(28,28,30,.32); letter-spacing: .02em; }
+.timeline-row.half.now .timeline-hour { color: var(--brass2); }
+.slot-add-btn { height: 36px; }
+.compact-calendar .timeline-row { min-height: 36px; padding: 2px 0; }
+.compact-calendar .slot-add-btn { height: 30px; }
