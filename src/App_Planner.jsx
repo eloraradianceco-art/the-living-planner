@@ -3390,6 +3390,16 @@ const FREE_LIMITS = {
 // ── Subscription Hook ─────────────────────────────────────────────────────
 // Complimentary Pro (owner/staff) is the profiles.pro_comp flag, set in the database only.
 
+// Stripe checkout links carry the account, so the purchase is matched to it.
+function plannerCheckoutUrl(base, user) {
+  if (!user) return base
+  const q = new URLSearchParams({ client_reference_id: user.id })
+  if (user.email) q.set('prefilled_email', user.email)
+  return `${base}?${q.toString()}`
+}
+
+// Pro is set only by Stripe (through the purchase webhook) or profiles.pro_comp.
+// The app reads it; it never writes it.
 function useSubscription(user) {
   const [tier, setTierState] = React.useState(() => {
     try { return localStorage.getItem('planner_tier') || 'free' } catch { return 'free' }
@@ -3397,111 +3407,109 @@ function useSubscription(user) {
   const [trialEndsAt, setTrialEndsAtState] = React.useState(() => {
     try { return localStorage.getItem('planner_trial_ends') } catch { return null }
   })
+  // After checkout Stripe sends people back with ?welcome=pro&session_id=…
+  // Pro turns on when Stripe's notice reaches the webhook, usually within seconds.
+  const [arrival] = React.useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      return params.get('welcome') === 'pro' ? { sessionId: params.get('session_id') || null } : null
+    } catch { return null }
+  })
+  const [welcome, setWelcome] = React.useState(arrival ? 'confirming' : null) // confirming | done | waiting
 
-  // ── Load tier from Supabase profile on mount (source of truth) ───────────
+  const apply = React.useCallback((row) => {
+    if (!row) return null
+    const finalTier = row.pro_comp ? 'pro' : (row.tier || 'free')
+    setTierState(finalTier)
+    setTrialEndsAtState(row.trial_ends_at || null)
+    try {
+      localStorage.setItem('planner_tier', finalTier)
+      if (row.trial_ends_at) localStorage.setItem('planner_trial_ends', row.trial_ends_at)
+      else localStorage.removeItem('planner_trial_ends')
+    } catch {}
+    return finalTier
+  }, [])
+
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
     let cancelled = false
+    let timer = null
+    const active = (t) => t === 'pro' || t === 'trial'
 
-    const loadTier = async () => {
+    const readProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('tier, trial_ends_at, pro_comp')
         .eq('user_id', user.id)
         .maybeSingle()
-
-      if (cancelled || error || !data) return
-
-      // Complimentary Pro always wins, even if tier says otherwise
-      const finalTier = data.pro_comp ? 'pro' : (data.tier || 'free')
-
-      setTierState(finalTier)
-      setTrialEndsAtState(data.trial_ends_at || null)
-      try {
-        localStorage.setItem('planner_tier', finalTier)
-        if (data.trial_ends_at) localStorage.setItem('planner_trial_ends', data.trial_ends_at)
-      } catch {}
+      return error ? null : data
     }
 
-    loadTier()
+    const load = async (attempt = 0) => {
+      let t = apply(await readProfile())
+      if (cancelled) return
+      if (!active(t)) {
+        // Links a subscription paid with this account's email (or the checkout just finished).
+        try { await supabase.rpc('claim_planner_subscription', { p_checkout_session: arrival?.sessionId || null }) } catch {}
+        if (cancelled) return
+        t = apply(await readProfile())
+        if (cancelled) return
+      }
+      if (!arrival) return
+      if (active(t)) setWelcome('done')
+      else if (attempt < 12) timer = setTimeout(() => load(attempt + 1), 2500)
+      else setWelcome('waiting')
+    }
 
-    // Realtime — if tier changes elsewhere (Stripe webhook, admin, another device), update here
+    if (arrival) { try { window.history.replaceState({}, '', window.location.pathname) } catch {} }
+    load()
+
+    // Realtime: Stripe changes (trial ending, renewal, cancellation) show up without a reload.
     const channel = supabase
       .channel('subscription_' + user.id)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'profiles',
         filter: `user_id=eq.${user.id}`,
       }, payload => {
-        const row = payload.new
-        if (!row) return
-        const finalTier = row.pro_comp ? 'pro' : (row.tier || 'free')
-        setTierState(finalTier)
-        setTrialEndsAtState(row.trial_ends_at || null)
-        try { localStorage.setItem('planner_tier', finalTier) } catch {}
+        const t = apply(payload.new)
+        if (arrival && active(t)) setWelcome(w => (w === 'confirming' || w === 'waiting') ? 'done' : w)
       })
       .subscribe()
 
-    return () => { cancelled = true; supabase.removeChannel(channel) }
+    return () => { cancelled = true; clearTimeout(timer); supabase.removeChannel(channel) }
   }, [user?.id])
-
-  // ── Setter that writes to BOTH localStorage and Supabase ─────────────────
-  const setTier = React.useCallback(async (newTier) => {
-    setTierState(newTier)
-    try { localStorage.setItem('planner_tier', newTier) } catch {}
-    if (user && hasSupabaseEnv) {
-      await supabase.from('profiles').update({
-        tier: newTier, updated_at: new Date().toISOString()
-      }).eq('user_id', user.id)
-    }
-  }, [user?.id])
-
-  const setTrialEndsAt = React.useCallback(async (date) => {
-    setTrialEndsAtState(date)
-    try {
-      if (date) localStorage.setItem('planner_trial_ends', date)
-      else localStorage.removeItem('planner_trial_ends')
-    } catch {}
-    if (user && hasSupabaseEnv) {
-      await supabase.from('profiles').update({
-        trial_ends_at: date, updated_at: new Date().toISOString()
-      }).eq('user_id', user.id)
-    }
-  }, [user?.id])
-
-  // Check URL for welcome=pro and activate pro (post-Stripe checkout)
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('welcome') === 'pro') {
-      setTier('pro')
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-  }, [setTier])
 
   const isPro = tier === 'pro' || tier === 'trial'
   const isTrialing = tier === 'trial' && trialEndsAt && new Date(trialEndsAt) > new Date()
   const daysLeftInTrial = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : 0
+  const dismissWelcome = React.useCallback(() => setWelcome(null), [])
 
-  return { tier, setTier, isPro, isTrialing, daysLeftInTrial, trialEndsAt, setTrialEndsAt }
+  return { tier, isPro, isTrialing, daysLeftInTrial, trialEndsAt, welcome, dismissWelcome }
 }
 
 // ── Welcome Pro Banner ────────────────────────────────────────────────────
-function WelcomeProBanner({ onDismiss }) {
+function WelcomeProBanner({ state = 'done', trial = false, onDismiss }) {
+  const copy = state === 'confirming'
+    ? { icon: '⏳', title: 'Confirming your subscription…', text: 'This usually takes a few seconds.' }
+    : state === 'waiting'
+      ? { icon: '⏳', title: 'Still confirming your payment', text: "Pro turns on as soon as Stripe confirms it. Make sure you're signed in with the email you paid with, or email support@eloraradiance.com." }
+      : { icon: '🎉', title: 'Welcome to Pro!', text: trial ? 'Your free trial has started. Plan with faith, live with purpose.' : 'Every Pro feature is unlocked. Plan with faith, live with purpose.' }
   return (
     <div style={{
-      position: 'fixed', top: 16, left: 16, right: 16, zIndex: 9999,
+      position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 16, right: 16, zIndex: 9999,
       maxWidth: 480, margin: '0 auto',
-      background: 'linear-gradient(135deg, var(--teal) 0%, var(--navy) 100%)',
+      background: 'linear-gradient(135deg, #23786D 0%, #1A2332 100%)',
       color: 'white', borderRadius: 16, padding: '16px 20px',
       boxShadow: '0 12px 40px rgba(0,0,0,.25)',
       display: 'flex', alignItems: 'center', gap: 12,
       animation: 'slideDown .4s ease',
     }}>
-      <div style={{ fontSize: '2rem' }}>🎉</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: 2 }}>Welcome to Pro!</div>
-        <div style={{ fontSize: '.78rem', opacity: .9 }}>Your free trial has started. Plan with faith, live with purpose.</div>
+      <div style={{ fontSize: '2rem' }} aria-hidden="true">{copy.icon}</div>
+      <div style={{ flex: 1 }} role="status" aria-live="polite">
+        <div style={{ fontWeight: 700, fontSize: '.95rem', marginBottom: 2 }}>{copy.title}</div>
+        <div style={{ fontSize: '.78rem', opacity: .9 }}>{copy.text}</div>
       </div>
-      <button onClick={onDismiss} style={{
+      <button onClick={onDismiss} aria-label="Dismiss" style={{
         background: 'rgba(255,255,255,.2)', color: 'white', border: 'none',
         borderRadius: 999, width: 28, height: 28, cursor: 'pointer', fontWeight: 700,
       }}>✕</button>
@@ -3554,6 +3562,7 @@ function ProTabGate({ isPro, onUpgrade, children }) {
 
 // ── Upgrade Card ──────────────────────────────────────────────────────────
 function UpgradeCard({ title, message, onClose }) {
+  const { user } = useAuth()
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
@@ -3575,7 +3584,7 @@ function UpgradeCard({ title, message, onClose }) {
         </p>
 
         <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
-          <a href={STRIPE_CONFIG.annualLink} target="_blank" rel="noopener noreferrer" style={{
+          <a href={plannerCheckoutUrl(STRIPE_CONFIG.annualLink, user)} target="_blank" rel="noopener noreferrer" style={{
             display: 'block', padding: '16px', borderRadius: 14,
             background: 'var(--teal)', color: 'white', textDecoration: 'none',
             fontWeight: 700, position: 'relative',
@@ -3588,7 +3597,7 @@ function UpgradeCard({ title, message, onClose }) {
               padding: '3px 10px', borderRadius: 999, fontWeight: 700,
             }}>BEST VALUE</span>
           </a>
-          <a href={STRIPE_CONFIG.monthlyLink} target="_blank" rel="noopener noreferrer" style={{
+          <a href={plannerCheckoutUrl(STRIPE_CONFIG.monthlyLink, user)} target="_blank" rel="noopener noreferrer" style={{
             display: 'block', padding: '14px', borderRadius: 14,
             background: 'var(--stone)', color: 'var(--ink)', textDecoration: 'none',
             fontWeight: 700, border: '1.5px solid var(--border2)',
@@ -9018,12 +9027,6 @@ function PlannerApp() {
   const { user } = useAuth()
   // Subscription
   const subscription = useSubscription(user)
-  const [showWelcomePro, setShowWelcomePro] = useState(() => {
-    try {
-      const params = new URLSearchParams(window.location.search)
-      return params.get('welcome') === 'pro'
-    } catch { return false }
-  })
   const [showA2HS, setShowA2HS] = useState(() => {
     try { return !isStandalone() && !localStorage.getItem('planner_a2hs_seen') } catch { return false }
   })
@@ -9071,8 +9074,8 @@ function PlannerApp() {
 
   return (
     <>
-      {showWelcomePro && <WelcomeProBanner onDismiss={() => setShowWelcomePro(false)} />}
-      {showA2HS && !showWelcomePro && <A2HSModal onClose={dismissA2HS} />}
+      {subscription.welcome && <WelcomeProBanner state={subscription.welcome} trial={subscription.tier === 'trial'} onDismiss={subscription.dismissWelcome} />}
+      {showA2HS && !subscription.welcome && <A2HSModal onClose={dismissA2HS} />}
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <ScrollToTop />
       <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}
