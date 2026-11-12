@@ -1299,8 +1299,8 @@ function AuthGate({ children, fallback }) {
       <div className="auth-shell" style={{background:'var(--ink)'}}>
         <div style={{textAlign:'center'}}>
           <div style={{marginBottom:18,opacity:.9}}><BrandMark size={52} ink="#1C1C1E" /></div>
-          <p style={{color:'var(--brass)',fontSize:'.75rem',fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',marginBottom:8}}>The Living Planner</p>
-          <p style={{color:'rgba(255,255,255,.4)',fontSize:'.88rem'}}>Loading your workspace…</p>
+          <p style={{color:'var(--brass-fg)',fontSize:'.75rem',fontWeight:700,letterSpacing:'.15em',textTransform:'uppercase',marginBottom:8}}>The Living Planner</p>
+          <p style={{color:'rgba(255,255,255,.64)',fontSize:'.88rem'}}>Loading your workspace…</p>
         </div>
       </div>
     )
@@ -1369,7 +1369,7 @@ function AuthPage() {
     <div className="auth-shell" style={{background:'var(--navy)'}}>
       <div style={{maxWidth:460, width:'100%', padding:'0 20px', textAlign:'center'}}>
         <div style={{marginBottom:22}}><BrandMark size={68} ink="#1C1C1E" /></div>
-        <p style={{color:'var(--brass)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.28em', textTransform:'uppercase', marginBottom:12}}>The Living Planner</p>
+        <p style={{color:'var(--brass-fg)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.28em', textTransform:'uppercase', marginBottom:12}}>The Living Planner</p>
         <h1 style={{color:'white', fontSize:'2.35rem', fontFamily:'var(--serif)', fontWeight:400, letterSpacing:'-.01em', lineHeight:1.12, marginBottom:16}}>
           Plan with clarity.<br/>Live with purpose.
         </h1>
@@ -1395,10 +1395,10 @@ function AuthPage() {
     <div className="auth-shell" style={{background:'var(--navy)', alignItems:'flex-start', paddingTop:40}}>
       <div style={{maxWidth:460, width:'100%', padding:'0 20px'}}>
         <button onClick={() => setStep('welcome')}
-          style={{background:'none', border:'none', color:'rgba(255,255,255,.4)', cursor:'pointer', fontSize:'.85rem', marginBottom:24, fontFamily:'inherit'}}>
+          style={{background:'none', border:'none', color:'rgba(255,255,255,.64)', cursor:'pointer', fontSize:'.85rem', marginBottom:24, fontFamily:'inherit'}}>
           ← Back
         </button>
-        <p style={{color:'var(--brass)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', marginBottom:8}}>Everything in one place</p>
+        <p style={{color:'var(--brass-fg)', fontSize:'.72rem', fontWeight:700, letterSpacing:'.2em', textTransform:'uppercase', marginBottom:8}}>Everything in one place</p>
         <h2 style={{color:'white', fontFamily:'var(--serif)', fontWeight:400, fontSize:'1.9rem', marginBottom:20}}>What's inside your planner</h2>
         <div style={{display:'grid', gap:10, marginBottom:28}}>
           {SECTIONS.map(s => (
@@ -1903,7 +1903,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
       <header ref={topbarRef} className="topbar premium-topbar living-planner-topbar">
         <Link to="/" className="topbar-copy" style={{textDecoration:'none'}}>
           <p className="eyebrow">The Living Planner</p>
-          <p style={{color:"rgba(255,255,255,.38)",fontSize:".72rem",marginTop:1}}>{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <p style={{color:"rgba(255,255,255,.64)",fontSize:".72rem",marginTop:1}}>{formatDateLabel(TODAY, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         </Link>
 
         <div className="topbar-actions">
@@ -1912,7 +1912,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
             <div style={{display:'flex',flexDirection:'column',gap:1,textAlign:'left'}}>
               <strong style={{lineHeight:1.1}}>{displayName}</strong>
-              <span style={{fontSize:'.58rem',opacity:.7}}>{modeOf(profile).id} mode ▾</span>
+              <span style={{fontSize:'.58rem',opacity:.92}}>{modeOf(profile).id} mode ▾</span>
             </div>
           </button>
         </div>
@@ -1979,7 +1979,7 @@ function StatusBanner({ syncing, error }) {
       padding:'6px 16px', fontSize:'.75rem', fontWeight:500,
       background: error ? 'rgba(217,79,61,.08)' : 'rgba(184,150,90,.08)',
       borderBottom: `1px solid ${error ? 'rgba(217,79,61,.15)' : 'rgba(184,150,90,.12)'}`,
-      color: error ? 'var(--danger)' : 'var(--brass)'
+      color: error ? 'var(--danger)' : 'var(--brass-fg)'
     }}>
       <span style={{width:6,height:6,borderRadius:'50%',background:error?'var(--danger)':'var(--brass)',flexShrink:0}} />
       <span>{error || (syncing ? 'Syncing…' : '')}</span>
@@ -2152,7 +2152,7 @@ function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
         const pct = max > 0 ? Math.max((val / max) * 100, total > 0 ? 8 : 0) : 0
         return (
           <div key={item.label} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end'}}>
-            <div style={{fontSize:'.65rem', color:'var(--brass)', fontWeight:700}}>{val > 0 ? val : ''}</div>
+            <div style={{fontSize:'.65rem', color:'var(--brass-fg)', fontWeight:700}}>{val > 0 ? val : ''}</div>
             <div style={{
               width:'100%', borderRadius:'4px 4px 0 0',
               height: total === 0 ? 4 : `${pct}%`,
@@ -2235,9 +2235,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             : 'A clear day. What will you make of it?'}
         </p>
         <div className="hero-focus-actions" style={{marginTop:14}}>
-          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
-          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
-          <Link to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, textDecoration:'none', display:'inline-block'}}>Day View</Link>
+          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
+          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
+          <Link to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, textDecoration:'none', display:'inline-block'}}>Day View</Link>
         </div>
         {/* Overall score pill */}
         {(() => {
@@ -2251,10 +2251,10 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                 border: `1px solid ${avg >= 7 ? 'rgba(52,168,83,.35)' : avg >= 5 ? 'rgba(42,157,143,.35)' : 'rgba(184,150,90,.35)'}`,
                 display:'flex',alignItems:'center',gap:6,
               }}>
-                <span style={{fontSize:'.7rem',color: avg >= 7 ? '#4ade80' : avg >= 5 ? 'var(--teal-bright)' : 'var(--brass)',fontWeight:700}}>Life Score</span>
+                <span style={{fontSize:'.7rem',color: avg >= 7 ? '#4ade80' : avg >= 5 ? 'var(--teal-bright)' : 'var(--brass-fg)',fontWeight:700}}>Life Score</span>
                 <span style={{fontSize:'.85rem',fontWeight:800,color:'white'}}>{avg}/10</span>
               </div>
-              <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.35)'}}>
+              <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.64)'}}>
                 {avg >= 8 ? 'Thriving ✦' : avg >= 6 ? 'On track' : avg >= 4 ? 'Needs attention' : 'Time to reset'}
               </span>
             </div>
@@ -2280,14 +2280,14 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           <section className="card" style={{padding:'14px 16px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
               <div style={{flex:1,minWidth:0}}>
-                <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Word of the Year</p>
+                <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass-fg)',textTransform:'uppercase',margin:'0 0 4px'}}>Word of the Year</p>
                 {editing ? (
                   <div style={{display:'flex',gap:8,alignItems:'center'}}>
                     <input autoFocus value={draft} onChange={e=>setDraft(e.target.value)}
                       onKeyDown={e=>{if(e.key==='Enter')save();if(e.key==='Escape')setEditing(false)}}
                       placeholder={`Your word for ${new Date().getFullYear()}...`}
                       style={{flex:1,padding:'6px 10px',border:'1.5px solid var(--brass)',borderRadius:8,fontSize:'1rem',fontFamily:'var(--serif)',fontStyle:'italic',background:'var(--stone)'}} />
-                    <button onClick={save} style={{padding:'6px 14px',borderRadius:999,background:'var(--brass)',color:'white',border:'none',fontSize:'.78rem',fontWeight:700,cursor:'pointer'}}>Save</button>
+                    <button onClick={save} style={{padding:'6px 14px',borderRadius:999,background:'var(--brass-text)',color:'white',border:'none',fontSize:'.78rem',fontWeight:700,cursor:'pointer'}}>Save</button>
                     <button onClick={()=>setEditing(false)} style={{padding:'6px 10px',borderRadius:999,background:'transparent',border:'1px solid var(--border2)',fontSize:'.78rem',cursor:'pointer'}}>✕</button>
                   </div>
                 ) : woty ? (
@@ -2299,7 +2299,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               {!editing && (
                 <button onClick={()=>{setDraft(woty);setEditing(true)}} style={{
                   padding:'6px 14px',borderRadius:999,background:'transparent',
-                  color:'var(--brass)',border:'1px solid var(--brass)',
+                  color:'var(--brass-fg)',border:'1px solid var(--brass)',
                   fontSize:'.74rem',fontWeight:600,cursor:'pointer',flexShrink:0,
                 }}>{woty ? 'Edit' : 'Set'}</button>
               )}
@@ -2386,7 +2386,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                     cursor:'pointer', flexShrink:0, padding:0,
                   }} aria-label="Mark habit complete" />
                   <Link to="/habits" style={{flex:1, minWidth:0, textDecoration:'none', color:'inherit'}}>
-                    <div style={{fontSize:'.58rem', color:'var(--brass)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT · TAP CIRCLE</div>
+                    <div style={{fontSize:'.58rem', color:'var(--brass-fg)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT · TAP CIRCLE</div>
                     <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                       {topHabit.title}
                     </div>
@@ -2504,7 +2504,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           : todaySchedule.slice(0, 6).map((item) => (
             <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
-              <strong style={{color:'var(--brass2)', fontSize:'.8rem', minWidth:62, fontWeight:600}}>{fmt12(item.startTime)}</strong>
+              <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600}}>{fmt12(item.startTime)}</strong>
               <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
               <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
@@ -2572,7 +2572,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
               <Link key={goal.id} to="/goals" className="progress-block" style={{display:'block', textDecoration:'none', color:'inherit'}}>
                 <div className="metric-row compact-row" style={{padding:'5px 0'}}>
                   <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{goal.title}</span>
-                  <strong style={{color:'var(--brass)', fontSize:'.88rem'}}>{pct}%</strong>
+                  <strong style={{color:'var(--brass-fg)', fontSize:'.88rem'}}>{pct}%</strong>
                 </div>
                 <div className="mini-progress"><div style={{ width: `${pct}%` }} /></div>
                 {next && <div className="home-next-step"><span>Next</span>{next}</div>}
@@ -2636,7 +2636,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             border:'1.5px solid rgba(184,150,90,.2)',
             padding:'16px 18px',
           }}>
-            <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Plan Tomorrow</p>
+            <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass-fg)',textTransform:'uppercase',margin:'0 0 4px'}}>Plan Tomorrow</p>
             <h3 style={{margin:'0 0 4px',fontSize:'1rem',color:'var(--ink)'}}>Your Top 3</h3>
             <p className="muted" style={{fontSize:'.8rem',marginBottom:12,fontStyle:'italic'}}>
               "He who fails to plan is planning to fail." — Set the night before. Rise focused.
@@ -2644,7 +2644,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             {[0,1,2].map(i => (
               <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
                 <span style={{
-                  width:24,height:24,borderRadius:'50%',background:'var(--brass)',
+                  width:24,height:24,borderRadius:'50%',background:'var(--brass-text)',
                   color:'white',display:'flex',alignItems:'center',justifyContent:'center',
                   fontSize:'.75rem',fontWeight:700,flexShrink:0,
                 }}>{i+1}</span>
@@ -2827,7 +2827,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
         }}>
           {task.title}
           {task.recurrence && task.recurrence !== 'none' &&
-            <span style={{marginLeft:6, fontSize:'.62rem', padding:'1px 7px', borderRadius:999, background:'var(--brass-dim)', color:'var(--brass2)', fontWeight:700, textTransform:'capitalize', textDecoration:'none', display:'inline-block'}}>↻ {task.recurrence}</span>
+            <span style={{marginLeft:6, fontSize:'.62rem', padding:'1px 7px', borderRadius:999, background:'var(--brass-dim)', color:'var(--brass-fg)', fontWeight:700, textTransform:'capitalize', textDecoration:'none', display:'inline-block'}}>↻ {task.recurrence}</span>
           }
         </div>
         <div style={{fontSize:'.72rem', color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:2}}>
@@ -2836,7 +2836,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
           </span>
           <span style={{color:'var(--muted)',fontSize:'.7rem'}}>{task.category}</span>
           {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{shortDate(task.date)}</span>}
-          {task.time && <span style={{color:'var(--brass2)',fontWeight:600}}>{fmt12(task.time)}</span>}
+          {task.time && <span style={{color:'var(--brass-fg)',fontWeight:600}}>{fmt12(task.time)}</span>}
         </div>
       </div>
 
@@ -3115,7 +3115,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
                     <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => openItem(item)}
                       draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
-                      <span style={{fontSize:'.7rem', color:'var(--brass2)', fontWeight:600}}>{fmt12(item.startTime)}</span>
+                      <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{fmt12(item.startTime)}</span>
                       <strong style={{fontSize:'.8rem', color:'var(--ink)'}}>{item.title}</strong>
                     </button>
                   ))}
@@ -3171,7 +3171,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
 
   const STATUS_ORDER = ['Active', 'In Progress', 'On Hold', 'Completed']
   const STATUS_STYLE = {
-    Active:        { color: 'var(--brass2)',  bg: 'var(--brass-dim)' },
+    Active:        { color:'var(--brass-fg)',  bg: 'var(--brass-dim)' },
     'In Progress': { color: '#B26B12',        bg: 'rgba(233,149,42,.14)' },
     'On Hold':     { color: 'var(--muted)',   bg: 'var(--stone2)' },
     Completed:     { color: 'var(--success)', bg: 'rgba(34,197,94,.12)' },
@@ -3201,7 +3201,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
               cursor:'pointer', fontFamily:'inherit', fontWeight:600,
               borderColor: filter===s ? 'var(--brass)' : 'var(--border2)',
               background: filter===s ? 'var(--brass-dim)' : 'transparent',
-              color: filter===s ? 'var(--brass2)' : 'var(--muted)'
+              color: filter===s ? 'var(--brass-fg)' : 'var(--muted)'
             }}>{s}</button>
           ))}
         </div>
@@ -3254,7 +3254,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
                 <span style={{fontSize:'.75rem', color:'var(--muted)'}}>
                   {summary}{project.dueDate ? ` · Due ${shortDate(project.dueDate)}` : ''}
                 </span>
-                <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--brass2)'}}>{progress}%</span>
+                <span style={{fontSize:'.82rem', fontWeight:700, color: progress >= 100 ? 'var(--success)' : 'var(--brass-fg)'}}>{progress}%</span>
               </div>
               <div style={{height:6, borderRadius:999, background:'var(--stone2)', overflow:'hidden'}}>
                 <div style={{
@@ -3288,7 +3288,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
                 </button>
               )}
               <button onClick={() => onQuickCreate('task', { linkedProjectId: project.id, linkedGoalId: project.goalId || '' })}
-                style={{background:'none', border:'none', color:'var(--brass2)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>
+                style={{background:'none', border:'none', color:'var(--brass-fg)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>
                 + Schedule a task
               </button>
             </div>
@@ -3929,10 +3929,10 @@ function A2HSInstructions() {
       </p>
       {A2HS_PLATFORMS.map(p => (
         <div key={p.os} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: '.64rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--brass2)', marginBottom: 8 }}>{p.os}</div>
+          <div style={{ fontSize: '.64rem', fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color:'var(--brass-fg)', marginBottom: 8 }}>{p.os}</div>
           {p.steps.map((step, i) => (
             <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 6, alignItems: 'flex-start' }}>
-              <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, background: 'var(--ink)', color: 'var(--brass)', fontSize: '.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
+              <span style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 999, background: 'var(--ink)', color:'var(--brass-fg)', fontSize: '.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>{i + 1}</span>
               <span style={{ fontSize: '.86rem', color: 'var(--ink2,#4B5563)', lineHeight: 1.5 }}>{step}</span>
             </div>
           ))}
@@ -4003,7 +4003,7 @@ function PageHeader({ icon: Icon, eyebrow, title, subtitle }) {
         {Icon && <Icon size={22} strokeWidth={1.6} color="var(--brass)" />}
       </div>
       <div style={{ minWidth: 0 }}>
-        {eyebrow && <p style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--brass)', margin: '0 0 2px' }}>{eyebrow}</p>}
+        {eyebrow && <p style={{ fontSize: '.6rem', fontWeight: 700, letterSpacing: '.16em', textTransform: 'uppercase', color:'var(--brass-fg)', margin: '0 0 2px' }}>{eyebrow}</p>}
         <h1 style={{ fontFamily: 'var(--serif)', fontWeight: 500, fontSize: '1.85rem', lineHeight: 1.05, letterSpacing: '-.015em', color: 'var(--ink)', margin: 0 }}>{title}</h1>
         {subtitle && <p style={{ fontSize: '.8rem', color: 'var(--muted)', margin: '3px 0 0', lineHeight: 1.35 }}>{subtitle}</p>}
       </div>
@@ -4379,7 +4379,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               }}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
                   <div>
-                    <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass)',textTransform:'uppercase',margin:'0 0 4px'}}>Net Worth</p>
+                    <p style={{fontSize:'.62rem',fontWeight:700,letterSpacing:'.1em',color:'var(--brass-fg)',textTransform:'uppercase',margin:'0 0 4px'}}>Net Worth</p>
                     <strong style={{fontSize:'1.6rem',display:'block'}}>{fmt(netWorth)}</strong>
                     {change !== 0 && (
                       <span style={{fontSize:'.78rem',color: change > 0 ? '#22C55E' : '#EF4444',fontWeight:600}}>
@@ -4389,7 +4389,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                   </div>
                   <button onClick={() => setShowNetWorthForm(!showNetWorthForm)} style={{
                     padding:'6px 14px',borderRadius:999,background:'rgba(184,150,90,.18)',
-                    color:'var(--brass)',border:'1px solid rgba(184,150,90,.35)',
+                    color:'var(--brass-fg)',border:'1px solid rgba(184,150,90,.35)',
                     fontSize:'.78rem',fontWeight:600,cursor:'pointer',
                   }}>{showNetWorthForm ? 'Cancel' : '+ Update'}</button>
                 </div>
@@ -4408,7 +4408,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                       saveNetWorth([...netWorthHistory, {...newNetWorth, id: Date.now(), assets: Number(newNetWorth.assets), liabilities: Number(newNetWorth.liabilities||0)}])
                       setNewNetWorth({assets:'', liabilities:'', date:TODAY})
                       setShowNetWorthForm(false)
-                    }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>Save Snapshot</button>
+                    }} style={{padding:'10px',background:'var(--brass-text)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>Save Snapshot</button>
                   </div>
                 )}
                 {netWorthHistory.length > 1 && (
@@ -4434,7 +4434,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ['Expenses (tracked)', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)'],
             ['Debt Min Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)'],
             ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33) - fpWeekSpend * (PERIOD_MULT[period]||4.33)), totalIncomeForPeriod > totalBillsForPeriod ? 'var(--success)' : 'var(--danger)'],
-            ['This Week Spend', fmt(fpWeekSpend), 'var(--brass)'],
+            ['This Week Spend', fmt(fpWeekSpend), 'var(--brass-fg)'],
             ['This Month Spend', fmt(fpMonthSpend), 'var(--slate)'],
             ['Total Saved (goals)', fmt(totalSavingsStored), 'var(--teal)'],
           ].map(([label, val, col]) => (
@@ -4449,8 +4449,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <p className="eyebrow" style={{marginBottom:6}}>50 / 30 / 20 Rule</p>
             <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of {fmt(totalIncomeForPeriod)}</p>
             {[
-              ['50% Needs', needs50, '#4CAF50', 'Rent, utilities, groceries, insurance, min debt payments'],
-              ['30% Wants', wants30, '#FF9800', 'Dining, shopping, subscriptions, gym, travel'],
+              ['50% Needs', needs50, '#256A2A', 'Rent, utilities, groceries, insurance, min debt payments'],
+              ['30% Wants', wants30, '#8F5300', 'Dining, shopping, subscriptions, gym, travel'],
               ['20% Savings & Debt', savings20, '#9C27B0', 'Emergency fund, investments, extra debt payments'],
             ].map(([label, amt, col, desc]) => (
               <div key={label} style={{marginBottom:12}}>
@@ -4503,7 +4503,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               const taxDed = donations.filter(d => d.date && d.date.startsWith(thisYear+'') && d.taxDeductible).reduce((s,d)=>s+Number(d.amount||0),0)
               return [
                 ['This Month', fmt(thisMonth), 'var(--teal)'],
-                ['Year to Date', fmt(ytd), 'var(--brass)'],
+                ['Year to Date', fmt(ytd), 'var(--brass-fg)'],
                 ['Tax-Deductible', fmt(taxDed), 'var(--success)'],
               ].map(([label,val,color]) => (
                 <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'10px 8px',textAlign:'center'}}>
@@ -4559,7 +4559,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               if(!newDonation.recipient || !newDonation.amount) return
               saveDonations([...donations, {...newDonation, id: Date.now(), amount: Number(newDonation.amount)}])
               setNewDonation({recipient:'', amount:'', category:'Tithe', date:TODAY, taxDeductible:true})
-            }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+            }} style={{padding:'10px',background:'var(--brass-text)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
               + Log Donation
             </button>
           </div>
@@ -4574,11 +4574,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:600,fontSize:'.88rem'}}>{d.recipient}</div>
                     <div className="muted" style={{fontSize:'.74rem'}}>
-                      <span style={{color:'var(--brass)',fontWeight:600}}>{d.category}</span> · {d.date}
+                      <span style={{color:'var(--brass-fg)',fontWeight:600}}>{d.category}</span> · {d.date}
                       {d.taxDeductible && <span style={{color:'var(--success)',marginLeft:6}}>· Tax ✓</span>}
                     </div>
                   </div>
-                  <strong style={{color:'var(--brass)',whiteSpace:'nowrap'}}>{fmt(d.amount)}</strong>
+                  <strong style={{color:'var(--brass-fg)',whiteSpace:'nowrap'}}>{fmt(d.amount)}</strong>
                   <button onClick={() => {
                     if(window.confirm(`Delete donation to ${d.recipient}?`))
                       saveDonations(donations.filter(x => x.id !== d.id))
@@ -4610,7 +4610,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                 <button aria-label="Previous month" style={navBtn} onClick={() => setIncomeView(shiftMonth(mk, -1))}>‹</button>
                 <div style={{textAlign:'center'}}>
                   <h3 style={{margin:0}}>{monthLabel(mk)}</h3>
-                  {mk !== CUR_MONTH && <button onClick={() => setIncomeView(CUR_MONTH)} style={{background:'none',border:'none',color:'var(--brass)',fontSize:'.75rem',fontWeight:600,cursor:'pointer',padding:'2px 0'}}>Back to this month</button>}
+                  {mk !== CUR_MONTH && <button onClick={() => setIncomeView(CUR_MONTH)} style={{background:'none',border:'none',color:'var(--brass-fg)',fontSize:'.75rem',fontWeight:600,cursor:'pointer',padding:'2px 0'}}>Back to this month</button>}
                 </div>
                 <button aria-label="Next month" style={navBtn} onClick={() => setIncomeView(shiftMonth(mk, 1))}>›</button>
               </div>
@@ -4997,9 +4997,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             {/* Challenge selector */}
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:16}}>
               {[
-                {goal:1000, label:'$1,000', timeLabel:'30 Days', type:'daily', periods:30, color:'#4CAF50'},
+                {goal:1000, label:'$1,000', timeLabel:'30 Days', type:'daily', periods:30, color:'#256A2A'},
                 {goal:3000, label:'$3,000', timeLabel:'3 Months', type:'weekly', periods:13, color:'#2196F3'},
-                {goal:5000, label:'$5,000', timeLabel:'6 Months', type:'biweekly', periods:26, color:'#FF9800'},
+                {goal:5000, label:'$5,000', timeLabel:'6 Months', type:'biweekly', periods:26, color:'#8F5300'},
                 {goal:10000, label:'$10,000', timeLabel:'52 Weeks', type:'weekly52', periods:52, color:'#9C27B0'},
               ].map(cfg => {
                 const isActive = challengeGoal === cfg.goal
@@ -5023,7 +5023,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             {(() => {
               const CHALLENGES = {
                 1000: {
-                  goal: 1000, label: '$1,000 in 30 Days', color: '#4CAF50', type: 'daily',
+                  goal: 1000, label: '$1,000 in 30 Days', color: '#256A2A', type: 'daily',
                   desc: 'Save every day for 30 days. Tap each day as you set money aside.',
                   unitLabel: 'Day', gridCols: 'repeat(6,1fr)',
                   // 30 amounts averaging $33.33/day that add to exactly $1000
@@ -5037,7 +5037,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                   amounts: [175,200,200,225,225,225,250,250,250,250,250,250,250]
                 },
                 5000: {
-                  goal: 5000, label: '$5,000 in 6 Months', color: '#FF9800', type: 'biweekly',
+                  goal: 5000, label: '$5,000 in 6 Months', color: '#8F5300', type: 'biweekly',
                   desc: 'Save every 2 weeks for 26 periods. Pairs perfectly with bi-weekly pay.',
                   unitLabel: 'Period', gridCols: 'repeat(4,1fr)',
                   // 26 bi-weekly amounts totaling $5000 (~$192/period), escalating
@@ -5071,7 +5071,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                       {[
                         ['Saved', '$'+totalSaved.toLocaleString(), cfg.color],
                         ['Remaining', '$'+remaining.toLocaleString(), 'var(--danger)'],
-                        ['Avg/period', '$'+avgNeeded.toFixed(0), 'var(--brass)'],
+                        ['Avg/period', '$'+avgNeeded.toFixed(0), 'var(--brass-fg)'],
                       ].map(([l,v,c]) => (
                         <div key={l} style={{textAlign:'center',background:'white',borderRadius:8,padding:'8px 4px'}}>
                           <div className="muted" style={{fontSize:'.68rem',marginBottom:2}}>{l}</div>
@@ -5179,7 +5179,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                       </>
                     ) : (
                       <>
-                        <strong style={{color:sg.color||'var(--brass)',flex:1}}>{fmt(sg.current)}</strong>
+                        <strong style={{color:sg.color||'var(--brass-fg)',flex:1}}>{fmt(sg.current)}</strong>
                         <button className="ghost-btn" style={{fontSize:'.78rem',padding:'4px 10px'}}
                           onClick={() => setEditingSavings(p=>({...p,[i]:sg.current}))}>Edit</button>
                       </>
@@ -5203,7 +5203,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               </div>
               <button className="primary-btn" onClick={() => {
                 if (!newSavings.label || !newSavings.goal) return
-                saveSavingsGoals([...savingsGoals, { id: Date.now(), label: newSavings.label, goal: Number(newSavings.goal), current: Number(newSavings.current||0), color: 'var(--brass)' }])
+                saveSavingsGoals([...savingsGoals, { id: Date.now(), label: newSavings.label, goal: Number(newSavings.goal), current: Number(newSavings.current||0), color:'var(--brass-fg)' }])
                 setNewSavings({ label: '', goal: '', current: '' })
               }}>+ Add Goal</button>
             </div>
@@ -5328,8 +5328,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <h3 style={{ margin: '4px 0 12px' }}>Where Should Your Money Go?</h3>
             <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of <strong>{fmt(totalIncomeForPeriod)}</strong></p>
             {[
-              ['50% — Needs', needs50, totalBillsForPeriod, '#4CAF50', 'Fixed bills, utilities, groceries, insurance'],
-              ['30% — Wants', wants30, fpWeekSpend*(PERIOD_MULT[period]||4.33), '#FF9800', 'Dining, shopping, subscriptions, entertainment'],
+              ['50% — Needs', needs50, totalBillsForPeriod, '#256A2A', 'Fixed bills, utilities, groceries, insurance'],
+              ['30% — Wants', wants30, fpWeekSpend*(PERIOD_MULT[period]||4.33), '#8F5300', 'Dining, shopping, subscriptions, entertainment'],
               ['20% — Savings & Debt', savings20, totalDebtPayments*((PERIOD_MULT[period]||4.33)/4.33), '#9C27B0', 'Emergency fund, investments, extra debt payments'],
             ].map(([label, target, actual, col, desc]) => {
               const pct = target > 0 ? Math.min((actual / target) * 100, 200) : 0
@@ -5361,7 +5361,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               return (
                 <div>
                   <div style={{textAlign:'center',marginBottom:16}}>
-                    <div style={{fontSize:'2.5rem',fontWeight:700,color:rate>=20?'var(--success)':rate>=10?'var(--brass)':'var(--danger)'}}>
+                    <div style={{fontSize:'2.5rem',fontWeight:700,color:rate>=20?'var(--success)':rate>=10?'var(--brass-fg)':'var(--danger)'}}>
                       {rate.toFixed(1)}%
                     </div>
                     <p className="muted" style={{fontSize:'.82rem',margin:'4px 0 0'}}>
@@ -5637,7 +5637,7 @@ function TrainingTab({ workouts, onSave }) {
                 <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{h.name}</div>
                 <div className="muted" style={{ fontSize: '.74rem' }}>Last {shortDate(h.lastDate)} · {fmtSet(h.last) || '—'} · {h.count} session{h.count !== 1 ? 's' : ''}</div>
               </div>
-              {h.best > 0 && <strong style={{ color: 'var(--brass2)', fontSize: '.9rem', whiteSpace: 'nowrap' }}>{h.best} lb</strong>}
+              {h.best > 0 && <strong style={{ color:'var(--brass-fg)', fontSize: '.9rem', whiteSpace: 'nowrap' }}>{h.best} lb</strong>}
             </div>
           ))}
         </section>
@@ -5856,7 +5856,7 @@ function NutritionTab({ meals, onSaveMeals, targets, onSaveTargets, water }) {
                   <div className="muted" style={{ fontSize: '.74rem' }}>{m.slot}{m.calories ? ` · ${m.calories} cal` : ''}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {m.protein ? <strong style={{ color: 'var(--brass2)', fontSize: '.88rem' }}>{m.protein}g</strong> : null}
+                  {m.protein ? <strong style={{ color:'var(--brass-fg)', fontSize: '.88rem' }}>{m.protein}g</strong> : null}
                   <button className="time-card-del" aria-label="Remove meal" onClick={() => onSaveMeals({ ...meals, [TODAY]: today.filter((x) => x.id !== m.id) })}>✕</button>
                 </div>
               </div>
@@ -6245,7 +6245,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           <div>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
               <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',margin:0}}>Water today</p>
-              <strong style={{fontSize:'.85rem',color:'var(--brass2)'}}>{waterLog[TODAY] || 0} / 8 cups</strong>
+              <strong style={{fontSize:'.85rem',color:'var(--brass-fg)'}}>{waterLog[TODAY] || 0} / 8 cups</strong>
             </div>
             <div style={{display:'flex',gap:6,marginBottom:8}}>
               {Array.from({length: 8}).map((_, i) => {
@@ -6258,7 +6258,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                     flex:1, aspectRatio:'1', borderRadius:8, cursor:'pointer',
                     background: filled ? 'var(--ink)' : 'transparent',
                     border: filled ? '1.5px solid var(--ink)' : '1.5px solid var(--border2)',
-                    color: filled ? 'var(--brass)' : 'var(--muted)',
+                    color: filled ? 'var(--brass-fg)' : 'var(--muted)',
                     fontSize:'.9rem',padding:0,
                   }}>{filled ? '●' : ''}</button>
                 )
@@ -6292,12 +6292,12 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                   transition:'all .15s'
                 }}>
                   <div style={{fontSize:'1.4rem',marginBottom:3}}>{m.emoji}</div>
-                  <div style={{fontSize:'.58rem',fontWeight:600,color:todayWellness.mood===m.value?'var(--brass)':'var(--muted)'}}>{m.label}</div>
+                  <div style={{fontSize:'.58rem',fontWeight:600,color:todayWellness.mood===m.value?'var(--brass-fg)':'var(--muted)'}}>{m.label}</div>
                 </button>
               ))}
             </div>
             {todayWellness.mood && (
-              <div style={{padding:'10px 12px',background:'var(--brass-dim)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',color:'var(--brass2)',textAlign:'center'}}>
+              <div style={{padding:'10px 12px',background:'var(--brass-dim)',borderRadius:'var(--radius-sm)',fontSize:'.82rem',color:'var(--brass-fg)',textAlign:'center'}}>
                 {todayWellness.mood >= 4 ? '✦ Carry that energy forward today.' : todayWellness.mood >= 3 ? "✦ That's okay. One step at a time." : '✦ Reach out to someone. You matter.'}
               </div>
             )}
@@ -6348,7 +6348,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             <h3 style={{margin:'4px 0 10px'}}>Today's Entry</h3>
             <div style={{padding:'10px 12px',background:'var(--brass-dim)',borderRadius:'var(--radius-sm)',marginBottom:12,cursor:'pointer'}}
               onClick={() => setJournalPrompt((journalPrompt+1)%JOURNAL_PROMPTS.length)}>
-              <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em',marginBottom:3}}>TODAY'S PROMPT — TAP TO CHANGE</div>
+              <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass-fg)',letterSpacing:'.08em',marginBottom:3}}>TODAY'S PROMPT — TAP TO CHANGE</div>
               <div style={{fontSize:'.88rem',color:'var(--ink)',fontStyle:'italic',fontFamily:'var(--serif)'}}>{JOURNAL_PROMPTS[journalPrompt]}</div>
             </div>
             <textarea value={journalText} onChange={e=>setJournalText(e.target.value)}
@@ -6366,7 +6366,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           {journalEntries.slice(0,10).map(entry => (
             <section key={entry.id} className="card">
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em'}}>{entry.date}</div>
+                <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass-fg)',letterSpacing:'.08em'}}>{entry.date}</div>
                 <button onClick={()=>saveJournal(journalEntries.filter(e=>e.id!==entry.id))}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
               </div>
@@ -6700,7 +6700,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           <h3 style={{margin:'4px 0 12px'}}>Your Toolkit</h3>
           {Object.entries(COPING_SKILLS).map(([category, skills]) => (
             <div key={category} style={{marginBottom:18}}>
-              <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass)', marginBottom:8}}>{category}</div>
+              <div style={{fontSize:'.7rem', fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'var(--brass-fg)', marginBottom:8}}>{category}</div>
               <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
                 {skills.map(skill => {
                   const used = todayCopingUsed.includes(skill)
@@ -6850,7 +6850,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
               {metricsLog.slice(0,10).map(entry => (
                 <div key={entry.id} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                    <div style={{fontSize:'.75rem',fontWeight:700,color:'var(--brass)'}}>{entry.date}</div>
+                    <div style={{fontSize:'.75rem',fontWeight:700,color:'var(--brass-fg)'}}>{entry.date}</div>
                     <button onClick={()=>saveMetrics(metricsLog.filter(m=>m.id!==entry.id))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
                   </div>
                   <div style={{display:'flex',gap:12,flexWrap:'wrap',fontSize:'.82rem',color:'var(--ink2)'}}>
@@ -7080,7 +7080,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               'Tracking sessions builds a visible record of deep work completed.',
             ].map((tip,i)=>(
               <div key={i} style={{display:'flex',gap:8,marginBottom:6,fontSize:'.8rem',color:'var(--ink2)'}}>
-                <span style={{color:'var(--brass)',fontWeight:700}}>{i+1}.</span>{tip}
+                <span style={{color:'var(--brass-fg)',fontWeight:700}}>{i+1}.</span>{tip}
               </div>
             ))}
           </div>
@@ -7202,7 +7202,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             <div key={i} style={{display:'flex',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)',alignItems:'flex-start'}}>
               <div style={{
                 width:24,height:24,borderRadius:6,flexShrink:0,
-                background:'var(--brass-dim)',color:'var(--brass)',
+                background:'var(--brass-dim)',color:'var(--brass-fg)',
                 display:'grid',placeItems:'center',
                 fontSize:'.72rem',fontWeight:700
               }}>{i+1}</div>
@@ -7212,7 +7212,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               </div>
             </div>
           ))}
-          <div style={{marginTop:10,padding:'12px 14px',background:'rgba(184,150,90,.08)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',color:'var(--brass2)',lineHeight:1.6,fontStyle:'italic'}}>
+          <div style={{marginTop:10,padding:'12px 14px',background:'rgba(184,150,90,.08)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',color:'var(--brass-fg)',lineHeight:1.6,fontStyle:'italic'}}>
             "The key is not to prioritize what's on your schedule, but to schedule your priorities." — Stephen Covey
           </div>
         </section>
@@ -7283,12 +7283,12 @@ function CleaningTracker() {
                     cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
                     borderColor: cleaningFreq===freq ? 'var(--brass)' : 'var(--border2)',
                     background: cleaningFreq===freq ? 'var(--brass-dim)' : 'transparent',
-                    color: cleaningFreq===freq ? 'var(--brass)' : 'var(--muted)',
+                    color: cleaningFreq===freq ? 'var(--brass-fg)' : 'var(--muted)',
                     position:'relative'
                   }}>
                     {FREQ_LABELS[freq]}
                     {done.length > 0 && (
-                      <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass)':'var(--success)',fontWeight:700}}>
+                      <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass-fg)':'var(--success)',fontWeight:700}}>
                         {done.length + '/' + tasks.length}
                       </span>
                     )}
@@ -7498,7 +7498,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
             ].map(({ cat, color, items }) => (
               <div key={cat} style={{marginBottom:16}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 10px'}}>
-                  <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass2)'}}>{stripEmoji(cat)}</span>
+                  <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass-fg)'}}>{stripEmoji(cat)}</span>
                   <span style={{flex:1,height:1,background:'var(--border2)'}} />
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -7590,7 +7590,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
               <div key={r.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)',gap:8}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
-                    {r.favorite && <span style={{color:'var(--brass)'}}>⭐</span>}
+                    {r.favorite && <span style={{color:'var(--brass-fg)'}}>⭐</span>}
                     <strong style={{fontSize:'.88rem'}}>{r.title}</strong>
                   </div>
                   <div className="muted" style={{fontSize:'.74rem'}}>
@@ -7644,7 +7644,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
                 </div>
                 <div style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
                   <div className="muted" style={{fontSize:'.65rem',fontWeight:600,letterSpacing:'.05em',textTransform:'uppercase',marginBottom:2}}>Spent</div>
-                  <strong style={{color:'var(--brass)',fontSize:'1rem'}}>{fmt(totalSpent)}</strong>
+                  <strong style={{color:'var(--brass-fg)',fontSize:'1rem'}}>{fmt(totalSpent)}</strong>
                 </div>
               </div>
             )
@@ -7674,7 +7674,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
               if(!newGift.recipient || !newGift.idea) return
               saveGifts([...gifts, {...newGift, id: Date.now()}])
               setNewGift({recipient:'',occasion:'Birthday',idea:'',amount:'',purchased:false,year:new Date().getFullYear()+''})
-            }} style={{padding:'10px',background:'var(--brass)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
+            }} style={{padding:'10px',background:'var(--brass-text)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer'}}>
               + Add Gift
             </button>
           </div>
@@ -7695,7 +7695,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
                   <div style={{flex:1,minWidth:0,textDecoration: g.purchased ? 'line-through' : 'none',opacity: g.purchased ? .6 : 1}}>
                     <div style={{fontWeight:600,fontSize:'.88rem'}}>{g.recipient} — {g.idea}</div>
                     <div className="muted" style={{fontSize:'.74rem'}}>
-                      <span style={{color:'var(--brass)',fontWeight:600}}>{g.occasion}</span> · {g.year}
+                      <span style={{color:'var(--brass-fg)',fontWeight:600}}>{g.occasion}</span> · {g.year}
                       {g.amount && <> · {fmt(g.amount)}</>}
                     </div>
                   </div>
@@ -7729,10 +7729,10 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
                 {trip.notes && <div style={{fontSize:'.82rem',color:'var(--ink2)',marginBottom:6,lineHeight:1.5}}>{trip.notes}</div>}
                 {trip.packing && (
                   <div style={{marginTop:6}}>
-                    <div style={{fontSize:'.68rem',fontWeight:700,color:'var(--brass)',letterSpacing:'.08em',marginBottom:4}}>PACKING LIST</div>
+                    <div style={{fontSize:'.68rem',fontWeight:700,color:'var(--brass-fg)',letterSpacing:'.08em',marginBottom:4}}>PACKING LIST</div>
                     <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
                       {trip.packing.split(',').map((item,j) => (
-                        <span key={j} style={{fontSize:'.72rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass2)',fontWeight:500}}>{item.trim()}</span>
+                        <span key={j} style={{fontSize:'.72rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass-fg)',fontWeight:500}}>{item.trim()}</span>
                       ))}
                     </div>
                   </div>
@@ -7866,7 +7866,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
     ['Express gratitude to someone','Lifestyle'],['Rest without guilt','Wellness'],
   ]
 
-  const CAT_COLOR = {Health:'#E85555',Wellness:'#22C55E',Productivity:'var(--teal)',Lifestyle:'var(--brass)',Finances:'#6366F1',Faith:'#A855F7'}
+  const CAT_COLOR = {Health:'#B83A3A',Wellness:'#1F7A43',Productivity:'var(--teal)',Lifestyle:'var(--brass-fg)',Finances:'#4F46E5',Faith:'#8B3FD1'} // text-safe on light cards
 
   return (
     <div className="screen-stack">
@@ -7935,7 +7935,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{habit.title}</div>
                 <div style={{display:'flex',gap:10,marginTop:2,fontSize:'.72rem',color:'var(--muted)'}}>
-                  <span style={{color:CAT_COLOR[habit.category]||'var(--brass)',fontWeight:600}}>{habit.category}</span>
+                  <span style={{color:CAT_COLOR[habit.category]||'var(--brass-fg)',fontWeight:600}}>{habit.category}</span>
                   <span>{weekComplete + '/7 this week'}</span>
                   {streak > 0 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
                   {longestStreak > streak && longestStreak > 2 && <span style={{color:'var(--muted)',fontSize:'.7rem'}}>· best {longestStreak}d</span>}
@@ -8059,7 +8059,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
 
       {/* SMART goals guide */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
-        <p className="eyebrow" style={{color:'var(--brass)'}}>How to Set Goals That Work</p>
+        <p className="eyebrow" style={{color:'var(--brass-fg)'}}>How to Set Goals That Work</p>
         <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px',fontSize:'1.1rem'}}>The SMART Framework</h3>
         <div style={{display:'grid',gap:10}}>
           {SMART_GUIDE.map(s => (
@@ -8092,7 +8092,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
               cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
               borderColor: activeFrame===tf.id ? 'var(--brass)' : 'var(--border2)',
               background: activeFrame===tf.id ? 'var(--brass-dim)' : 'transparent',
-              color: activeFrame===tf.id ? 'var(--brass)' : 'var(--muted)'
+              color: activeFrame===tf.id ? 'var(--brass-fg)' : 'var(--muted)'
             }}>{tf.label}</button>
           ))}
         </div>
@@ -8127,7 +8127,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
                 <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
                   <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>{goal.title}</div>
                   {tf && tf.id !== 'all' && (
-                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass2)',fontWeight:700}}>{tf.label}</span>
+                    <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'var(--brass-dim)',color:'var(--brass-fg)',fontWeight:700}}>{tf.label}</span>
                   )}
                   {goal.completed && (
                     <span style={{fontSize:'.65rem',padding:'2px 8px',borderRadius:999,background:'rgba(34,197,94,.12)',color:'var(--success)',fontWeight:700}}>Achieved</span>
@@ -8144,7 +8144,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
             </div>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
               <span style={{color:'var(--muted)'}}>{summary}</span>
-              <strong style={{color: progress>=100?'var(--success)':'var(--brass2)'}}>{progress}%</strong>
+              <strong style={{color: progress>=100?'var(--success)':'var(--brass-fg)'}}>{progress}%</strong>
             </div>
             <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
               <div style={{height:'100%',width:`${progress}%`,background:progress>=100?'var(--success)':'linear-gradient(90deg, var(--brass2), var(--brass))',borderRadius:999,transition:'width .4s'}} />
@@ -8172,7 +8172,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
 
             <div style={{display:'flex',gap:14,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
               <button onClick={() => onQuickCreate('task', { linkedGoalId: goal.id, category: goal.category || 'Productivity' })}
-                style={{background:'none',border:'none',color:'var(--brass2)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Schedule a task</button>
+                style={{background:'none',border:'none',color:'var(--brass-fg)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Schedule a task</button>
               <button onClick={() => onQuickCreate('project', { goalId: goal.id })}
                 style={{background:'none',border:'none',color:'var(--ink2)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Project for this goal</button>
               {goal.completed && onUpdate && (
@@ -8187,15 +8187,15 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
       {/* ── Vision & Affirmations ───────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none',padding:'12px 14px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-          <p className="eyebrow" style={{color:'var(--brass)',fontSize:'.6rem',margin:0}}>Vision & Affirmations</p>
-          <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.4)'}}>{visionItems.length} saved</span>
+          <p className="eyebrow" style={{color:'var(--brass-fg)',fontSize:'.6rem',margin:0}}>Vision & Affirmations</p>
+          <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.64)'}}>{visionItems.length} saved</span>
         </div>
         {visionItems.length === 0
-          ? <p style={{color:'rgba(255,255,255,.4)',fontSize:'.8rem',margin:'0 0 8px',fontStyle:'italic'}}>Speak it before you see it. Add yours below.</p>
+          ? <p style={{color:'rgba(255,255,255,.64)',fontSize:'.8rem',margin:'0 0 8px',fontStyle:'italic'}}>Speak it before you see it. Add yours below.</p>
           : <div style={{maxHeight:140,overflowY:'auto',marginBottom:8}}>
               {visionItems.map((item,i) => (
                 <div key={i} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'6px 0',borderBottom:'1px solid rgba(255,255,255,.06)'}}>
-                  <span style={{color:'var(--brass)',fontSize:'.85rem',flexShrink:0}}>✦</span>
+                  <span style={{color:'var(--brass-fg)',fontSize:'.85rem',flexShrink:0}}>✦</span>
                   <div style={{flex:1,fontFamily:'var(--serif)',fontSize:'.85rem',color:'rgba(255,255,255,.8)',lineHeight:1.5,fontStyle:'italic'}}>{item.text}</div>
                   <button onClick={()=>saveVision(visionItems.filter((_,j)=>j!==i))}
                     style={{background:'none',border:'none',color:'rgba(255,255,255,.25)',cursor:'pointer',flexShrink:0,fontSize:'.85rem'}}>✕</button>
@@ -8222,7 +8222,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
 
 
 // Reading list — lives in Growth; data stays under page 'wellness', key 'books'.
-const BOOK_STATUS = { Reading: { color: 'var(--brass2)', bg: 'var(--brass-dim)' }, 'Want to Read': { color: 'var(--ink2)', bg: 'var(--stone2)' }, Completed: { color: 'var(--success)', bg: 'rgba(34,197,94,.12)' } }
+const BOOK_STATUS = { Reading: { color:'var(--brass-fg)', bg: 'var(--brass-dim)' }, 'Want to Read': { color: 'var(--ink2)', bg: 'var(--stone2)' }, Completed: { color: 'var(--success)', bg: 'rgba(34,197,94,.12)' } }
 function ReadingList() {
   const [books, saveBooks] = usePageKey('wellness', 'books', [], ['planner.hw.books', 'books'])
   const [b, setB] = useState({ title: '', author: '', status: 'Reading' })
@@ -8328,7 +8328,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
   const scoreValues = Object.values(scores)
   const overallScore = scoreValues.length > 0 ? (scoreValues.reduce((s,v)=>s+v,0)/scoreValues.length).toFixed(1) : 0
   const scoreLabel = overallScore >= 8 ? 'Thriving' : overallScore >= 6 ? 'On Track' : overallScore >= 4 ? 'Needs Attention' : 'Reset Needed'
-  const scoreColor = overallScore >= 8 ? 'var(--success)' : overallScore >= 6 ? 'var(--teal)' : overallScore >= 4 ? 'var(--brass)' : 'var(--danger)'
+  const scoreColor = overallScore >= 8 ? 'var(--success)' : overallScore >= 6 ? 'var(--teal)' : overallScore >= 4 ? 'var(--brass-fg)' : 'var(--danger)'
 
   // Streak calculations
   const todayHabitsDone = habits.filter(h => weekLogs.find(l => l.habitId===h.id && l.completed && l.date===TODAY)).length
@@ -8437,7 +8437,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
                 const best = scoreHistory.length ? Math.max(...scoreHistory.map(d=>d.overall_score)) : 0
                 return [
                   ['Average', avg.toFixed(1), 'var(--teal)'],
-                  ['Latest', latest, 'var(--brass)'],
+                  ['Latest', latest, 'var(--brass-fg)'],
                   ['Best', best, 'var(--success)'],
                 ].map(([label, val, color]) => (
                   <div key={label} style={{textAlign:'center', background:'var(--stone)', borderRadius:8, padding:'10px 4px'}}>
@@ -8474,7 +8474,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
           {[
             ['✓', todayHabitsDone + ' of ' + habits.length, 'Habits done today', todayHabitsDone===habits.length&&habits.length>0?'var(--success)':'var(--teal)'],
             ['📋', tasksDueToday > 0 ? tasksDueToday + ' due today' : 'All clear', 'Tasks', tasksDueToday>0?'var(--danger)':'var(--success)'],
-            ['🎯', activeGoals + ' active', 'Goals in progress', 'var(--brass)'],
+            ['🎯', activeGoals + ' active', 'Goals in progress', 'var(--brass-fg)'],
             ['⚠', goalsNearDue > 0 ? goalsNearDue + ' overdue' : 'On schedule', 'Goal deadlines', goalsNearDue>0?'var(--danger)':'var(--success)'],
           ].map(([icon, val, label, col]) => (
             <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'12px 14px'}}>
@@ -8516,7 +8516,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
             <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>Past Reviews</p>
             {reviewHistory.slice(0,5).map((entry,i) => (
               <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<4?'1px solid var(--border)':'none'}}>
-                <div style={{fontWeight:600,fontSize:'.8rem',color:'var(--brass)',marginBottom:6}}>{entry.date}</div>
+                <div style={{fontWeight:600,fontSize:'.8rem',color:'var(--brass-fg)',marginBottom:6}}>{entry.date}</div>
                 {weeklyReviewPrompts.slice(0,2).map((prompt,j) => (
                   entry.answers[j] && (
                     <div key={j} style={{marginBottom:4}}>
@@ -8532,7 +8532,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
 
         {weeklyReviewPrompts.map((prompt,i) => (
           <div key={i} style={{marginBottom:14}}>
-            <div style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6,letterSpacing:'.03em'}}>{prompt}</div>
+            <div style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6,letterSpacing:'.03em'}}>{prompt}</div>
             <textarea value={reviewAnswers[i]||''} onChange={e=>{const u={...reviewAnswers,[i]:e.target.value};setReviewAnswers(u);syncPageData('reviewAnswers',u)}}
               placeholder="Write freely..."
               style={{width:'100%',minHeight:70,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
@@ -8579,7 +8579,7 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
 
       <section className="card" style={{ padding: '12px 16px' }}>
         <Link to="/finance" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textDecoration: 'none', color: 'var(--ink2)', fontSize: '.85rem', fontWeight: 600 }}>
-          <span>Weekly spending target is in Finance → Budget Plan</span><span style={{ color: 'var(--brass2)' }}>→</span>
+          <span>Weekly spending target is in Finance → Budget Plan</span><span style={{ color:'var(--brass-fg)' }}>→</span>
         </Link>
       </section>
       <PageNav />
@@ -8822,7 +8822,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
 
       <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
         <span style={{fontSize:"1.1rem"}}>⚙</span>
-        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:"var(--brass)",margin:0}}>Settings</p>
+        <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:'var(--brass-fg)',margin:0}}>Settings</p>
       </div>
 
       {/* ── Profile ────────────────────────────────────────────────── */}
@@ -8881,7 +8881,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Add to Home Screen</div>
             <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Install the planner for full-screen, one-tap access</div>
           </div>
-          <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0}}>→</span>
+          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
         </button>
       </section>
 
@@ -8898,7 +8898,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Ratings &amp; Reviews</div>
             <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Share your experience or see what others say</div>
           </div>
-          <span style={{color:'var(--brass)',fontSize:'1rem',flexShrink:0}}>→</span>
+          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
         </button>
       </section>
 
@@ -8972,7 +8972,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
               <span style={{display:'block',fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{app.label}</span>
               <span style={{display:'block',fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>{app.desc}</span>
             </span>
-            <span style={{color:'var(--brass)',fontSize:'.95rem',flexShrink:0}}>↗</span>
+            <span style={{color:'var(--brass-fg)',fontSize:'.95rem',flexShrink:0}}>↗</span>
           </a>
         ))}
       </section>
@@ -8992,7 +8992,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
 
       {/* ── Support & Contact ──────────────────────────────────────── */}
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
-        <p className="eyebrow" style={{color:'var(--brass)'}}>Support</p>
+        <p className="eyebrow" style={{color:'var(--brass-fg)'}}>Support</p>
         <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px'}}>We're here to help</h3>
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
           <a href="mailto:support@eloraradiance.com" style={{
@@ -9003,8 +9003,8 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>✉</div>
             <div>
               <div style={{color:'var(--warm-white)',fontWeight:600,fontSize:'.9rem'}}>Email Support</div>
-              <div style={{color:'var(--brass)',fontSize:'.8rem',marginTop:2}}>support@eloraradiance.com</div>
-              <div style={{color:'rgba(255,255,255,.4)',fontSize:'.72rem',marginTop:2}}>We respond within 24 hours</div>
+              <div style={{color:'var(--brass-fg)',fontSize:'.8rem',marginTop:2}}>support@eloraradiance.com</div>
+              <div style={{color:'rgba(255,255,255,.64)',fontSize:'.72rem',marginTop:2}}>We respond within 24 hours</div>
             </div>
           </a>
           <div style={{padding:'12px 14px',background:'rgba(255,255,255,.04)',borderRadius:10,border:'1px solid rgba(255,255,255,.08)'}}>
@@ -9403,18 +9403,18 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               }}>
                 <p style={{
                   fontSize: '.62rem', fontWeight: 700, letterSpacing: '.1em',
-                  color: 'var(--brass)', textTransform: 'uppercase', marginBottom: 8,
+                  color:'var(--brass-fg)', textTransform: 'uppercase', marginBottom: 8,
                 }}>Verse of the Day</p>
                 <p style={{
                   fontFamily: "var(--serif)", fontSize: '1.02rem', lineHeight: 1.5,
                   color: 'var(--ink)', fontStyle: 'italic', marginBottom: 8,
                 }}>"{vod.v}"</p>
-                <p style={{fontSize: '.78rem', color: 'var(--brass)', fontWeight: 700, textAlign: 'right'}}>— {vod.r}</p>
+                <p style={{fontSize: '.78rem', color:'var(--brass-fg)', fontWeight: 700, textAlign: 'right'}}>— {vod.r}</p>
                 <button onClick={() => {
                   saveScriptures([...scriptures, { id: Date.now(), verse: vod.v, reference: vod.r, date: TODAY }])
                 }} style={{
                   marginTop: 10, padding: '7px 14px', borderRadius: 999,
-                  background: 'var(--brass)', color: 'white', border: 'none',
+                  background:'var(--brass-text)', color: 'white', border: 'none',
                   fontSize: '.78rem', fontWeight: 600, cursor: 'pointer',
                 }}>+ Save to Scripture</button>
               </div>
@@ -9427,7 +9427,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
           {/* Daily verse prompt */}
           <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
-            <p className="eyebrow" style={{color:'var(--brass)',marginBottom:6}}>Today's Anchor</p>
+            <p className="eyebrow" style={{color:'var(--brass-fg)',marginBottom:6}}>Today's Anchor</p>
             {[
               '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
               '"I can do all things through Christ who strengthens me." — Philippians 4:13 NKJV',
@@ -9439,7 +9439,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             ][new Date().getDay() % 7].split('—').map((part, i) => (
               i === 0
                 ? <p key={i} style={{color:'white',fontSize:'.95rem',fontFamily:'var(--serif)',lineHeight:1.7,fontStyle:'italic',margin:'0 0 6px'}}>"{part.trim()}"</p>
-                : <p key={i} style={{color:'var(--brass)',fontSize:'.78rem',fontWeight:600,margin:0}}>— {part.trim()}</p>
+                : <p key={i} style={{color:'var(--brass-fg)',fontSize:'.78rem',fontWeight:600,margin:0}}>— {part.trim()}</p>
             ))}
           </div>
 
@@ -9504,7 +9504,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <div key={prayer.id} style={{padding:'12px',background:'var(--stone)',borderRadius:10,marginBottom:8}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:'.78rem',color:'var(--brass)',fontWeight:600,marginBottom:4}}>{prayer.type} · {prayer.date}</div>
+                  <div style={{fontSize:'.78rem',color:'var(--brass-fg)',fontWeight:600,marginBottom:4}}>{prayer.type} · {prayer.date}</div>
                   <div style={{fontSize:'.9rem',color:'var(--ink)',lineHeight:1.5}}>{prayer.text}</div>
                 </div>
                 <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -9567,9 +9567,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
                 <p style={{
                   fontSize: '.65rem', fontWeight: 700, letterSpacing: '.08em',
-                  color: 'var(--brass)', textTransform: 'uppercase', margin: 0,
+                  color:'var(--brass-fg)', textTransform: 'uppercase', margin: 0,
                 }}>📚 Memorizing</p>
-                <strong style={{fontSize:'.78rem',color:'var(--brass)'}}>{scriptures.filter(s => s.memorized).length} of {scriptures.filter(s => s.memorizing).length} mastered</strong>
+                <strong style={{fontSize:'.78rem',color:'var(--brass-fg)'}}>{scriptures.filter(s => s.memorized).length} of {scriptures.filter(s => s.memorizing).length} mastered</strong>
               </div>
               {scriptures.filter(s => s.memorizing && !s.memorized).slice(0, 3).map(s => {
                 const isRevealed = revealedVerse === s.id
@@ -9585,11 +9585,11 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                       {isRevealed ? s.verse : hidden}
                     </p>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <p style={{fontSize:'.74rem',color:'var(--brass)',fontWeight:700,margin:0}}>— {s.reference}</p>
+                      <p style={{fontSize:'.74rem',color:'var(--brass-fg)',fontWeight:700,margin:0}}>— {s.reference}</p>
                       <div style={{display:'flex',gap:6}}>
                         <button onClick={() => setRevealedVerse(isRevealed ? null : s.id)} style={{
                           fontSize:'.72rem',padding:'4px 10px',borderRadius:999,
-                          background:'transparent',color:'var(--brass)',
+                          background:'transparent',color:'var(--brass-fg)',
                           border:'1px solid var(--brass)',cursor:'pointer',fontWeight:600,
                         }}>{isRevealed ? 'Hide' : 'Reveal'}</button>
                         <button onClick={() => saveScriptures(scriptures.map(x => x.id === s.id ? {...x, memorized: true} : x))} style={{
@@ -9611,12 +9611,12 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           {scriptures.map((s, i) => (
             <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-                <strong style={{color:'var(--brass)',fontSize:'.85rem'}}>{s.reference}</strong>
+                <strong style={{color:'var(--brass-fg)',fontSize:'.85rem'}}>{s.reference}</strong>
                 <div style={{display:'flex',gap:6}}>
                   <button onClick={() => saveScriptures(scriptures.map((x,j)=>j===i?{...x, memorizing: !x.memorizing, memorized: x.memorizing ? false : x.memorized}:x))}
                     style={{
                       background: s.memorizing ? 'var(--brass)' : 'transparent',
-                      color: s.memorizing ? 'white' : 'var(--brass)',
+                      color: s.memorizing ? 'white' : 'var(--brass-fg)',
                       border: '1px solid var(--brass)', borderRadius: 999,
                       padding: '3px 10px', fontSize: '.7rem', fontWeight: 600,
                       cursor: 'pointer',
@@ -9690,7 +9690,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                 saveBibleReading({...bibleReading, completedDates: next})
               }} style={{
                 padding:'6px 14px', borderRadius:999, fontSize:'.8rem', fontWeight:700, cursor:'pointer',
-                background: (bibleReading.completedDates||[]).includes(TODAY) ? 'var(--success)' : 'var(--brass)',
+                background: (bibleReading.completedDates||[]).includes(TODAY) ? 'var(--success)' : 'var(--brass-text)',
                 color:'white', border:'none',
               }}>{(bibleReading.completedDates||[]).includes(TODAY) ? '✓ Done Today' : 'Mark Read'}</button>
             </div>
@@ -9729,7 +9729,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               const total = dates.length
               return [
                 ['Current Streak', current + 'd', current > 0 ? 'var(--warning)' : 'var(--muted)'],
-                ['Longest', longest + 'd', 'var(--brass)'],
+                ['Longest', longest + 'd', 'var(--brass-fg)'],
                 ['Total Days', total + '', 'var(--teal)'],
               ].map(([label, val, color]) => (
                 <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'10px 4px',textAlign:'center'}}>
@@ -9798,7 +9798,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             </div>
           </div>
           <div style={{background:'var(--stone)',borderRadius:10,padding:'12px',marginBottom:14,display:'flex',justifyContent:'space-between'}}>
-            <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Today</p><strong style={{color:'var(--brass)'}}>{todayGratitude.length} entries</strong></div>
+            <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>Today</p><strong style={{color:'var(--brass-fg)'}}>{todayGratitude.length} entries</strong></div>
             <div style={{textAlign:'right'}}><p className="muted" style={{fontSize:'.72rem',margin:'0 0 2px'}}>All time</p><strong>{gratitude.length} blessings</strong></div>
           </div>
           <div style={{display:'flex',gap:8,marginBottom:16}}>
@@ -9821,7 +9821,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
 .map(group => (
             <div key={group.date} style={{marginBottom:14}}>
-              <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass)',marginBottom:6}}>
+              <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6}}>
                 {group.date === TODAY ? 'Today' : group.date}
               </p>
               {group.items.map(item => (
@@ -9845,7 +9845,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           <p className="muted" style={{fontSize:'.8rem',marginBottom:16}}>Fasting is a powerful spiritual discipline. Track your intentions and stay accountable.</p>
           {fasting.active ? (
             <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
-              <p style={{color:'var(--brass)',fontWeight:700,fontSize:'.85rem',marginBottom:4}}>Active Fast</p>
+              <p style={{color:'var(--brass-fg)',fontWeight:700,fontSize:'.85rem',marginBottom:4}}>Active Fast</p>
               <p style={{color:'white',fontSize:'1rem',fontWeight:600,marginBottom:4}}>{fasting.intention || 'No intention set'}</p>
               <p style={{color:'rgba(255,255,255,.6)',fontSize:'.8rem'}}>{fasting.startDate} → {fasting.endDate || 'Open'}</p>
               <button onClick={() => saveFasting({...fasting, active:false, log:[...fasting.log, {start:fasting.startDate,end:TODAY,intention:fasting.intention}]})}
