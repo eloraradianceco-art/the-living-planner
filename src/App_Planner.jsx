@@ -3388,8 +3388,7 @@ const FREE_LIMITS = {
 }
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
-// Owner emails that automatically get Pro access
-const OWNER_EMAILS = ['aja2012@gmail.com']
+// Complimentary Pro (owner/staff) is the profiles.pro_comp flag, set in the database only.
 
 function useSubscription(user) {
   const [tier, setTierState] = React.useState(() => {
@@ -3407,15 +3406,14 @@ function useSubscription(user) {
     const loadTier = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('tier, trial_ends_at')
+        .select('tier, trial_ends_at, pro_comp')
         .eq('user_id', user.id)
         .maybeSingle()
 
       if (cancelled || error || !data) return
 
-      // Owner emails always get pro, even if profile says otherwise
-      const isOwner = user.email && OWNER_EMAILS.includes(user.email.toLowerCase())
-      const finalTier = isOwner ? 'pro' : (data.tier || 'free')
+      // Complimentary Pro always wins, even if tier says otherwise
+      const finalTier = data.pro_comp ? 'pro' : (data.tier || 'free')
 
       setTierState(finalTier)
       setTrialEndsAtState(data.trial_ends_at || null)
@@ -3423,11 +3421,6 @@ function useSubscription(user) {
         localStorage.setItem('planner_tier', finalTier)
         if (data.trial_ends_at) localStorage.setItem('planner_trial_ends', data.trial_ends_at)
       } catch {}
-
-      // Sync owner upgrade back to profile if needed
-      if (isOwner && data.tier !== 'pro') {
-        supabase.from('profiles').update({ tier: 'pro', updated_at: new Date().toISOString() }).eq('user_id', user.id).then(()=>{})
-      }
     }
 
     loadTier()
@@ -3441,8 +3434,7 @@ function useSubscription(user) {
       }, payload => {
         const row = payload.new
         if (!row) return
-        const isOwner = user.email && OWNER_EMAILS.includes(user.email.toLowerCase())
-        const finalTier = isOwner ? 'pro' : (row.tier || 'free')
+        const finalTier = row.pro_comp ? 'pro' : (row.tier || 'free')
         setTierState(finalTier)
         setTrialEndsAtState(row.trial_ends_at || null)
         try { localStorage.setItem('planner_tier', finalTier) } catch {}
@@ -3450,7 +3442,7 @@ function useSubscription(user) {
       .subscribe()
 
     return () => { cancelled = true; supabase.removeChannel(channel) }
-  }, [user?.id, user?.email])
+  }, [user?.id])
 
   // ── Setter that writes to BOTH localStorage and Supabase ─────────────────
   const setTier = React.useCallback(async (newTier) => {
