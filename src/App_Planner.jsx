@@ -11,7 +11,7 @@ import {
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
-  House, Ellipsis,
+  House, Ellipsis, LayoutGrid, X,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -1479,12 +1479,12 @@ function AuthPage() {
 }
 
 
+// Phone bottom bar. The last slot opens the Menu sheet with every section.
 const tabs = [
-  { to: '/', label: 'Home', icon: '⌂' },
-  { to: '/tasks', label: 'Tasks', icon: '✓' },
-  { to: '/calendar', label: 'Calendar', icon: '◷' },
-  { to: '/growth', label: 'Growth', icon: '↑' },
-  { to: '/more', label: 'More', icon: '⋯' },
+  { to: '/', label: 'Home', icon: House },
+  { to: '/tasks', label: 'Tasks', icon: SquareCheck },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/growth', label: 'Growth', icon: TrendingUp },
 ]
 
 // Additional routes not in bottom nav
@@ -1515,6 +1515,82 @@ const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
 const isNavActive = (item, path) => item.to === '/'
   ? path === '/'
   : path === item.to || path.startsWith(item.to + '/') || (item.also || []).includes(path)
+
+// Phone: every section, one tap from the bottom bar. Swipe down, tap outside or ✕ to close.
+function MenuSheet({ open, onClose, onQuickAdd }) {
+  const { pathname } = useLocation()
+  const sheetRef = React.useRef(null)
+  const drag = React.useRef({ y: 0, dy: 0, active: false })
+
+  useEffect(() => { if (open) onClose() }, [pathname]) // close after navigating
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [open])
+
+  const onTouchStart = (e) => {
+    if (sheetRef.current && sheetRef.current.scrollTop > 0) return
+    drag.current = { y: e.touches[0].clientY, dy: 0, active: true }
+    sheetRef.current.style.transition = 'none'
+  }
+  const onTouchMove = (e) => {
+    if (!drag.current.active) return
+    const dy = Math.max(0, e.touches[0].clientY - drag.current.y)
+    drag.current.dy = dy
+    sheetRef.current.style.transform = `translateY(${dy}px)`
+  }
+  const onTouchEnd = () => {
+    if (!drag.current.active) return
+    const { dy } = drag.current
+    drag.current.active = false
+    sheetRef.current.style.transition = ''
+    sheetRef.current.style.transform = ''
+    if (dy > 90) onClose()
+  }
+
+  return (
+    <div className={'menu-sheet-root' + (open ? ' open' : '')} aria-hidden={!open}>
+      <div className="menu-backdrop" onClick={onClose} />
+      <div ref={sheetRef} className="menu-sheet" role="dialog" aria-modal="true" aria-label="All sections"
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+        <div className="menu-grabber" />
+        <div className="menu-head">
+          <span>Go to</span>
+          <button className="menu-close" onClick={onClose} aria-label="Close menu"><X size={18} /></button>
+        </div>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="menu-group">
+            <p className="side-group-label">{group.label}</p>
+            <div className="menu-grid">
+              {group.items.filter((item) => item.to !== '/').map((item) => {   // Home is already in the bottom bar
+                const active = isNavActive(item, pathname)
+                const Icon = item.icon
+                return (
+                  <Link key={item.to} to={item.to} onClick={onClose} className={'menu-tile' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
+                    <Icon size={22} strokeWidth={active ? 1.9 : 1.6} />
+                    <span>{item.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="menu-foot">
+          <Link to="/more" onClick={onClose} className={'menu-foot-link' + (pathname === '/more' ? ' active' : '')}>
+            <Ellipsis size={18} /> More &amp; Settings
+          </Link>
+          <button className="menu-foot-add" onClick={() => { onClose(); onQuickAdd() }}>
+            <Plus size={17} strokeWidth={2.2} /> Quick Add
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function SideNav({ onQuickAdd }) {
   const { pathname } = useLocation()
@@ -1553,6 +1629,8 @@ function Layout({ children, onQuickAdd, banner, profile }) {
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
   const showSideNav = !isMobile   // iPad (portrait + landscape) and desktop
+  const [menuOpen, setMenuOpen] = useState(false)
+  const onTabRoute = tabs.some((t) => t.to === location.pathname)
 
   // Keep the side nav pinned just below the sticky topbar, whatever its height
   // (it grows with the iOS safe-area inset).
@@ -1646,18 +1724,25 @@ function Layout({ children, onQuickAdd, banner, profile }) {
 
       {!showSideNav ? (
         <nav className="bottom-nav premium-nav">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.to}
-              to={tab.to}
-              className={location.pathname === tab.to ? 'nav-item active' : 'nav-item'}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              <span className="nav-label">{tab.label}</span>
-            </Link>
-          ))}
+          {tabs.map((tab) => {
+            const active = !menuOpen && location.pathname === tab.to
+            const Icon = tab.icon
+            return (
+              <Link key={tab.to} to={tab.to} className={active ? 'nav-item active' : 'nav-item'} aria-current={active ? 'page' : undefined}>
+                <span className="nav-icon"><Icon size={21} strokeWidth={active ? 2 : 1.7} /></span>
+                <span className="nav-label">{tab.label}</span>
+              </Link>
+            )
+          })}
+          <button type="button" className={menuOpen || !onTabRoute ? 'nav-item active' : 'nav-item'}
+            onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-label="Menu — all sections">
+            <span className="nav-icon"><LayoutGrid size={21} strokeWidth={menuOpen || !onTabRoute ? 2 : 1.7} /></span>
+            <span className="nav-label">Menu</span>
+          </button>
         </nav>
       ) : null}
+
+      {!showSideNav ? <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onQuickAdd={onQuickAdd} /> : null}
 
       {!showSideNav ? (
         <button onClick={onQuickAdd} style={{
