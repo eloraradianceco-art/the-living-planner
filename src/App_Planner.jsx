@@ -8956,11 +8956,11 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         <h3 style={{margin:'4px 0 6px'}}>More from Elora Radiance Co.</h3>
         <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:14}}>Scripture-based tools for the whole Christian life.</p>
         {[
-          { label:'Armed & Anchored', desc:'Spiritual warfare training — 26 weapons', url:'https://armedandanchored.vercel.app/', icon:'⚔️' },
-          { label:'Anchored Steps · Year 1', desc:'52 weeks of faith in action', url:'https://anchored-steps.vercel.app/', icon:'⚓' },
-          { label:'Anchored Steps · Year 2', desc:'52 weeks of deeper study', url:'https://anchored-steps-year2.vercel.app/', icon:'⚓' },
-          { label:'The Red Letters', desc:'The words of Jesus by theme — free', url:'https://redletters.vercel.app/', icon:'✦' },
-          { label:'Anchored Verse', desc:'Scripture for every emotion — free', url:'https://anchoredverse.vercel.app/', icon:'📖' },
+          { label:'Armed & Anchored', desc:'Spiritual warfare training — 26 weapons', url:'https://armed.eloraradiance.com/', icon:'⚔️' },
+          { label:'Anchored Steps · Year 1', desc:'52 weeks of faith in action', url:'https://steps.eloraradiance.com/', icon:'⚓' },
+          { label:'Anchored Steps · Year 2', desc:'52 weeks of deeper study', url:'https://steps2.eloraradiance.com/', icon:'⚓' },
+          { label:'The Red Letters', desc:'The words of Jesus by theme — free', url:'https://redletters.eloraradiance.com/', icon:'✦' },
+          { label:'Anchored Verse', desc:'Scripture for every emotion — free', url:'https://verse.eloraradiance.com/', icon:'📖' },
         ].map(app => (
           <a key={app.url} href={app.url} target="_blank" rel="noopener noreferrer" style={{
             display:'flex', alignItems:'center', gap:12, padding:'12px 14px', marginBottom:8,

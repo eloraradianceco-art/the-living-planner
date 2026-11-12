@@ -31,15 +31,54 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="The Living Planner" />
     <meta property="og:description" content="Plan with faith. Live with purpose." />
-    <meta property="og:image" content="https://the-living-planner.vercel.app/icon-512.png" />
-    <meta property="og:url" content="https://the-living-planner.vercel.app" />
+    <meta property="og:image" content="https://planner.eloraradiance.com/icon-512.png" />
+    <meta property="og:url" content="https://planner.eloraradiance.com" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="The Living Planner" />
     <meta name="twitter:description" content="Plan with faith. Live with purpose." />
-    <meta name="twitter:image" content="https://the-living-planner.vercel.app/icon-512.png" />
+    <meta name="twitter:image" content="https://planner.eloraradiance.com/icon-512.png" />
     <style>:root{--top-band:0px;--safe-top:env(safe-area-inset-top,0px)}.ipad-app{--top-band:32px;--safe-top:calc(env(safe-area-inset-top,0px) + 32px)}</style>
+    <!-- New address (Nov 2026): the old vercel.app address forwards here and brings this device's
+         sign-in and saved settings along (in the #er-moved part of the link, which never reaches a server). -->
+    <script>
+    (function () {
+      var OLD = 'the-living-planner.vercel.app', NEW = 'https://planner.eloraradiance.com', KEY = 'er-moved';
+      try {
+        if (location.hostname === OLD) {
+          if (location.pathname.indexOf('/api/') === 0) return;
+          var keys = [], data = {}, size = 0;
+          for (var i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i));
+          keys.sort(function (a, b) { return (localStorage.getItem(a) || '').length - (localStorage.getItem(b) || '').length; });
+          keys.forEach(function (k) { var v = localStorage.getItem(k); if (v != null && size + v.length < 60000) { data[k] = v; size += v.length; } });
+          var dest = NEW + location.pathname + location.search;
+          if (keys.length) { try { dest += '#' + KEY + '=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data))))); } catch (e) {} }
+          var installed = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+          if (!installed) { location.replace(dest); return; }
+          // Home Screen app on the old address: explain the move instead of jumping out of the app.
+          document.addEventListener('DOMContentLoaded', function () {
+            var d = document.createElement('div');
+            d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true'); d.setAttribute('aria-label', 'We have moved');
+            d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#1A2332;color:#F5F1EA;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px 24px;font-family:Georgia,serif';
+            d.innerHTML = '<div style="font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:#C9A86B;margin-bottom:14px">The Living Planner</div>'
+              + '<div style="font-size:26px;line-height:1.25;margin-bottom:14px">We have a new home</div>'
+              + '<p style="font-size:17px;line-height:1.6;max-width:340px;margin:0 0 8px">The Living Planner now lives at <b>' + NEW.replace('https://', '') + '</b>. Your account and everything you saved are safe.</p>'
+              + '<p style="font-size:16px;line-height:1.6;max-width:340px;margin:0 0 24px;opacity:.85">Tap below, then in Safari tap <b>Share → Add to Home Screen</b>. After that you can delete this old icon.</p>'
+              + '<a target="_blank" rel="noopener" style="display:inline-block;background:#C9A86B;color:#1A2332;text-decoration:none;font-weight:700;font-size:17px;padding:14px 26px;border-radius:999px;font-family:system-ui,sans-serif">Open the new Planner</a>'
+              + '<button type="button" style="margin-top:18px;background:none;border:0;color:inherit;opacity:.8;font-size:15px;text-decoration:underline;min-height:44px;font-family:inherit">Keep using this one for now</button>';
+            d.querySelector('a').href = dest;
+            d.querySelector('button').onclick = function () { d.remove(); };
+            document.body.appendChild(d);
+          });
+        } else if (location.hash.indexOf('#' + KEY + '=') === 0) {
+          var moved = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(location.hash.slice(KEY.length + 2))))));
+          for (var k in moved) if (localStorage.getItem(k) === null) localStorage.setItem(k, moved[k]);
+          history.replaceState(null, '', location.pathname + location.search);
+        }
+      } catch (e) {}
+    })();
+    </script>
     <script>(function(){try{var d=document.documentElement,n=navigator,ipad=/iPad/.test(n.userAgent)||(n.platform==='MacIntel'&&n.maxTouchPoints>1),app=(window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||n.standalone===true;if(ipad&&app)d.classList.add('ipad-app')}catch(e){}})()</script>
   </head>
   <body>
