@@ -345,6 +345,22 @@ function nextStepFor(goal, projects = []) {
 
 const shortDate = (d) => d ? formatDateLabel(d, { month: 'short', day: 'numeric' }) : ''
 
+// "05:00" → "5:00 AM". Leaves anything it can't read untouched.
+function fmt12(t) {
+  if (!t) return ''
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return String(t)
+  const h = Number(m[1])
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? 'AM' : 'PM'}`
+}
+// "05:00","06:00" → "5:00 – 6:00 AM"; drops the first AM/PM when both match.
+function fmtRange(start, end) {
+  if (!end) return fmt12(start)
+  const a = fmt12(start), b = fmt12(end)
+  return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)} – ${b}` : `${a} – ${b}`
+}
+const hourLabel = (hh) => { const h = Number(String(hh).slice(0, 2)); return `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}` }
+
 const upsertById = (list, item) => list.some((x) => x.id === item.id)
   ? list.map((x) => x.id === item.id ? item : x)
   : [...list, item]
@@ -2156,7 +2172,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           : todaySchedule.slice(0, 6).map((item) => (
             <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
-              <strong style={{color:'var(--teal)', fontSize:'.82rem', minWidth:36}}>{item.startTime}</strong>
+              <strong style={{color:'var(--brass2)', fontSize:'.8rem', minWidth:62, fontWeight:600}}>{fmt12(item.startTime)}</strong>
               <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
               <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
@@ -2334,8 +2350,8 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
             {task.priority || 'Low'}
           </span>
           <span style={{color:'var(--muted)',fontSize:'.7rem'}}>{task.category}</span>
-          {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{task.date}</span>}
-          {task.time && <span style={{color:'var(--teal)',fontWeight:600}}>{task.time}</span>}
+          {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{shortDate(task.date)}</span>}
+          {task.time && <span style={{color:'var(--brass2)',fontWeight:600}}>{fmt12(task.time)}</span>}
         </div>
       </div>
 
@@ -2445,43 +2461,7 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
 }
 
 
-function DropSlot({ date, time, onQuickCreate, onDropItem, items, onEdit, onDelete, prefersTouch }) {
-  const [dragOver, setDragOver] = useState(false)
-
-  const handleDrop = (event) => {
-    event.preventDefault()
-    setDragOver(false)
-    try {
-      const payload = JSON.parse(event.dataTransfer.getData('application/json'))
-      onDropItem(payload, date, time)
-    } catch {
-      // ignore invalid payloads
-    }
-  }
-
-  return (
-    <div
-      className={dragOver ? 'timeline-slot drop-active' : 'timeline-slot'}
-      onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
-    >
-      {items.length === 0 ? (
-        <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date, time })}>{prefersTouch ? 'Tap to add here' : 'Open • Add task'}</button>
-      ) : items.map((item) => (
-        <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable onDragStart={(event) => event.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
-          <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
-            <strong>{item.title}</strong>
-            <span>{item.itemType === 'task' ? 'Task' : 'Event'} • {item.startTime}{item.endTime ? ` - ${item.endTime}` : ''}</span>
-          </button>
-          <button className="ghost-btn" onClick={() => onDelete(item.itemType, item.id)}>Delete</button>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule }) {
+function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule, onToggle }) {
   const [view, setView] = useState('day')
   const [selectedDate, setSelectedDate] = useState(TODAY)
   const { prefersTouch, isMobile } = useResponsive()
@@ -2492,11 +2472,19 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`))
   }, [tasks, events])
 
-  const hours = Array.from({ length: 16 }, (_, i) => `${String(i + 5).padStart(2, '0')}:00`)
   const weekDays = getWeekDays(selectedDate)
   const monthDays = getMonthDays(selectedDate)
   const dayScheduled = scheduled.filter((item) => item.date === selectedDate)
-  const upcomingScheduled = scheduled.filter((item) => item.date >= TODAY).slice(0, 6)
+  // 5 AM – 8 PM always, stretched to include anything scheduled earlier or later
+  const hours = useMemo(() => {
+    const set = new Set(Array.from({ length: 16 }, (_, i) => i + 5))
+    dayScheduled.forEach((item) => { const h = Number(String(item.startTime || '').slice(0, 2)); if (!isNaN(h) && h >= 0 && h < 24) set.add(h) })
+    return [...set].sort((a, b) => a - b).map((h) => `${String(h).padStart(2, '0')}:00`)
+  }, [dayScheduled])
+  const nowHour = selectedDate === TODAY ? String(new Date().getHours()).padStart(2, '0') : null
+  const confirmDelete = (item) => {
+    if (window.confirm(`Delete "${item.title}"?`)) onDelete(item.itemType, item.id)
+  }
   const selectedMonthLabel = formatDateLabel(selectedDate, { month: 'long', year: 'numeric' })
 
   const handleDropItem = async (payload, date, time) => {
@@ -2559,40 +2547,42 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
       {view === 'day' && (
         <section className="card">
           <div className="section-title-row">
-            <h3 style={{fontSize:'1rem'}}>Daily Schedule</h3>
-            <span className="status-pill" style={{fontSize:'.72rem'}}>{prefersTouch ? 'Tap a slot' : 'Drag to reschedule'}</span>
+            <h3 style={{fontSize:'1rem', whiteSpace:'nowrap'}}>Daily Schedule</h3>
+            <span className="status-pill" style={{fontSize:'.72rem'}}>
+              {dayScheduled.length ? `${dayScheduled.length} scheduled` : 'Open day'}
+            </span>
           </div>
-          {isMobile && upcomingScheduled.length > 0 && (
-            <div className="mobile-agenda-strip">
-              {upcomingScheduled.map((item) => (
-                <button key={`${item.itemType}-${item.id}`} className="agenda-chip" onClick={() => onEdit(item.itemType, item)}>
-                  <strong style={{fontSize:'.75rem', color:'var(--teal)'}}>{item.startTime}</strong>
-                  <span style={{fontSize:'.8rem', color:'var(--text)', fontWeight:600}}>{item.title}</span>
-                </button>
-              ))}
-            </div>
-          )}
           <div className={settings.compactCalendar ? 'timeline compact-calendar' : 'timeline'}>
             {hours.map((hour) => {
               const items = dayScheduled.filter((item) => item.startTime?.slice(0, 2) === hour.slice(0, 2))
+              const isNow = nowHour === hour.slice(0, 2)
               return (
-                <div className="timeline-row" key={hour}>
-                  <div className="timeline-hour">{(() => { const h = Number(hour.slice(0, 2)); return `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'}` })()}</div>
+                <div className={'timeline-row' + (isNow ? ' now' : '')} key={hour}>
+                  <div className="timeline-hour">{hourLabel(hour)}</div>
                   <div className="timeline-slot"
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}>
                     {items.length === 0
-                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {hour}</span></button>
-                      : items.map((item) => (
-                        <div key={`${item.itemType}-${item.id}`} className="time-card premium-time-card" draggable
-                          onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
-                          <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
-                            <strong style={{fontSize:'.88rem'}}>{item.title}</strong>
-                            <span style={{fontSize:'.75rem', color:'var(--muted)'}}>{item.startTime}{item.endTime ? ` – ${item.endTime}` : ''}</span>
-                          </button>
-                          <button className="ghost-btn" style={{fontSize:'.75rem', padding:'4px 8px'}} onClick={() => onDelete(item.itemType, item.id)}>✕</button>
-                        </div>
-                      ))}
+                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {hourLabel(hour)}</span></button>
+                      : items.map((item) => {
+                        const done = item.itemType === 'task' && item.completed
+                        return (
+                          <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card ${item.itemType}${done ? ' done' : ''}`} draggable
+                            onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                            {item.itemType === 'task' && onToggle && (
+                              <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
+                                aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
+                                {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+                              </button>
+                            )}
+                            <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
+                              <span className="time-card-title">{item.title}</span>
+                              <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                            </button>
+                            <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
+                          </div>
+                        )
+                      })}
                   </div>
                 </div>
               )
@@ -2618,8 +2608,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
                     <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)}
                       draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
-                      <span style={{fontSize:'.7rem', color:'var(--teal)'}}>{item.startTime}</span>
-                      <strong style={{fontSize:'.8rem'}}>{item.title}</strong>
+                      <span style={{fontSize:'.7rem', color:'var(--brass2)', fontWeight:600}}>{fmt12(item.startTime)}</span>
+                      <strong style={{fontSize:'.8rem', color:'var(--ink)'}}>{item.title}</strong>
                     </button>
                   ))}
                 </div>
@@ -2807,7 +2797,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
                     </button>
                     <div style={{flex:1, minWidth:0}}>
                       <div style={{fontSize:'.88rem', color: task.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: task.completed ? 'line-through' : 'none'}}>{task.title}</div>
-                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{shortDate(task.date)}{task.time ? ` · ${task.time}` : ''}</div>}
+                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{shortDate(task.date)}{task.time ? ` · ${fmt12(task.time)}` : ''}</div>}
                     </div>
                   </div>
                 ))}
@@ -8014,7 +8004,7 @@ function PlannerApp() {
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
+          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
