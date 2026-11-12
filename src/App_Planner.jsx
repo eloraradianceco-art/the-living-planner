@@ -738,6 +738,8 @@ async function loadSupabaseAll(userId) {
   }
 }
 
+const sameTaskTitle = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+
 function nextRecurringDate(date, recurrence) {
   if (recurrence === 'daily') return addDays(date, 1)
   if (recurrence === 'weekly') return addDays(date, 7)
@@ -829,7 +831,8 @@ const plannerService = {
       let next = current.map((item) => item.id === task.id ? updatedTask : item)
       if (!task.completed && task.recurrence && task.recurrence !== 'none') {
         const futureDate = nextRecurringDate(task.date, task.recurrence)
-        if (futureDate) {
+        const already = next.some((item) => item.id !== task.id && item.date === futureDate && sameTaskTitle(item.title, task.title))
+        if (futureDate && !already) {
           next.push({ ...task, id: Date.now(), completed: false, date: futureDate })
         }
       }
@@ -843,9 +846,18 @@ const plannerService = {
     let extraTask = null
     if (!task.completed && task.recurrence && task.recurrence !== 'none') {
       const futureDate = nextRecurringDate(task.date, task.recurrence)
+      // Skip if next occurrence already exists (re-checking a task, or it was made earlier)
+      let already = false
       if (futureDate) {
+        const { data: existing } = await supabase.from('tasks').select('id, title')
+          .eq('user_id', userId).eq('date', futureDate)
+        already = (existing || []).some((row) => row.id !== task.id && sameTaskTitle(row.title, task.title))
+      }
+      if (futureDate && !already) {
         let clonePayload = { ...task, completed: false, date: futureDate, user_id: userId }
         delete clonePayload.id
+        delete clonePayload.created_at; delete clonePayload.updated_at
+        delete clonePayload.startTime; delete clonePayload.itemType
         // Normalize camelCase -> snake_case before inserting
         if ('linkedGoalId' in clonePayload) { clonePayload.goal_id = clonePayload.linkedGoalId || null; delete clonePayload.linkedGoalId }
         if ('linkedProjectId' in clonePayload) { clonePayload.project_id = clonePayload.linkedProjectId || null; delete clonePayload.linkedProjectId }
@@ -2323,13 +2335,9 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
   return (
     <div style={{padding:'10px 0', borderBottom:'1px solid var(--surface)', display:'flex', alignItems:'center', gap:10}}>
       {/* Complete toggle — left side circle */}
-      <button onClick={() => onToggle(task.id)} style={{
-        width:24, height:24, borderRadius:'50%', border:'2px solid', flexShrink:0, cursor:'pointer',
-        borderColor: task.completed ? 'var(--success)' : 'var(--teal)',
-        background: task.completed ? 'var(--success)' : 'transparent',
-        display:'grid', placeItems:'center'
-      }}>
-        {task.completed && <span style={{color:'white', fontSize:'.7rem', fontWeight:700}}>✓</span>}
+      <button type="button" className={'step-check' + (task.completed ? ' done' : '')} onClick={() => onToggle(task.id)}
+        aria-label={task.completed ? `Mark ${task.title} not done` : `Mark ${task.title} done`} aria-pressed={!!task.completed}>
+        {task.completed && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
       </button>
 
       {/* Content — middle */}
@@ -2342,7 +2350,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
         }}>
           {task.title}
           {task.recurrence && task.recurrence !== 'none' &&
-            <span style={{marginLeft:6, fontSize:'.65rem', padding:'1px 5px', borderRadius:999, background:'var(--teal-dim)', color:'var(--teal)', fontWeight:700}}>↻</span>
+            <span style={{marginLeft:6, fontSize:'.62rem', padding:'1px 7px', borderRadius:999, background:'var(--brass-dim)', color:'var(--brass2)', fontWeight:700, textTransform:'capitalize', textDecoration:'none', display:'inline-block'}}>↻ {task.recurrence}</span>
           }
         </div>
         <div style={{fontSize:'.72rem', color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', marginTop:2}}>
@@ -2374,7 +2382,8 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
     try {
       return (tasks || []).filter((task) => {
         if (!task || !task.title) return false
-        if (!(settings || {}).showCompletedTasks && task.completed) return false
+        // Today's finished tasks always stay (checked); older ones follow the setting
+        if (!(settings || {}).showCompletedTasks && task.completed && !isToday(task.date)) return false
         if (category !== 'All' && task.category !== category) return false
         if (status === 'Open' && task.completed) return false
         if (status === 'Done' && !task.completed) return false
@@ -2387,9 +2396,9 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
   const groups = {
     Overdue: filtered.filter((task) => !task.completed && isOverdue(task.date)),
     Today: filtered.filter((task) => isToday(task.date)),
-    'This Week': filtered.filter((task) => isThisWeek(task.date) && !isToday(task.date) && !isOverdue(task.date)),
-    Upcoming: filtered.filter((task) => !isThisWeek(task.date) && task.date > new Date().toISOString().slice(0, 10)),
-    Completed: filtered.filter((task) => task.completed),
+    'This Week': filtered.filter((task) => !task.completed && isThisWeek(task.date) && !isToday(task.date) && !isOverdue(task.date)),
+    Upcoming: filtered.filter((task) => !task.completed && !isThisWeek(task.date) && task.date > TODAY),
+    Completed: filtered.filter((task) => task.completed && !isToday(task.date)),
   }
 
   const openCount = filtered.filter(t => !t.completed).length
