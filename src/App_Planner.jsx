@@ -11,7 +11,7 @@ import {
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
-  House, Ellipsis, LayoutGrid, X,
+  House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -1364,7 +1364,7 @@ function AuthPage() {
     { icon: Wallet, title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
     { icon: Leaf, title: 'Health & Wellness', desc: 'Mood, sleep, journal, medications, and daily routines.' },
     { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, a focus timer, and cleaning schedules.' },
-    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes, trips, birthdays, gifts, and workouts.' },
+    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes, trips, birthdays, and gifts.' },
   ]
 
   // ── Welcome screen ──────────────────────────────────────────────────────
@@ -2548,15 +2548,33 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     </section>
   )
 
+  const recoveryLog = useWellnessKey('recovery', {})
+  const workoutLog = useWellnessKey('workouts', [])
+  const todayReadiness = readinessOf(recoveryLog?.[TODAY])
+  const todayBand = readinessBand(todayReadiness)
+  const sessionsThisWeek = (workoutLog || []).filter((w) => w.date >= startOfWeek(TODAY) && w.date <= TODAY).length
   const habitDone = (h) => habitLogs.some((l) => l.habitId === h.id && l.date === TODAY && l.completed)
   const habitsToday = habits.slice().sort((a, b) => Number(habitDone(a)) - Number(habitDone(b)))
   const habitsDoneCount = habits.filter(habitDone).length
   const B_body = (
     <section className="card">
       <div className="section-title-row" style={{marginBottom:6}}>
-        <div><p className="eyebrow">Body & Recovery</p><h3>Today's habits</h3></div>
-        <span className="status-pill" style={{fontSize:'.72rem'}}>{habitsDoneCount}/{habits.length} done</span>
+        <div><p className="eyebrow">Body &amp; Recovery</p><h3>Readiness</h3></div>
+        <span className="status-pill" style={{fontSize:'.72rem'}}>{sessionsThisWeek} session{sessionsThisWeek !== 1 ? 's' : ''} this week</span>
       </div>
+      {todayBand ? (
+        <Link to="/wellness?tab=recovery" className={'readiness-hero compact tone-' + todayBand.tone} style={{textDecoration:'none'}}>
+          <div className="readiness-num">{todayReadiness}</div>
+          <div><strong>{todayBand.label}</strong><p>{todayBand.advice}</p></div>
+        </Link>
+      ) : (
+        <Link to="/wellness?tab=recovery" className="readiness-cta">
+          <Gauge size={20} />
+          <div><strong>Check in</strong><span>20 seconds: sleep, energy, soreness, stress</span></div>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
+      <p className="eyebrow" style={{margin:'14px 0 2px'}}>Today's habits · {habitsDoneCount}/{habits.length}</p>
       {habits.length === 0 ? (
         <p className="muted" style={{fontSize:'.85rem', margin:'4px 0 0'}}>No habits yet. Add a few to build your daily rhythm.</p>
       ) : habitsToday.slice(0, 6).map((h) => {
@@ -2572,8 +2590,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         )
       })}
       <div className="home-chip-row">
-        <Link to="/wellness" className="home-chip"><Dumbbell size={15} /> Log training</Link>
-        <Link to="/wellness" className="home-chip"><Moon size={15} /> Sleep &amp; mood</Link>
+        <Link to="/wellness?tab=training" className="home-chip"><Dumbbell size={15} /> Log training</Link>
+        <Link to="/wellness?tab=sleep" className="home-chip"><Moon size={15} /> Sleep</Link>
+        <Link to="/wellness?tab=mood" className="home-chip"><Smile size={15} /> Mood</Link>
         <Link to="/habits" className="home-chip"><Repeat size={15} /> All habits</Link>
       </div>
     </section>
@@ -3319,9 +3338,9 @@ function WelcomeProBanner({ onDismiss }) {
 const PRO_TABS = {
   faith: ['fasting', 'sermons', 'goals', 'reading'],
   finance: ['income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
-  lifestyle: ['recipes', 'trips', 'birthdays', 'gifts', 'workout'],
+  lifestyle: ['recipes', 'trips', 'birthdays', 'gifts'],
   productivity: ['checklists', 'focus', 'cleaning'],
-  wellness: ['sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
+  wellness: ['training', 'sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
 function ProTabGate({ isPro, onUpgrade, children }) {
@@ -3761,11 +3780,11 @@ const SECTION_ICONS = {
   donations: HeartHandshake, budget: ClipboardList, nospend: CircleSlash,
   // Wellness
   mood: Smile, sleep: Moon, journal: PenLine, routine: Sunrise, reading: BookOpen, meds: Pill,
-  metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield,
+  metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield, training: Dumbbell, recovery: BatteryCharging,
   // Productivity
   tasks: SquareCheck, braindump: Brain, notes: StickyNote, checklists: ListChecks, focus: Timer, cleaning: Sparkles, tips: Lightbulb,
   // Lifestyle
-  groceries: ShoppingCart, recipes: ChefHat, trips: Plane, birthdays: Cake, gifts: Gift, workout: Dumbbell,
+  groceries: ShoppingCart, recipes: ChefHat, trips: Plane, birthdays: Cake, gifts: Gift,
   // Faith
   devotional: BookOpen, prayer: HandHeart, scripture: ScrollText, gratitude: Flower2, fasting: Hourglass, sermons: Mic, goals: Target,
 }
@@ -5231,11 +5250,305 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
 
 // ── WELLNESS PAGE ─────────────────────────────────────────────────────────
+// ── Wellness data helpers ───────────────────────────────────────────────
+// Workouts used to live under Lifestyle in device-only storage. Fold them in once.
+function mergeLegacyWorkouts(current) {
+  try {
+    if (localStorage.getItem('planner.l.workouts.moved')) return current
+    const legacy = JSON.parse(localStorage.getItem('planner.l.workouts') || '[]')
+    if (!legacy.length) return current
+    const ids = new Set((current || []).map((w) => String(w.id)))
+    const add = legacy.filter((w) => !ids.has(String(w.id))).map((w) => ({ ...w, exercises: w.exercises || [] }))
+    return add.length ? [...(current || []), ...add] : current
+  } catch { return current }
+}
+const markLegacyWorkoutsMoved = () => { try { localStorage.setItem('planner.l.workouts.moved', '1') } catch {} }
+const HW_PREFIX = 'planner.hw.'
+function hwRead(key, fallback) {
+  try {
+    const v = localStorage.getItem(HW_PREFIX + key) ?? localStorage.getItem(key)
+    return v ? JSON.parse(v) : fallback
+  } catch { return fallback }
+}
+// Read one wellness key anywhere in the app (e.g. Home), refreshed from Supabase.
+function useWellnessKey(key, fallback) {
+  const { user } = useAuth()
+  const [value, setValue] = useState(() => hwRead(key, fallback))
+  useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    let alive = true
+    supabase.from('page_data').select('data_value, updated_at').eq('user_id', user.id).eq('page', 'wellness').eq('data_key', key).maybeSingle()
+      .then(({ data }) => {
+        if (!alive || !data) return
+        // Don't let an older server copy replace a save made on this device seconds ago
+        const localAt = Number(localStorage.getItem(HW_PREFIX + key + '.at') || 0)
+        if (localAt && new Date(data.updated_at).getTime() < localAt - 1000) return
+        setValue(data.data_value ?? fallback)
+        try { localStorage.setItem(HW_PREFIX + key, JSON.stringify(data.data_value)) } catch {}
+      })
+    return () => { alive = false }
+  }, [user?.id, key])
+  return value
+}
+
+// Readiness 0–100 from last night's sleep, energy, soreness, stress and pain.
+function readinessOf(c) {
+  if (!c) return null
+  const h = Number(c.sleepHours)
+  const sleepPart = !h ? 0.6 : h < 5 ? 0.2 : h < 6 ? 0.45 : h < 7 ? 0.7 : h <= 9 ? 1 : 0.85
+  const energy = ((Number(c.energy) || 3) - 1) / 4
+  const sore = (5 - (Number(c.soreness) || 3)) / 4
+  const stress = (5 - (Number(c.stress) || 3)) / 4
+  const pain = Math.min(15, (c.pain || []).length * 5)
+  return Math.max(0, Math.min(100, Math.round((sleepPart * 30 + energy * 30 + sore * 25 + stress * 15) - pain)))
+}
+function readinessBand(score) {
+  if (score == null) return null
+  if (score >= 75) return { label: 'Train hard', tone: 'good', advice: 'Green light. Push the main work today.' }
+  if (score >= 50) return { label: 'Train light', tone: 'mid', advice: 'Moderate volume, longer warm-up, leave a rep or two in the tank.' }
+  return { label: 'Recover', tone: 'low', advice: 'Walk, stretch, hydrate, sleep early. Growth happens in recovery.' }
+}
+const sleepHoursFrom = (bed, wake) => {
+  if (!bed || !wake) return ''
+  const [bh, bm] = bed.split(':').map(Number), [wh, wm] = wake.split(':').map(Number)
+  let mins = (wh * 60 + wm) - (bh * 60 + bm)
+  if (mins <= 0) mins += 24 * 60
+  return Math.round(mins / 30) / 2
+}
+const PAIN_AREAS = ['Neck', 'Shoulders', 'Upper back', 'Low back', 'Hips', 'Knees', 'Ankles/feet', 'Elbows/wrists']
+const TRAINING_TYPES = ['Strength', 'Hypertrophy', 'Conditioning', 'Calisthenics', 'Mobility', 'Combat', 'Cardio', 'HIIT', 'Running', 'Walking', 'Sports', 'Other']
+const exKey = (n) => String(n || '').trim().toLowerCase()
+const fmtSet = (e) => [e.sets && e.reps ? `${e.sets}×${e.reps}` : e.sets ? `${e.sets} sets` : e.reps ? `${e.reps} reps` : '', e.weight ? `@ ${e.weight} lb` : ''].filter(Boolean).join(' ')
+
+function ScaleRow({ label, low, high, value, onChange }) {
+  return (
+    <div className="scale-block">
+      <div className="scale-head"><span>{label}</span><small>{low} → {high}</small></div>
+      <div className="scale-row" role="radiogroup" aria-label={label}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={value === n}
+            className={'scale-btn' + (value === n ? ' active' : '')} onClick={() => onChange(n)}>{n}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TrainingTab({ workouts, onSave }) {
+  const blankEx = () => ({ id: newStepId(), name: '', sets: '', reps: '', weight: '' })
+  const blank = () => ({ type: 'Strength', duration: '', effort: '', date: TODAY, notes: '', exercises: [blankEx()] })
+  const [f, setF] = useState(blank)
+  const [open, setOpen] = useState(false)
+
+  const weekStart = startOfWeek(TODAY)
+  const thisWeek = workouts.filter((w) => w.date >= weekStart && w.date <= TODAY)
+  const weekMins = thisWeek.reduce((n, w) => n + Number(w.duration || 0), 0)
+
+  // Per-exercise history (most recent first) → "Last" + "Best"
+  const history = useMemo(() => {
+    const map = {}
+    workouts.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).forEach((w) => (w.exercises || []).forEach((e) => {
+      const k = exKey(e.name); if (!k) return
+      if (!map[k]) map[k] = { name: e.name.trim(), last: e, lastDate: w.date, best: Number(e.weight) || 0, count: 0 }
+      map[k].best = Math.max(map[k].best, Number(e.weight) || 0); map[k].count += 1
+    }))
+    return map
+  }, [workouts])
+  const topLifts = Object.values(history).sort((a, b) => b.count - a.count).slice(0, 6)
+
+  const setEx = (id, patch) => setF((p) => ({ ...p, exercises: p.exercises.map((e) => e.id === id ? { ...e, ...patch } : e) }))
+  const save = () => {
+    const exercises = f.exercises.filter((e) => e.name.trim()).map((e) => ({ ...e, name: e.name.trim() }))
+    if (!f.duration && !exercises.length) return
+    onSave([{ ...f, exercises, id: Date.now() }, ...workouts])
+    setF(blank()); setOpen(false)
+  }
+
+  return (
+    <div className="screen-stack" style={{ gap: 14 }}>
+      <section className="card">
+        <p className="eyebrow">Training</p>
+        <h3 style={{ margin: '4px 0 12px' }}>Log the work</h3>
+        <div className="wl-stats">
+          <div><strong>{thisWeek.length}</strong><span>sessions this week</span></div>
+          <div><strong>{weekMins}</strong><span>minutes this week</span></div>
+          <div><strong>{workouts.length}</strong><span>total logged</span></div>
+        </div>
+
+        {!open ? (
+          <button className="primary-btn" style={{ width: '100%', marginTop: 12 }} onClick={() => setOpen(true)}>+ Log a session</button>
+        ) : (
+          <div className="wl-form">
+            <div className="wl-grid3">
+              <label>Type<select value={f.type} onChange={(e) => setF((p) => ({ ...p, type: e.target.value }))}>{TRAINING_TYPES.map((t) => <option key={t}>{t}</option>)}</select></label>
+              <label>Minutes<input type="number" inputMode="numeric" value={f.duration} onChange={(e) => setF((p) => ({ ...p, duration: e.target.value }))} placeholder="45" /></label>
+              <label>Effort<select value={f.effort} onChange={(e) => setF((p) => ({ ...p, effort: e.target.value }))}><option value="">—</option>{[5, 6, 7, 8, 9, 10].map((n) => <option key={n} value={n}>RPE {n}</option>)}</select></label>
+            </div>
+            <label>Date<input type="date" value={f.date} onChange={(e) => setF((p) => ({ ...p, date: e.target.value }))} /></label>
+
+            <div className="wl-ex-head"><span>Exercises</span><small>sets × reps @ lb</small></div>
+            <datalist id="exercise-names">{Object.values(history).map((h) => <option key={h.name} value={h.name} />)}</datalist>
+            {f.exercises.map((e) => {
+              const h = history[exKey(e.name)]
+              return (
+                <div key={e.id} className="wl-ex">
+                  <div className="wl-ex-row">
+                    <input className="wl-ex-name" list="exercise-names" placeholder="Exercise (e.g. Trap bar deadlift)" value={e.name} onChange={(ev) => setEx(e.id, { name: ev.target.value })} />
+                    {f.exercises.length > 1 && <button type="button" className="time-card-del" onClick={() => setF((p) => ({ ...p, exercises: p.exercises.filter((x) => x.id !== e.id) }))} aria-label="Remove exercise">✕</button>}
+                  </div>
+                  <div className="wl-ex-nums">
+                    <input type="number" inputMode="numeric" placeholder="Sets" value={e.sets} onChange={(ev) => setEx(e.id, { sets: ev.target.value })} />
+                    <input type="number" inputMode="numeric" placeholder="Reps" value={e.reps} onChange={(ev) => setEx(e.id, { reps: ev.target.value })} />
+                    <input type="number" inputMode="decimal" placeholder="lb" value={e.weight} onChange={(ev) => setEx(e.id, { weight: ev.target.value })} />
+                  </div>
+                  {h && <div className="wl-ex-hint">Last {shortDate(h.lastDate)}: {fmtSet(h.last) || '—'}{h.best ? ` · Best ${h.best} lb` : ''}</div>}
+                </div>
+              )
+            })}
+            <button type="button" className="wl-add-ex" onClick={() => setF((p) => ({ ...p, exercises: [...p.exercises, blankEx()] }))}><Plus size={15} /> Add exercise</button>
+            <input placeholder="Notes (PRs, how it felt, what to change)" value={f.notes} onChange={(e) => setF((p) => ({ ...p, notes: e.target.value }))} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="secondary-btn" style={{ flex: 1 }} onClick={() => { setF(blank()); setOpen(false) }}>Cancel</button>
+              <button className="primary-btn" style={{ flex: 2 }} onClick={save}>Save session</button>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {topLifts.length > 0 && (
+        <section className="card">
+          <p className="eyebrow">Progress</p>
+          <h3 style={{ margin: '4px 0 10px' }}>Your main lifts</h3>
+          {topLifts.map((h) => (
+            <div key={h.name} className="metric-row card-row">
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{h.name}</div>
+                <div className="muted" style={{ fontSize: '.74rem' }}>Last {shortDate(h.lastDate)} · {fmtSet(h.last) || '—'} · {h.count} session{h.count !== 1 ? 's' : ''}</div>
+              </div>
+              {h.best > 0 && <strong style={{ color: 'var(--brass2)', fontSize: '.9rem', whiteSpace: 'nowrap' }}>{h.best} lb</strong>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      <section className="card">
+        <p className="eyebrow">History</p>
+        {workouts.length === 0 ? (
+          <EmptyState icon={Dumbbell} title="No sessions yet" message="Log your first session. Exercises you enter here show your last numbers next time." />
+        ) : workouts.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 20).map((w) => (
+          <div key={w.id} className="wl-session">
+            <div className="wl-session-head">
+              <div>
+                <strong>{w.type}</strong>
+                <span className="muted"> · {shortDate(w.date)}{w.duration ? ` · ${w.duration} min` : ''}{w.effort ? ` · RPE ${w.effort}` : ''}</span>
+              </div>
+              <button className="time-card-del" onClick={() => { if (window.confirm('Delete this session?')) onSave(workouts.filter((x) => x.id !== w.id)) }} aria-label="Delete session">✕</button>
+            </div>
+            {(w.exercises || []).length > 0 && (
+              <ul className="wl-session-ex">{w.exercises.map((e, i) => <li key={i}><span>{e.name}</span><span>{fmtSet(e)}</span></li>)}</ul>
+            )}
+            {w.notes && <div className="muted" style={{ fontSize: '.78rem', marginTop: 4 }}>{w.notes}</div>}
+          </div>
+        ))}
+      </section>
+    </div>
+  )
+}
+
+function RecoveryTab({ checkins, onSave, sleep }) {
+  const today = checkins[TODAY]
+  const lastSleep = (sleep || []).find((e) => e.date === TODAY)
+  const prefillSleep = lastSleep ? sleepHoursFrom(lastSleep.bed, lastSleep.wake) : ''
+  const blank = () => ({ sleepHours: prefillSleep, energy: 0, soreness: 0, stress: 0, pain: [], note: '' })
+  const [editing, setEditing] = useState(!today)
+  const [f, setF] = useState(() => today ? { ...blank(), ...today } : blank())
+  const live = readinessOf({ ...f, energy: f.energy || 3, soreness: f.soreness || 3, stress: f.stress || 3 })
+  const score = today ? readinessOf(today) : null
+  const band = readinessBand(score)
+  const ready = f.energy && f.soreness && f.stress
+
+  const last7 = Array.from({ length: 7 }, (_, i) => addDays(TODAY, i - 6)).map((d) => ({ d, v: readinessOf(checkins[d]) }))
+  const painCounts = {}
+  Array.from({ length: 14 }, (_, i) => addDays(TODAY, -i)).forEach((d) => (checkins[d]?.pain || []).forEach((a) => { painCounts[a] = (painCounts[a] || 0) + 1 }))
+  const painList = Object.entries(painCounts).sort((a, b) => b[1] - a[1])
+
+  return (
+    <div className="screen-stack" style={{ gap: 14 }}>
+      <section className="card">
+        <p className="eyebrow">Recovery</p>
+        <h3 style={{ margin: '4px 0 12px' }}>{editing ? 'Daily check-in' : 'Today\'s readiness'}</h3>
+
+        {!editing && today ? (
+          <>
+            <div className={'readiness-hero tone-' + band.tone}>
+              <div className="readiness-num">{score}</div>
+              <div>
+                <strong>{band.label}</strong>
+                <p>{band.advice}</p>
+              </div>
+            </div>
+            <div className="readiness-inputs">
+              {today.sleepHours ? <span>Sleep {today.sleepHours}h</span> : null}
+              <span>Energy {today.energy}/5</span><span>Soreness {today.soreness}/5</span><span>Stress {today.stress}/5</span>
+              {(today.pain || []).length > 0 && <span>Pain: {today.pain.join(', ')}</span>}
+            </div>
+            <button className="secondary-btn" style={{ marginTop: 12 }} onClick={() => { setF({ ...blank(), ...today }); setEditing(true) }}>Edit check-in</button>
+          </>
+        ) : (
+          <div className="wl-form" style={{ marginTop: 0 }}>
+            <label>Sleep last night (hours){lastSleep ? <small className="muted" style={{ fontWeight: 400 }}> · from your sleep log</small> : null}
+              <input type="number" step="0.5" inputMode="decimal" value={f.sleepHours} placeholder="7.5" onChange={(e) => setF((p) => ({ ...p, sleepHours: e.target.value }))} />
+            </label>
+            <ScaleRow label="Energy" low="drained" high="charged" value={f.energy} onChange={(n) => setF((p) => ({ ...p, energy: n }))} />
+            <ScaleRow label="Soreness" low="fresh" high="beat up" value={f.soreness} onChange={(n) => setF((p) => ({ ...p, soreness: n }))} />
+            <ScaleRow label="Stress" low="calm" high="maxed" value={f.stress} onChange={(n) => setF((p) => ({ ...p, stress: n }))} />
+            <div className="scale-block">
+              <div className="scale-head"><span>Anything hurting?</span><small>tap all that apply</small></div>
+              <div className="pain-chips">
+                {PAIN_AREAS.map((a) => {
+                  const on = f.pain.includes(a)
+                  return <button key={a} type="button" className={'pain-chip' + (on ? ' on' : '')} aria-pressed={on}
+                    onClick={() => setF((p) => ({ ...p, pain: on ? p.pain.filter((x) => x !== a) : [...p.pain, a] }))}>{a}</button>
+                })}
+              </div>
+            </div>
+            <input placeholder="Note (optional)" value={f.note} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} />
+            <button className="primary-btn" disabled={!ready} style={{ opacity: ready ? 1 : .5 }}
+              onClick={() => { onSave({ ...checkins, [TODAY]: { ...f, at: new Date().toISOString() } }); setEditing(false) }}>
+              {ready ? `Save · readiness ${live}` : 'Rate energy, soreness and stress'}
+            </button>
+            {today && <button className="secondary-btn" onClick={() => setEditing(false)}>Cancel</button>}
+          </div>
+        )}
+      </section>
+
+      <section className="card">
+        <p className="eyebrow">Last 7 days</p>
+        <div className="readiness-bars">
+          {last7.map(({ d, v }) => (
+            <div key={d} className="readiness-bar">
+              <div className="readiness-bar-track"><div className={'readiness-bar-fill tone-' + (readinessBand(v)?.tone || 'none')} style={{ height: `${v ?? 0}%` }} /></div>
+              <span className="readiness-bar-val">{v ?? '–'}</span>
+              <span className="readiness-bar-day">{formatDateLabel(d, { weekday: 'narrow' })}</span>
+            </div>
+          ))}
+        </div>
+        {painList.length > 0 && (
+          <>
+            <p className="eyebrow" style={{ marginTop: 14 }}>Pain, last 14 days</p>
+            <div className="pain-chips">{painList.map(([a, n]) => <span key={a} className="pain-chip on static">{a} · {n} day{n !== 1 ? 's' : ''}</span>)}</div>
+          </>
+        )}
+      </section>
+    </div>
+  )
+}
+
 function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
-    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    try { localStorage.setItem(HW_PREFIX + key, JSON.stringify(value)); localStorage.setItem(HW_PREFIX + key + '.at', String(Date.now())) } catch {}
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
@@ -5267,12 +5580,28 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'sleep') setSleep(row.data_value || [])
           if (row.data_key === 'copingUsed') setCopingUsed(row.data_value || {})
           if (row.data_key === 'metricsLog') setMetricsLog(row.data_value || [])
+          if (row.data_key === 'workouts') setWorkouts(row.data_value || [])
+          if (row.data_key === 'recovery') setRecovery(row.data_value || {})
         })
+        // One-time move of workouts logged under Lifestyle (device-only) into synced Wellness
+        const remote = (data.find((r) => r.data_key === 'workouts')?.data_value) || []
+        const merged = mergeLegacyWorkouts(remote)
+        if (merged !== remote) { setWorkouts(merged); syncPageData('workouts', merged) }
+        markLegacyWorkoutsMoved()
       })
   }, [user?.id])
 
+  // Offline/demo mode: keep the moved workouts locally
+  React.useEffect(() => {
+    if (hasSupabaseEnv) return
+    const cur = lsGet('workouts', [])
+    const merged = mergeLegacyWorkouts(cur)
+    if (merged !== cur) syncPageData('workouts', merged)
+    markLegacyWorkoutsMoved()
+  }, [])
+
   // ── Shared ─────────────────────────────────────────────────────────────
-  const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.hw.' + k); return v ? JSON.parse(v) : d } catch { return d } }
+  const lsGet = (k, d) => hwRead(k, d)
   const lsSet = (k, v) => { try { localStorage.setItem('planner.hw.' + k, JSON.stringify(v)) } catch {} }
 
   // ── Wellness state ──────────────────────────────────────────────────────
@@ -5283,7 +5612,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const [newRoutineItem, setNewRoutineItem] = useState({ time: '', label: '', type: 'morning' })
   const [routineLog, setRoutineLog] = useState(() => lsGet('routineLog', {}))
   const [wellnessLog, setWellnessLog] = useState(() => lsGet('wellnessLog', {}))
-  const [journalEntries, setJournalEntries] = useState(() => lsGet('journal', []))
+  const [journalEntries, setJournalEntries] = useState(() => lsGet('journalEntries', lsGet('journal', [])))
   const [journalText, setJournalText] = useState('')
   const [journalPrompt, setJournalPrompt] = useState(0)
 
@@ -5327,12 +5656,19 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
 
 
   // ── Health state ────────────────────────────────────────────────────────
-  const [tab, setTab] = useState('mood')
+  const location = useLocation()
+  const urlTab = new URLSearchParams(location.search).get('tab')
+  const [tab, setTab] = useState(urlTab || 'mood')
+  useEffect(() => { if (urlTab) setTab(urlTab) }, [urlTab])
   
   
 
   // tab state above
-  const [metricsLog, setMetricsLog] = useState(() => { try { const v = localStorage.getItem('planner.h.metrics'); return v ? JSON.parse(v) : [] } catch { return [] } })
+  const [metricsLog, setMetricsLog] = useState(() => { const v = lsGet('metricsLog', null); if (v) return v; try { const o = localStorage.getItem('planner.h.metrics'); return o ? JSON.parse(o) : [] } catch { return [] } })
+  const [workouts, setWorkouts] = useState(() => mergeLegacyWorkouts(lsGet('workouts', [])))
+  const [recovery, setRecovery] = useState(() => lsGet('recovery', {}))
+  const saveWorkouts = (w) => { setWorkouts(w); syncPageData('workouts', w) }
+  const saveRecovery = (r) => { setRecovery(r); syncPageData('recovery', r) }
   const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
   const saveMetrics = (m) => { setMetricsLog(m); syncPageData('metricsLog', m) }
   const [meds, setMeds] = useState(() => lsGet('meds', []))
@@ -5386,7 +5722,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
 
 
   const TABS = [
-    {id:'mood',label:'😊 Mood'},{id:'sleep',label:'😴 Sleep'},
+    {id:'mood',label:'😊 Mood'},{id:'training',label:'Training'},{id:'recovery',label:'Recovery'},{id:'sleep',label:'😴 Sleep'},
     {id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},
     {id:'reading',label:'📚 Reading'},{id:'meds',label:'💊 Medications'},
     {id:'metrics',label:'📈 Body Metrics'},{id:'anxiety',label:'🧘 Anxiety'},
@@ -5400,6 +5736,13 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
+      {tab === 'training' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+          <TrainingTab workouts={workouts} onSave={saveWorkouts} />
+        </ProTabGate>
+      )}
+      {tab === 'recovery' && <RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} />}
+
       {tab === 'mood' && (
         <div>
           <section className="card">
@@ -6567,75 +6910,6 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 }
 
 // ── LIFESTYLE PAGE ─────────────────────────────────────────────────────────
-function WorkoutTrackerTab() {
-  const lsG = (k,d) => { try{const v=localStorage.getItem('planner.l.'+k);return v?JSON.parse(v):d}catch{return d} }
-  const lsS = (k,v) => { try{localStorage.setItem('planner.l.'+k,JSON.stringify(v))}catch{} }
-  const [wLogs, setWLogs] = useState(()=>lsG('workouts',[]))
-  const [wForm, setWForm] = useState({type:'Strength',duration:'',notes:'',date:new Date().toISOString().slice(0,10)})
-  const saveWLogs = (v) => { setWLogs(v); lsS('workouts',v) }
-  const TYPES = ['Strength','Cardio','HIIT','Yoga','Pilates','Cycling','Running','Swimming','Walking','Sports','Other']
-  const today = new Date().toISOString().slice(0,10)
-  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-  const weekStartStr = weekStart.toISOString().slice(0,10)
-  const thisWeekLogs = wLogs.filter(l => l.date >= weekStartStr && l.date <= today)
-  const totalMins = thisWeekLogs.reduce((s,l)=>s+Number(l.duration||0),0)
-
-  return (
-    <section className="card">
-      <p className="eyebrow">Workout Tracker</p>
-      <h3 style={{margin:'4px 0 14px'}}>Log Your Training</h3>
-
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:16}}>
-        {[
-          ['This Week',thisWeekLogs.length+' sessions','var(--teal)'],
-          ['Minutes',totalMins+' min','var(--brass)'],
-          ['Total',wLogs.length+' logged','var(--success)'],
-        ].map(([l,v,c])=>(
-          <div key={l} style={{background:'var(--stone)',borderRadius:10,padding:'10px',textAlign:'center'}}>
-            <div className="muted" style={{fontSize:'.7rem',marginBottom:3}}>{l}</div>
-            <strong style={{color:c,fontSize:'.9rem'}}>{v}</strong>
-          </div>
-        ))}
-      </div>
-
-      <div style={{display:'grid',gap:8,marginBottom:16,padding:'14px',background:'var(--stone)',borderRadius:10}}>
-        <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Log a Workout</p>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-          <select value={wForm.type} onChange={e=>setWForm(p=>({...p,type:e.target.value}))}
-            style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
-            {TYPES.map(t=><option key={t}>{t}</option>)}
-          </select>
-          <input type="number" placeholder="Duration (min)" value={wForm.duration}
-            onChange={e=>setWForm(p=>({...p,duration:e.target.value}))}
-            style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-        </div>
-        <input type="date" value={wForm.date} onChange={e=>setWForm(p=>({...p,date:e.target.value}))}
-          style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-        <input placeholder="Notes (e.g. PRs, how you felt)" value={wForm.notes}
-          onChange={e=>setWForm(p=>({...p,notes:e.target.value}))}
-          style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-        <button className="primary-btn" onClick={()=>{
-          if(!wForm.duration) return
-          saveWLogs([{...wForm,id:Date.now()},...wLogs])
-          setWForm({type:'Strength',duration:'',notes:'',date:today})
-        }}>+ Log Workout</button>
-      </div>
-
-      {wLogs.length === 0 && <EmptyState icon="💪" title="No workouts logged" message="Log your first workout and start building your fitness history." />}
-      {wLogs.slice(0,15).map((log,i)=>(
-        <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-          <div>
-            <div style={{fontWeight:600,fontSize:'.88rem'}}>{log.type}</div>
-            <div className="muted" style={{fontSize:'.75rem'}}>{log.date} · {log.duration} min{log.notes?' · '+log.notes:''}</div>
-          </div>
-          <button onClick={()=>saveWLogs(wLogs.filter((_,j)=>j!==i))}
-            style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem'}}>✕</button>
-        </div>
-      ))}
-    </section>
-  )
-}
-
 function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -6700,7 +6974,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
     { id: 'trips', label: '✈ Trips' },
     { id: 'birthdays', label: '🎂 Birthdays' },
     { id: 'gifts', label: '🎁 Gifts' },
-    { id: 'workout', label: '💪 Workout' },
   ]
 
   const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
@@ -7003,7 +7276,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
         </section>
       </ProTabGate>)}
 
-      {tab === 'workout' && <WorkoutTrackerTab />}
 
       {tab === 'passwords' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -8314,7 +8586,7 @@ function PlannerApp() {
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
-          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Trips, birthdays, contacts, workouts, and passwords.")} />} />
+          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipes, trips, birthdays, and gift ideas.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
