@@ -11,7 +11,7 @@ import {
   Wallet, Leaf, Repeat, TrendingUp, Cross, Zap, Compass, Plus, CalendarDays,
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
-  House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge,
+  House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge, Utensils, Stethoscope,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -2550,6 +2550,10 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
   const recoveryLog = useWellnessKey('recovery', {})
   const workoutLog = useWellnessKey('workouts', [])
+  const mealLog = useWellnessKey('meals', {})
+  const nutTargets = { ...DEFAULT_TARGETS, ...(useWellnessKey('nutritionTargets', {}) || {}) }
+  const proteinToday = dayProtein(mealLog, TODAY)
+  const proteinTarget = Number(nutTargets.protein) || 0
   const todayReadiness = readinessOf(recoveryLog?.[TODAY])
   const todayBand = readinessBand(todayReadiness)
   const sessionsThisWeek = (workoutLog || []).filter((w) => w.date >= startOfWeek(TODAY) && w.date <= TODAY).length
@@ -2574,6 +2578,10 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           <span aria-hidden="true">→</span>
         </Link>
       )}
+      <Link to="/wellness?tab=nutrition" className="home-protein">
+        <div className="nut-protein-top"><span><strong>{proteinToday}</strong> / {proteinTarget || '—'} g protein</span><span className="muted">{proteinTarget && proteinToday >= proteinTarget ? 'Target hit' : 'Log a meal →'}</span></div>
+        <div className="nut-bar"><div style={{ width: `${proteinTarget ? Math.min(100, Math.round(proteinToday / proteinTarget * 100)) : 0}%` }} className={proteinTarget && proteinToday >= proteinTarget ? 'hit' : ''} /></div>
+      </Link>
       <p className="eyebrow" style={{margin:'14px 0 2px'}}>Today's habits · {habitsDoneCount}/{habits.length}</p>
       {habits.length === 0 ? (
         <p className="muted" style={{fontSize:'.85rem', margin:'4px 0 0'}}>No habits yet. Add a few to build your daily rhythm.</p>
@@ -3340,7 +3348,7 @@ const PRO_TABS = {
   finance: ['income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
   lifestyle: ['recipes', 'trips', 'birthdays', 'gifts'],
   productivity: ['checklists', 'focus', 'cleaning'],
-  wellness: ['training', 'sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
+  wellness: ['training', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
 function ProTabGate({ isPro, onUpgrade, children }) {
@@ -3780,7 +3788,7 @@ const SECTION_ICONS = {
   donations: HeartHandshake, budget: ClipboardList, nospend: CircleSlash,
   // Wellness
   mood: Smile, sleep: Moon, journal: PenLine, routine: Sunrise, reading: BookOpen, meds: Pill,
-  metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield, training: Dumbbell, recovery: BatteryCharging,
+  metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield, training: Dumbbell, recovery: BatteryCharging, nutrition: Utensils, care: Stethoscope,
   // Productivity
   tasks: SquareCheck, braindump: Brain, notes: StickyNote, checklists: ListChecks, focus: Timer, cleaning: Sparkles, tips: Lightbulb,
   // Lifestyle
@@ -5544,7 +5552,273 @@ function RecoveryTab({ checkins, onSave, sleep }) {
   )
 }
 
-function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
+const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Shake']
+const DEFAULT_TARGETS = { protein: 150, calories: '' }
+const dayProtein = (meals, d) => (meals?.[d] || []).reduce((n, m) => n + (Number(m.protein) || 0), 0)
+const dayCalories = (meals, d) => (meals?.[d] || []).reduce((n, m) => n + (Number(m.calories) || 0), 0)
+
+function NutritionTab({ meals, onSaveMeals, targets, onSaveTargets, water }) {
+  const [f, setF] = useState({ slot: 'Breakfast', name: '', protein: '', calories: '' })
+  const [editTargets, setEditTargets] = useState(false)
+  const [t, setT] = useState(targets)
+  const today = meals[TODAY] || []
+  const protein = dayProtein(meals, TODAY)
+  const calories = dayCalories(meals, TODAY)
+  const target = Number(targets.protein) || 0
+  const pct = target ? Math.min(100, Math.round(protein / target * 100)) : 0
+
+  // Recent distinct meals → one-tap re-log
+  const favorites = useMemo(() => {
+    const seen = new Map()
+    Object.keys(meals).sort().reverse().forEach((d) => (meals[d] || []).forEach((m) => {
+      const k = exKey(m.name); if (k && !seen.has(k)) seen.set(k, m)
+    }))
+    return [...seen.values()].slice(0, 8)
+  }, [meals])
+
+  const last7 = Array.from({ length: 7 }, (_, i) => addDays(TODAY, i - 6))
+  const logged = last7.filter((d) => (meals[d] || []).length)
+  const avg = logged.length ? Math.round(logged.reduce((n, d) => n + dayProtein(meals, d), 0) / logged.length) : 0
+  const hits = target ? last7.filter((d) => dayProtein(meals, d) >= target).length : 0
+
+  const add = (m) => {
+    if (!m.name.trim() && !m.protein) return
+    onSaveMeals({ ...meals, [TODAY]: [...today, { id: Date.now(), slot: m.slot, name: m.name.trim(), protein: m.protein, calories: m.calories }] })
+  }
+
+  return (
+    <div className="screen-stack" style={{ gap: 14 }}>
+      <section className="card">
+        <div className="section-title-row" style={{ marginBottom: 10 }}>
+          <div><p className="eyebrow">Nutrition</p><h3>Today's fuel</h3></div>
+          <button className="ghost-btn" style={{ fontSize: '.78rem' }} onClick={() => { setT(targets); setEditTargets((v) => !v) }}>Targets</button>
+        </div>
+
+        {editTargets && (
+          <div className="wl-form" style={{ marginTop: 0, marginBottom: 12 }}>
+            <div className="wl-grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <label>Protein (g/day)<input type="number" inputMode="numeric" value={t.protein} onChange={(e) => setT((p) => ({ ...p, protein: e.target.value }))} /></label>
+              <label>Calories (optional)<input type="number" inputMode="numeric" value={t.calories} onChange={(e) => setT((p) => ({ ...p, calories: e.target.value }))} /></label>
+            </div>
+            <small className="muted">A common starting point for building muscle is about 0.7–1 g of protein per pound of bodyweight.</small>
+            <button className="primary-btn" onClick={() => { onSaveTargets(t); setEditTargets(false) }}>Save targets</button>
+          </div>
+        )}
+
+        <div className="nut-protein">
+          <div className="nut-protein-top">
+            <span><strong>{protein}</strong> / {target || '—'} g protein</span>
+            <span className="muted">{target ? (protein >= target ? 'Target hit' : `${target - protein} g to go`) : 'Set a target'}</span>
+          </div>
+          <div className="nut-bar"><div style={{ width: `${pct}%` }} className={pct >= 100 ? 'hit' : ''} /></div>
+          <div className="nut-mini">
+            <span>{calories ? `${calories}${targets.calories ? ` / ${targets.calories}` : ''} cal` : 'Calories optional'}</span>
+            <span>{today.length} meal{today.length !== 1 ? 's' : ''}</span>
+            <span>Water {water || 0}/8 cups</span>
+          </div>
+        </div>
+
+        <div className="wl-form">
+          <div className="pain-chips">
+            {MEAL_SLOTS.map((m) => <button key={m} type="button" className={'pain-chip' + (f.slot === m ? ' sel' : '')} onClick={() => setF((p) => ({ ...p, slot: m }))}>{m}</button>)}
+          </div>
+          <input placeholder="What did you eat?" value={f.name} onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} />
+          <div className="wl-grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <input type="number" inputMode="numeric" placeholder="Protein (g)" value={f.protein} onChange={(e) => setF((p) => ({ ...p, protein: e.target.value }))} />
+            <input type="number" inputMode="numeric" placeholder="Calories" value={f.calories} onChange={(e) => setF((p) => ({ ...p, calories: e.target.value }))} />
+          </div>
+          <button className="primary-btn" onClick={() => { add(f); setF((p) => ({ ...p, name: '', protein: '', calories: '' })) }}>+ Log meal</button>
+        </div>
+
+        {favorites.length > 0 && (
+          <>
+            <p className="eyebrow" style={{ margin: '14px 0 6px' }}>Log again</p>
+            <div className="pain-chips">
+              {favorites.map((m) => (
+                <button key={m.name} type="button" className="pain-chip" onClick={() => add({ ...m, slot: f.slot })}>
+                  {m.name}{m.protein ? ` · ${m.protein}g` : ''}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {today.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            {today.map((m) => (
+              <div key={m.id} className="metric-row card-row">
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{m.name || m.slot}</div>
+                  <div className="muted" style={{ fontSize: '.74rem' }}>{m.slot}{m.calories ? ` · ${m.calories} cal` : ''}</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {m.protein ? <strong style={{ color: 'var(--brass2)', fontSize: '.88rem' }}>{m.protein}g</strong> : null}
+                  <button className="time-card-del" aria-label="Remove meal" onClick={() => onSaveMeals({ ...meals, [TODAY]: today.filter((x) => x.id !== m.id) })}>✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="card">
+        <p className="eyebrow">Last 7 days</p>
+        <div className="readiness-bars">
+          {last7.map((d) => {
+            const v = dayProtein(meals, d)
+            const h = target ? Math.min(100, Math.round(v / target * 100)) : 0
+            return (
+              <div key={d} className="readiness-bar">
+                <div className="readiness-bar-track"><div className={'readiness-bar-fill ' + (target && v >= target ? 'tone-good' : v ? 'tone-mid' : 'tone-none')} style={{ height: `${h}%` }} /></div>
+                <span className="readiness-bar-val">{v || '–'}</span>
+                <span className="readiness-bar-day">{formatDateLabel(d, { weekday: 'narrow' })}</span>
+              </div>
+            )
+          })}
+        </div>
+        <p className="muted" style={{ fontSize: '.8rem', margin: '10px 0 0' }}>
+          {logged.length ? `Average ${avg} g protein on days logged${target ? ` · target hit ${hits} of 7 days` : ''}.` : 'Log a few meals to see your week.'}
+        </p>
+        <div className="home-chip-row">
+          <Link to="/lifestyle" className="home-chip"><ChefHat size={15} /> Recipes &amp; groceries</Link>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+// Blood pressure category (American Heart Association ranges) — a label, not a diagnosis.
+function bpCategory(sys, dia) {
+  sys = Number(sys); dia = Number(dia)
+  if (!sys || !dia) return null
+  if (sys > 180 || dia > 120) return { label: 'Very high — contact your doctor', tone: 'low' }
+  if (sys >= 140 || dia >= 90) return { label: 'High (stage 2)', tone: 'low' }
+  if (sys >= 130 || dia >= 80) return { label: 'High (stage 1)', tone: 'mid' }
+  if (sys >= 120) return { label: 'Elevated', tone: 'mid' }
+  return { label: 'Normal', tone: 'good' }
+}
+
+function CareTab({ vitals, onSaveVitals, appts, onSaveAppts, labs, onSaveLabs, onAddEvent }) {
+  const [v, setV] = useState({ date: TODAY, sys: '', dia: '', rhr: '', hrv: '' })
+  const [a, setA] = useState({ date: TODAY, time: '09:00', who: '', reason: '', addToCalendar: true })
+  const [l, setL] = useState({ date: TODAY, test: '', value: '', unit: '' })
+  const latest = vitals[0]
+  const cat = latest ? bpCategory(latest.sys, latest.dia) : null
+  const upcoming = appts.filter((x) => x.date >= TODAY).sort((x, y) => `${x.date}${x.time}`.localeCompare(`${y.date}${y.time}`))
+  const past = appts.filter((x) => x.date < TODAY).sort((x, y) => y.date.localeCompare(x.date)).slice(0, 5)
+  const labGroups = useMemo(() => {
+    const g = {}
+    labs.slice().sort((x, y) => y.date.localeCompare(x.date)).forEach((r) => { const k = exKey(r.test); (g[k] = g[k] || { name: r.test, rows: [] }).rows.push(r) })
+    return Object.values(g)
+  }, [labs])
+
+  return (
+    <div className="screen-stack" style={{ gap: 14 }}>
+      <section className="card">
+        <p className="eyebrow">Vitals</p>
+        <h3 style={{ margin: '4px 0 12px' }}>Blood pressure &amp; heart</h3>
+        {latest && (
+          <div className={'readiness-hero compact tone-' + (cat?.tone || 'mid')} style={{ marginBottom: 12 }}>
+            <div className="readiness-num" style={{ fontSize: '1rem', lineHeight: 1.1, textAlign: 'center' }}>{latest.sys && latest.dia ? <>{latest.sys}<br />{latest.dia}</> : '—'}</div>
+            <div>
+              <strong>{cat ? cat.label : 'Latest reading'}</strong>
+              <p>{shortDate(latest.date)}{latest.rhr ? ` · Resting HR ${latest.rhr}` : ''}{latest.hrv ? ` · HRV ${latest.hrv}` : ''}</p>
+            </div>
+          </div>
+        )}
+        <div className="wl-form" style={{ marginTop: 0 }}>
+          <div className="wl-grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <input type="number" inputMode="numeric" placeholder="Systolic (top)" value={v.sys} onChange={(e) => setV((p) => ({ ...p, sys: e.target.value }))} />
+            <input type="number" inputMode="numeric" placeholder="Diastolic (bottom)" value={v.dia} onChange={(e) => setV((p) => ({ ...p, dia: e.target.value }))} />
+            <input type="number" inputMode="numeric" placeholder="Resting HR (bpm)" value={v.rhr} onChange={(e) => setV((p) => ({ ...p, rhr: e.target.value }))} />
+            <input type="number" inputMode="numeric" placeholder="HRV (ms, optional)" value={v.hrv} onChange={(e) => setV((p) => ({ ...p, hrv: e.target.value }))} />
+          </div>
+          <input type="date" value={v.date} onChange={(e) => setV((p) => ({ ...p, date: e.target.value }))} />
+          <button className="primary-btn" onClick={() => {
+            if (!v.sys && !v.rhr && !v.hrv) return
+            onSaveVitals([{ ...v, id: Date.now() }, ...vitals].sort((x, y) => y.date.localeCompare(x.date)))
+            setV({ date: TODAY, sys: '', dia: '', rhr: '', hrv: '' })
+          }}>+ Log vitals</button>
+        </div>
+        {vitals.slice(0, 8).map((r) => {
+          const c = bpCategory(r.sys, r.dia)
+          return (
+            <div key={r.id} className="metric-row card-row">
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{r.sys && r.dia ? `${r.sys}/${r.dia}` : '—'}{r.rhr ? ` · ${r.rhr} bpm` : ''}{r.hrv ? ` · HRV ${r.hrv}` : ''}</div>
+                <div className="muted" style={{ fontSize: '.74rem' }}>{shortDate(r.date)}{c ? ` · ${c.label}` : ''}</div>
+              </div>
+              <button className="time-card-del" aria-label="Delete reading" onClick={() => onSaveVitals(vitals.filter((x) => x.id !== r.id))}>✕</button>
+            </div>
+          )
+        })}
+      </section>
+
+      <section className="card">
+        <p className="eyebrow">Appointments</p>
+        <h3 style={{ margin: '4px 0 12px' }}>Doctor, dentist, therapy, PT</h3>
+        <div className="wl-form" style={{ marginTop: 0 }}>
+          <input placeholder="Who (e.g. Dr. Smith, dentist)" value={a.who} onChange={(e) => setA((p) => ({ ...p, who: e.target.value }))} />
+          <input placeholder="Reason or what to ask" value={a.reason} onChange={(e) => setA((p) => ({ ...p, reason: e.target.value }))} />
+          <div className="wl-grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <input type="date" value={a.date} onChange={(e) => setA((p) => ({ ...p, date: e.target.value }))} />
+            <input type="time" value={a.time} onChange={(e) => setA((p) => ({ ...p, time: e.target.value }))} />
+          </div>
+          {onAddEvent && (
+            <label className="care-check"><input type="checkbox" checked={a.addToCalendar} onChange={(e) => setA((p) => ({ ...p, addToCalendar: e.target.checked }))} /> Also put it on my calendar</label>
+          )}
+          <button className="primary-btn" onClick={() => {
+            if (!a.who.trim()) return
+            const appt = { id: Date.now(), date: a.date, time: a.time, who: a.who.trim(), reason: a.reason.trim() }
+            onSaveAppts([...appts, appt])
+            if (a.addToCalendar && onAddEvent) onAddEvent({ title: appt.reason ? `${appt.who} · ${appt.reason}` : appt.who, date: appt.date, startTime: appt.time, endTime: '', category: 'Health', location: '' })
+            setA({ date: TODAY, time: '09:00', who: '', reason: '', addToCalendar: true })
+          }}>+ Add appointment</button>
+        </div>
+        {upcoming.length === 0 && past.length === 0 && <p className="muted" style={{ fontSize: '.84rem', margin: '10px 0 0' }}>No appointments yet.</p>}
+        {[...upcoming, ...past].map((x) => (
+          <div key={x.id} className="metric-row card-row" style={x.date < TODAY ? { opacity: .6 } : undefined}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{x.who}</div>
+              <div className="muted" style={{ fontSize: '.74rem' }}>{shortDate(x.date)}{x.time ? ` · ${fmt12(x.time)}` : ''}{x.reason ? ` · ${x.reason}` : ''}</div>
+            </div>
+            <button className="time-card-del" aria-label="Delete appointment" onClick={() => onSaveAppts(appts.filter((y) => y.id !== x.id))}>✕</button>
+          </div>
+        ))}
+      </section>
+
+      <section className="card">
+        <p className="eyebrow">Lab results</p>
+        <h3 style={{ margin: '4px 0 12px' }}>Track numbers over time</h3>
+        <div className="wl-form" style={{ marginTop: 0 }}>
+          <datalist id="lab-names">{labGroups.map((g) => <option key={g.name} value={g.name} />)}</datalist>
+          <input list="lab-names" placeholder="Test (e.g. Vitamin D, A1C, LDL)" value={l.test} onChange={(e) => setL((p) => ({ ...p, test: e.target.value }))} />
+          <div className="wl-grid3">
+            <input placeholder="Value" inputMode="decimal" value={l.value} onChange={(e) => setL((p) => ({ ...p, value: e.target.value }))} />
+            <input placeholder="Unit" value={l.unit} onChange={(e) => setL((p) => ({ ...p, unit: e.target.value }))} />
+            <input type="date" value={l.date} onChange={(e) => setL((p) => ({ ...p, date: e.target.value }))} />
+          </div>
+          <button className="primary-btn" onClick={() => {
+            if (!l.test.trim() || !l.value) return
+            onSaveLabs([...labs, { ...l, test: l.test.trim(), id: Date.now() }])
+            setL((p) => ({ ...p, value: '' }))
+          }}>+ Add result</button>
+        </div>
+        {labGroups.map((g) => (
+          <div key={g.name} className="metric-row card-row">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{g.name}</div>
+              <div className="muted" style={{ fontSize: '.74rem' }}>{g.rows.slice(0, 4).map((r) => `${r.value}${r.unit ? ' ' + r.unit : ''} (${shortDate(r.date)})`).join(' → ')}</div>
+            </div>
+            <button className="time-card-del" aria-label="Delete latest result" onClick={() => onSaveLabs(labs.filter((x) => x.id !== g.rows[0].id))}>✕</button>
+          </div>
+        ))}
+      </section>
+    </div>
+  )
+}
+
+function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent }) {
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
@@ -5582,6 +5856,11 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
           if (row.data_key === 'metricsLog') setMetricsLog(row.data_value || [])
           if (row.data_key === 'workouts') setWorkouts(row.data_value || [])
           if (row.data_key === 'recovery') setRecovery(row.data_value || {})
+          if (row.data_key === 'meals') setMeals(row.data_value || {})
+          if (row.data_key === 'nutritionTargets') setNutritionTargets({ ...DEFAULT_TARGETS, ...(row.data_value || {}) })
+          if (row.data_key === 'vitals') setVitals(row.data_value || [])
+          if (row.data_key === 'appointments') setAppts(row.data_value || [])
+          if (row.data_key === 'labs') setLabs(row.data_value || [])
         })
         // One-time move of workouts logged under Lifestyle (device-only) into synced Wellness
         const remote = (data.find((r) => r.data_key === 'workouts')?.data_value) || []
@@ -5669,6 +5948,16 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
   const [recovery, setRecovery] = useState(() => lsGet('recovery', {}))
   const saveWorkouts = (w) => { setWorkouts(w); syncPageData('workouts', w) }
   const saveRecovery = (r) => { setRecovery(r); syncPageData('recovery', r) }
+  const [meals, setMeals] = useState(() => lsGet('meals', {}))
+  const [nutritionTargets, setNutritionTargets] = useState(() => ({ ...DEFAULT_TARGETS, ...lsGet('nutritionTargets', {}) }))
+  const [vitals, setVitals] = useState(() => lsGet('vitals', []))
+  const [appts, setAppts] = useState(() => lsGet('appointments', []))
+  const [labs, setLabs] = useState(() => lsGet('labs', []))
+  const saveMeals = (m) => { setMeals(m); syncPageData('meals', m) }
+  const saveTargets = (t) => { setNutritionTargets(t); syncPageData('nutritionTargets', t) }
+  const saveVitals = (v) => { setVitals(v); syncPageData('vitals', v) }
+  const saveAppts = (a) => { setAppts(a); syncPageData('appointments', a) }
+  const saveLabs = (l) => { setLabs(l); syncPageData('labs', l) }
   const [newMetric, setNewMetric] = useState({ weight: '', bp: '', heartRate: '', waist: '', notes: '' })
   const saveMetrics = (m) => { setMetricsLog(m); syncPageData('metricsLog', m) }
   const [meds, setMeds] = useState(() => lsGet('meds', []))
@@ -5722,10 +6011,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
 
 
   const TABS = [
-    {id:'mood',label:'😊 Mood'},{id:'training',label:'Training'},{id:'recovery',label:'Recovery'},{id:'sleep',label:'😴 Sleep'},
+    {id:'mood',label:'😊 Mood'},{id:'training',label:'Training'},{id:'recovery',label:'Recovery'},{id:'nutrition',label:'Nutrition'},{id:'sleep',label:'😴 Sleep'},
     {id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},
     {id:'reading',label:'📚 Reading'},{id:'meds',label:'💊 Medications'},
-    {id:'metrics',label:'📈 Body Metrics'},{id:'anxiety',label:'🧘 Anxiety'},
+    {id:'metrics',label:'📈 Body Metrics'},{id:'care',label:'Vitals & Care'},{id:'anxiety',label:'🧘 Anxiety'},
     {id:'migraines',label:'🤕 Migraines'},{id:'coping',label:'🛡 Coping Skills'},
   ]
 
@@ -5742,6 +6031,16 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {} }) {
         </ProTabGate>
       )}
       {tab === 'recovery' && <RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} />}
+      {tab === 'nutrition' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+          <NutritionTab meals={meals} onSaveMeals={saveMeals} targets={nutritionTargets} onSaveTargets={saveTargets} water={waterLog[TODAY]} />
+        </ProTabGate>
+      )}
+      {tab === 'care' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+          <CareTab vitals={vitals} onSaveVitals={saveVitals} appts={appts} onSaveAppts={saveAppts} labs={labs} onSaveLabs={saveLabs} onAddEvent={onAddEvent} />
+        </ProTabGate>
+      )}
 
       {tab === 'mood' && (
         <div>
@@ -8584,11 +8883,11 @@ function PlannerApp() {
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
-          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
+          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, body metrics, and more.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipes, trips, birthdays, and gift ideas.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
-          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Sleep, journal, routine, reading, meds, metrics, anxiety, migraines, and coping skills.")} />} />
+          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, body metrics, and more.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
