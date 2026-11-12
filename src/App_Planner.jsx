@@ -162,6 +162,49 @@ function getWeekDays(dateString = TODAY) {
   return Array.from({ length: 7 }, (_, index) => addDays(start, index))
 }
 
+// ── Repeating events ─────────────────────────────────────────────────────
+// One stored row per series; occurrences are generated for whatever range is shown.
+const EVENT_REPEATS = [['none', 'Does not repeat'], ['daily', 'Every day'], ['weekly', 'Every week'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Every month']]
+const repeatLabel = (r) => ({ daily: 'Daily', weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly' })[r] || ''
+function addMonthsKeepDay(dateString, n, day) {
+  const [y, m] = dateString.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + n, 1))
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  if (day > last) return null // e.g. the 31st in a 30-day month: skip that month
+  return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+function expandEvents(events, from, to) {
+  const out = []
+  for (const ev of events || []) {
+    if (!ev?.date) continue
+    const r = ev.recurrence || 'none'
+    if (r === 'none') { if (ev.date >= from && ev.date <= to) out.push(ev); continue }
+    const skip = new Set(ev.skipDates || [])
+    const end = ev.recurrenceUntil && ev.recurrenceUntil < to ? ev.recurrenceUntil : to
+    if (ev.date > end) continue
+    const push = (d) => { if (d >= from && d <= end && !skip.has(d)) out.push({ ...ev, date: d, seriesStart: ev.date, isRepeat: true }) }
+    if (r === 'monthly') {
+      const day = Number(ev.date.slice(8, 10))
+      for (let k = 0; k < 600; k++) {
+        const d = k === 0 ? ev.date : addMonthsKeepDay(ev.date, k, day)
+        if (!d) continue
+        if (d > end) break
+        push(d)
+      }
+    } else {
+      const step = { daily: 1, weekly: 7, biweekly: 14 }[r]
+      if (!step) { if (ev.date >= from && ev.date <= to) out.push(ev); continue }
+      const gap = Math.round((Date.parse(from + 'T12:00:00Z') - Date.parse(ev.date + 'T12:00:00Z')) / 86400000)
+      for (let k = Math.max(0, Math.floor(gap / step)); k < 100000; k++) {
+        const d = addDays(ev.date, k * step)
+        if (d > end) break
+        push(d)
+      }
+    }
+  }
+  return out
+}
+
 function getMonthDays(dateString = TODAY) {
   const date = new Date(`${dateString}T12:00:00`)
   const first = new Date(date.getFullYear(), date.getMonth(), 1, 12)
@@ -361,7 +404,7 @@ function getHomeInsights({ tasks, expenses, budget, projects, goals, events, hab
   const budgetRemaining = Number((budget.weeklyTarget - spend).toFixed(2))
   const activeProjects = projects.filter((project) => project.status === 'Active').length
   const goalCount = goals.length
-  const scheduleCount = events.filter((event) => isToday(event.date)).length + tasks.filter((task) => isToday(task.date) && task.time).length
+  const scheduleCount = expandEvents(events, TODAY, TODAY).length + tasks.filter((task) => isToday(task.date) && task.time).length
 
   const recentDays = Array.from({ length: 7 }, (_, index) => addDays(TODAY, index - 6))
 
@@ -578,6 +621,10 @@ function normalizePayload(type, payload, userId) {
   if (type === 'event') {
     if ('startTime' in raw) { raw.time = raw.startTime || null; delete raw.startTime }
     if ('endTime' in raw) { raw.end_time = raw.endTime || null; delete raw.endTime }
+    if ('recurrenceUntil' in raw) { raw.recurrence_until = raw.recurrenceUntil || null; delete raw.recurrenceUntil }
+    if ('skipDates' in raw) { raw.skip_dates = Array.isArray(raw.skipDates) ? raw.skipDates : []; delete raw.skipDates }
+    if (!raw.recurrence) raw.recurrence = 'none'
+    delete raw.seriesStart; delete raw.isRepeat; delete raw.itemType
     delete raw.linkedType; delete raw.linkedId
     return raw
   }
@@ -638,7 +685,9 @@ function mapDbRow(type, row) {
   if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id }
   if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date; r.steps = normalizeSteps(r.steps) }
   if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date; r.steps = normalizeSteps(r.steps) }
-  if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time }
+  if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time
+                            r.recurrence = r.recurrence || 'none'; r.recurrenceUntil = r.recurrence_until || ''; r.skipDates = Array.isArray(r.skip_dates) ? r.skip_dates : []
+                            delete r.recurrence_until; delete r.skip_dates }
   if (t === 'expenses')   { r.note = r.description }
   if (t === 'habit_logs') { r.habitId = r.habit_id; delete r.habit_id }
   return r
@@ -1801,7 +1850,7 @@ function ToastStack({ toasts, onDismiss }) {
 
 const baseForms = {
   task: { title: '', date: TODAY, time: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
-  event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '' },
+  event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '', recurrence: 'none', recurrenceUntil: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
   goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr', steps: [] },
@@ -1873,6 +1922,13 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <label>End<input type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} /></label>
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label className="full-span">Location<input value={form.location || ''} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Optional" /></label>
+            <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>{EVENT_REPEATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            {(form.recurrence || 'none') !== 'none' && (
+              <label>Until (optional)<input type="date" value={form.recurrenceUntil || ''} min={form.date} onChange={(e) => setForm({ ...form, recurrenceUntil: e.target.value })} /></label>
+            )}
+            {mode === 'edit' && (form.recurrence || 'none') !== 'none' && (
+              <p className="full-span muted" style={{ fontSize: '.76rem', margin: 0 }}>Changes apply to every occurrence. To remove a single date, use ✕ on that day in the calendar.</p>
+            )}
           </>)}
 
           {selectedType === 'expense' && (<>
@@ -1982,7 +2038,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     .reduce((sum, item) => sum + Number(item.amount), 0)
   const todaySchedule = [
     ...todayTasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' })),
-    ...events.filter((event) => event.date === TODAY).map((event) => ({ ...event, itemType: 'event' })),
+    ...expandEvents(events, TODAY, TODAY).map((event) => ({ ...event, itemType: 'event' })),
   ].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
   const insights = getHomeInsights({ tasks, expenses, budget, projects, goals, events, habits, habitLogs })
   const suggestions = getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitLogs })
@@ -2288,7 +2344,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         {todaySchedule.length === 0
           ? <p className="muted" style={{fontSize:'.85rem'}}>Nothing scheduled yet today. <button onClick={() => onQuickCreate('task', { date: TODAY })} style={{background:'none', border:'none', color:'var(--teal)', cursor:'pointer', fontFamily:'inherit', fontWeight:600, padding:0}}>Add a task →</button></p>
           : todaySchedule.slice(0, 6).map((item) => (
-            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item)}
+            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
               <strong style={{color:'var(--brass2)', fontSize:'.8rem', minWidth:62, fontWeight:600}}>{fmt12(item.startTime)}</strong>
               <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
@@ -2733,16 +2789,23 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
 }
 
 
-function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule, onToggle }) {
+function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule, onToggle, onSkipOccurrence }) {
   const [view, setView] = useState('day')
   const [selectedDate, setSelectedDate] = useState(TODAY)
   const { prefersTouch, isMobile } = useResponsive()
 
   const scheduled = useMemo(() => {
+    const md = getMonthDays(selectedDate), wd = getWeekDays(selectedDate)
+    const from = [md[0], wd[0], selectedDate].sort()[0], to = [md[md.length - 1], wd[6], selectedDate].sort()[2]
     const taskItems = tasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' }))
-    const eventItems = events.map((event) => ({ ...event, itemType: 'event' }))
+    const eventItems = expandEvents(events, from, to).map((event) => ({ ...event, itemType: 'event' }))
     return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`))
-  }, [tasks, events])
+  }, [tasks, events, selectedDate])
+  // Editing a repeat opens the series (with its real start date), never the single occurrence
+  const openItem = (item) => item.itemType === 'event' && item.isRepeat
+    ? onEdit('event', events.find((e) => e.id === item.id) || item)
+    : onEdit(item.itemType, item)
+  const [pendingDelete, setPendingDelete] = useState(null)
 
   const weekDays = getWeekDays(selectedDate)
   const monthDays = getMonthDays(selectedDate)
@@ -2758,12 +2821,13 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   const slotOf = (t) => { const [hh, mm] = String(t || '').split(':'); return `${hh}:${Number(mm) >= 30 ? '30' : '00'}` }
   const nowSlot = selectedDate === TODAY ? slotOf(`${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`) : null
   const confirmDelete = (item) => {
+    if (item.itemType === 'event' && item.isRepeat) { setPendingDelete(`${item.id}:${item.date}`); return }
     if (window.confirm(`Delete "${item.title}"?`)) onDelete(item.itemType, item.id)
   }
   const selectedMonthLabel = formatDateLabel(selectedDate, { month: 'long', year: 'numeric' })
 
   const handleDropItem = async (payload, date, time) => {
-    if (!payload?.id || !payload?.type) return
+    if (!payload?.id || !payload?.type || payload.repeat) return
     await onReschedule(payload.type, payload.id, { date, ...(time ? { time, startTime: time } : {}) })
   }
 
@@ -2843,20 +2907,29 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                       : items.map((item) => {
                         const done = item.itemType === 'task' && item.completed
                         return (
-                          <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card ${item.itemType}${done ? ' done' : ''}`} draggable
-                            onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                          pendingDelete === `${item.id}:${item.date}` ? (
+                            <div key={`${item.itemType}-${item.id}`} className="time-card event repeat-delete">
+                              <span className="time-card-title" style={{ flex: 1 }}>Remove "{item.title}"</span>
+                              <button className="repeat-del-btn" onClick={() => { setPendingDelete(null); onSkipOccurrence && onSkipOccurrence(item.id, item.date) }}>Just this day</button>
+                              <button className="repeat-del-btn danger" onClick={() => { setPendingDelete(null); onDelete('event', item.id) }}>Whole series</button>
+                              <button className="time-card-del" onClick={() => setPendingDelete(null)} aria-label="Cancel">✕</button>
+                            </div>
+                          ) : (
+                          <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card ${item.itemType}${done ? ' done' : ''}`} draggable={!item.isRepeat}
+                            onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                             {item.itemType === 'task' && onToggle && (
                               <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
                                 aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
                                 {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
                               </button>
                             )}
-                            <button className="time-card-main" onClick={() => onEdit(item.itemType, item)}>
+                            <button className="time-card-main" onClick={() => openItem(item)}>
                               <span className="time-card-title">{item.title}</span>
-                              <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                              <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
                             </button>
                             <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
                           </div>
+                          )
                         )
                       })}
                   </div>
@@ -2882,8 +2955,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                     {formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}
                   </button>
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
-                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => onEdit(item.itemType, item)}
-                      draggable onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id }))}>
+                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => openItem(item)}
+                      draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                       <span style={{fontSize:'.7rem', color:'var(--brass2)', fontWeight:600}}>{fmt12(item.startTime)}</span>
                       <strong style={{fontSize:'.8rem', color:'var(--ink)'}}>{item.title}</strong>
                     </button>
@@ -8839,7 +8912,7 @@ function PlannerApp() {
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
+          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onSkipOccurrence={async (id, date) => { const ev = events.find((e) => e.id === id); if (!ev) return; await saveItem('event', { ...ev, skipDates: [...(ev.skipDates || []), date] }, 'edit'); pushToast('Removed that day', 'The rest of the series is unchanged.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
@@ -8848,7 +8921,7 @@ function PlannerApp() {
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists and the focus timer.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipes, cleaning tracker, trips, birthdays, and gift ideas.")} />} />
-          <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
+          <Route path="/faith" element={<FaithPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onCreateGoal={async (g) => { await saveItem('goal', g, 'create') }} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
@@ -8944,7 +9017,9 @@ function getVerseOfDay() {
 }
 
 
-function FaithPage({ isPro = false, onUpgrade = () => {} }) {
+const FAITH_AREAS = ['Spiritual Growth', 'Prayer Life', 'Scripture Study', 'Community/Church', 'Service', 'Fasting', 'Evangelism', 'Discipleship']
+
+function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = [], projects = [], onCreateGoal, onEdit }) {
   const { user } = useAuth()
 
   // Faith data sync helper — saves to Supabase + localStorage backup
@@ -9058,6 +9133,21 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
   const [faithGoals, setFaithGoals] = useState(() => lsGet('faithGoals', []))
   const [newFaithGoal, setNewFaithGoal] = useState({ text: '', category: 'Spiritual Growth', done: false })
   const saveFaithGoals = (v) => { setFaithGoals(v); syncFaith('faithGoals', v) }
+  // Faith goals now live in Goals (category "Faith"). Move any old ones over once.
+  const movingGoals = React.useRef(false)
+  useEffect(() => {
+    if (!onCreateGoal || !faithGoals.length || movingGoals.current) return
+    movingGoals.current = true
+    ;(async () => {
+      for (const g of faithGoals) {
+        if (!g?.text) continue
+        await onCreateGoal({ title: g.text, category: 'Faith', description: g.category || '', completed: !!g.done, timeframe: '1yr', targetDate: addDays(TODAY, 365), why: '', steps: [] })
+      }
+      saveFaithGoals([])
+    })()
+  }, [faithGoals.length])
+  const faithAreaOf = (g) => g.description && FAITH_AREAS.includes(g.description) ? g.description : ''
+  const myFaithGoals = (goals || []).filter((g) => g.category === 'Faith').sort((a, b) => Number(!!a.completed) - Number(!!b.completed))
 
   // Sermon notes
   const [sermons, setSermons] = useState(() => lsGet('sermons', []))
@@ -9647,43 +9737,42 @@ function FaithPage({ isPro = false, onUpgrade = () => {} }) {
         </section>
       </ProTabGate>)}
 
-      {/* ── FAITH GOALS ─────────────────────────────────────────────────────── */}
+      {/* ── FAITH GOALS (shared with Goals) ───────────────────────────────── */}
       {tab === 'goals' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
-          <p className="eyebrow">Faith Goals</p>
-          <h3 style={{ margin: '4px 0 14px' }}>Growing in the Spirit</h3>
-          {faithGoals.length === 0 && <p className="muted" style={{marginBottom:16}}><EmptyState icon="✝" title="What is God calling you to" message="Spiritual growth is intentional. What is being asked of you in this season?" /></p>}
-          {faithGoals.map((goal, i) => (
-            <div key={goal.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
-              <div onClick={() => saveFaithGoals(faithGoals.map((g,j) => j===i ? {...g, done:!g.done} : g))}
-                style={{width:22,height:22,borderRadius:6,border:'2px solid',borderColor:goal.done?'var(--success)':'var(--brass)',
-                background:goal.done?'var(--success)':'transparent',flexShrink:0,cursor:'pointer',
-                display:'flex',alignItems:'center',justifyContent:'center'}}>
-                {goal.done && <span style={{color:'white',fontSize:'.8rem',fontWeight:700}}>✓</span>}
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:600,fontSize:'.88rem',textDecoration:goal.done?'line-through':'none',color:goal.done?'var(--muted)':'var(--ink)'}}>{goal.text}</div>
-                <div className="muted" style={{fontSize:'.72rem'}}>{goal.category}</div>
-              </div>
-              <button onClick={() => saveFaithGoals(faithGoals.filter((_,j)=>j!==i))}
-                style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-            </div>
-          ))}
-          <div style={{marginTop:16,display:'grid',gap:8}}>
-            <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Add a Faith Goal</p>
-            <input placeholder="e.g. Read the Bible in a year" value={newFaithGoal.text}
-              onChange={e => setNewFaithGoal(p => ({...p, text: e.target.value}))}
-              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
-            <select value={newFaithGoal.category} onChange={e => setNewFaithGoal(p => ({...p, category: e.target.value}))}
-              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}}>
-              {['Spiritual Growth','Prayer Life','Scripture Study','Community/Church','Service','Fasting','Evangelism','Discipleship'].map(c => <option key={c}>{c}</option>)}
+          <div className="section-title-row" style={{ marginBottom: 6 }}>
+            <div><p className="eyebrow">Faith Goals</p><h3>Growing in the Spirit</h3></div>
+            <Link className="ghost-btn" to="/goals" style={{ fontSize: '.8rem' }}>All goals →</Link>
+          </div>
+          <p className="muted" style={{ fontSize: '.8rem', margin: '0 0 12px' }}>These live in Goals too, so they get steps, progress and a place on Home.</p>
+          {myFaithGoals.length === 0 && <EmptyState icon={Cross} title="What is God calling you to?" message="Spiritual growth is intentional. What is being asked of you in this season?" />}
+          {myFaithGoals.map((g) => {
+            const pct = getGoalProgress(g, tasks, projects)
+            const next = nextStepFor(g, projects)
+            return (
+              <button key={g.id} className="faith-goal" onClick={() => onEdit && onEdit('goal', g)} style={g.completed ? { opacity: .6 } : undefined}>
+                <div className="faith-goal-top">
+                  <strong>{g.title}</strong>
+                  <span>{g.completed ? 'Achieved' : `${pct}%`}</span>
+                </div>
+                {faithAreaOf(g) && <small className="muted">{faithAreaOf(g)}</small>}
+                <div className="nut-bar" style={{ height: 5 }}><div style={{ width: `${pct}%` }} className={pct >= 100 ? 'hit' : ''} /></div>
+                {next && !g.completed && <div className="home-next-step" style={{ marginTop: 2 }}><span>Next</span>{next}</div>}
+              </button>
+            )
+          })}
+          <div className="wl-form">
+            <input placeholder="e.g. Read the Bible in a year" value={newFaithGoal.text} onChange={(e) => setNewFaithGoal((p) => ({ ...p, text: e.target.value }))} />
+            <select value={newFaithGoal.category} onChange={(e) => setNewFaithGoal((p) => ({ ...p, category: e.target.value }))}>
+              {FAITH_AREAS.map((c) => <option key={c}>{c}</option>)}
             </select>
-            <button className="primary-btn" onClick={() => {
-              if (!newFaithGoal.text.trim()) return
-              saveFaithGoals([{...newFaithGoal, id: Date.now(), done: false}, ...faithGoals])
+            <button className="primary-btn" onClick={async () => {
+              if (!newFaithGoal.text.trim() || !onCreateGoal) return
+              await onCreateGoal({ title: newFaithGoal.text.trim(), category: 'Faith', description: newFaithGoal.category, completed: false, timeframe: '1yr', targetDate: addDays(TODAY, 365), why: '', steps: [] })
               setNewFaithGoal({ text: '', category: 'Spiritual Growth', done: false })
-            }}>+ Add Goal</button>
+            }}>+ Add faith goal</button>
+            <small className="muted">Tap a goal to add steps, a target date or your why.</small>
           </div>
         </section>
       </ProTabGate>)}
