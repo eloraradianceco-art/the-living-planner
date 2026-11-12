@@ -3546,7 +3546,7 @@ function ProTabGate({ isPro, onUpgrade, children }) {
       <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white', marginBottom: 8 }}>
         Pro Feature
       </div>
-      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.55)', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 24px' }}>
+      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.78)', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 24px' }}>
         Unlock this and every Pro feature with a 7-day free trial. No commitment required.
       </p>
       <button onClick={onUpgrade} style={{
@@ -3556,7 +3556,7 @@ function ProTabGate({ isPro, onUpgrade, children }) {
         fontSize: '.92rem', fontWeight: 700, cursor: 'pointer',
         boxShadow: '0 4px 20px rgba(184,150,90,.35)',
       }}>Start Free Trial →</button>
-      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.3)',marginTop:12}}>7-day free trial · Cancel anytime</p>
+      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.7)',marginTop:12}}>7-day free trial · Cancel anytime</p>
     </div>
   )
 }
@@ -8655,7 +8655,7 @@ function NotificationSettings({ settings, updateSettings }) {
     try {
       if (!connected) { const sub = await PlannerPush.subscribe(); setConnected(Boolean(sub)) }
       const r = await PlannerPush.sendTest()
-      setMsg(r?.sent ? `Sent to ${r.sent} device${r.sent > 1 ? 's' : ''}. It should arrive in a few seconds.` : 'No devices are registered yet.')
+      setMsg(r?.sent ? `Sent to ${r.sent} device${r.sent > 1 ? 's' : ''}. It should arrive in a few seconds.` : r?.devices ? 'This device is registered, but the test could not be delivered right now. Try again in a minute.' : 'No devices are registered yet.')
     } catch (e) { setMsg('Could not send a test right now.') }
     setBusy(false)
   }

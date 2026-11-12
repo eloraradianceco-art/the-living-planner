@@ -1,5 +1,6 @@
 // The Living Planner — reminder service.
-// Runs every 5 minutes (pg_cron → pg_net) and sends web push reminders:
+// Runs every 5 minutes (pg_cron → pg_net) and sends reminders by web push (website / Home Screen app)
+// and by Apple's notification service (the App Store app, push_subscriptions.kind = 'apns'):
 //   • timed tasks & events (incl. repeating events), N minutes before (default 15)
 //   • health appointments: evening before (6 PM) and 1 hour before
 //   • daily: devotional 6:00, today's tasks 7:30, habits 8:00, birthdays 8:00,
@@ -16,7 +17,7 @@ import webpush from 'npm:web-push@3.6.7'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const SUBJECT = 'https://the-living-planner.vercel.app'
+const SUBJECT = 'https://planner.eloraradiance.com'
 const WINDOW_MS = 15 * 60 * 1000 // only send reminders that came due in the last 15 minutes
 const DEFAULT_TZ = 'America/Chicago'
 const DEFAULT_TOGGLES = { tasks: true, habits: true, goals: true, faith: true, reflection: true, birthdays: true, overdue: true, finance: false }
@@ -203,13 +204,86 @@ async function remindersFor(userId: string, now: number) {
   return out.filter((r) => r.at <= now && r.at > now - WINDOW_MS)
 }
 
+// ── Apple Push Notification service (the App Store app) ─────────────────
+// Needs three Vault secrets from the Apple Developer account: apns_key_id, apns_team_id and
+// apns_private_key (the .p8 key file's text). Until they exist, App Store devices are skipped.
+const APNS_TOPIC = 'com.eloraradiance.livingplanner'
+const b64url = (bytes: Uint8Array) => {
+  let str = ''
+  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i])
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+let apnsToken: { at: number; jwt: string } | null = null
+export async function apnsJwt(creds?: { keyId: string; teamId: string; pem: string }): Promise<string | null> {
+  if (!creds && apnsToken && Date.now() - apnsToken.at < 40 * 60 * 1000) return apnsToken.jwt // Apple: reuse 20–60 min
+  let c = creds
+  if (!c) {
+    const [keyId, teamId, pem] = await Promise.all([getSecret('apns_key_id'), getSecret('apns_team_id'), getSecret('apns_private_key')])
+    if (!keyId || !teamId || !pem) return null
+    c = { keyId, teamId, pem }
+  }
+  const der = Uint8Array.from(atob(c.pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')), (ch) => ch.charCodeAt(0))
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
+  const enc = new TextEncoder()
+  const head = b64url(enc.encode(JSON.stringify({ alg: 'ES256', kid: c.keyId.trim() })))
+  const claims = b64url(enc.encode(JSON.stringify({ iss: c.teamId.trim(), iat: Math.floor(Date.now() / 1000) })))
+  const sig = new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${claims}`)))
+  const jwt = `${head}.${claims}.${b64url(sig)}`
+  if (!creds) apnsToken = { at: Date.now(), jwt }
+  return jwt
+}
+export function apnsRequest(token: string, payload: Record<string, unknown>, jwt: string, host = 'api.push.apple.com') {
+  const tag = String(payload.tag || '').slice(0, 64)
+  return {
+    url: `https://${host}/3/device/${token}`,
+    init: {
+      method: 'POST',
+      headers: {
+        authorization: `bearer ${jwt}`,
+        'apns-topic': APNS_TOPIC,
+        'apns-push-type': 'alert',
+        'apns-priority': '10',
+        'apns-expiration': String(Math.floor(Date.now() / 1000) + 3600),
+        ...(tag ? { 'apns-collapse-id': tag } : {}),
+      },
+      body: JSON.stringify({ aps: { alert: { title: payload.title, body: payload.body }, sound: 'default', 'thread-id': tag || 'planner' }, url: payload.url }),
+    } as RequestInit,
+  }
+}
+// 'ok' | 'gone' (device no longer valid) | 'skip' (no Apple keys yet) | 'fail'
+async function sendApns(token: string, payload: Record<string, unknown>): Promise<string> {
+  const jwt = await apnsJwt()
+  if (!jwt) return 'skip'
+  for (const host of ['api.push.apple.com', 'api.sandbox.push.apple.com']) {
+    const { url, init } = apnsRequest(token, payload, jwt, host)
+    const res = await fetch(url, init)
+    if (res.status === 200) return 'ok'
+    const reason = ((await res.json().catch(() => ({}))) as { reason?: string }).reason
+    // A development build's token only works with Apple's sandbox: try it there once.
+    if (res.status === 400 && reason === 'BadDeviceToken' && host === 'api.push.apple.com') continue
+    if (res.status === 410 || reason === 'BadDeviceToken' || reason === 'Unregistered') return 'gone'
+    console.error('apns failed', res.status, reason)
+    return 'fail'
+  }
+  return 'gone'
+}
+
 // ── Sending ─────────────────────────────────────────────────────────────
-type Sub = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string }
+type Sub = { id: string; user_id: string; endpoint: string; p256dh: string | null; auth: string | null; kind?: string }
+const SUB_COLUMNS = 'id,user_id,endpoint,p256dh,auth,kind'
 async function sendTo(subs: Sub[], payload: Record<string, unknown>) {
   let sent = 0
   for (const s of subs) {
+    if (s.kind === 'apns') {
+      try {
+        const r = await sendApns(s.endpoint.replace(/^apns:/, ''), payload)
+        if (r === 'ok') { sent++; await sb.from('push_subscriptions').update({ last_success_at: new Date().toISOString() }).eq('id', s.id) }
+        else if (r === 'gone') await sb.from('push_subscriptions').delete().eq('id', s.id)
+      } catch (err) { console.error('apns error', (err as Error).message) }
+      continue
+    }
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { TTL: 3600, urgency: 'high' })
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh!, auth: s.auth! } }, JSON.stringify(payload), { TTL: 3600, urgency: 'high' })
       sent++
       await sb.from('push_subscriptions').update({ last_success_at: new Date().toISOString() }).eq('id', s.id)
     } catch (err) {
@@ -222,7 +296,7 @@ async function sendTo(subs: Sub[], payload: Record<string, unknown>) {
 }
 
 async function run(now: number) {
-  const { data: subs, error } = await sb.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth')
+  const { data: subs, error } = await sb.from('push_subscriptions').select(SUB_COLUMNS)
   if (error) throw error
   const byUser = new Map<string, Sub[]>()
   for (const s of (subs || []) as Sub[]) byUser.set(s.user_id, [...(byUser.get(s.user_id) || []), s])
@@ -256,7 +330,7 @@ Deno.serve(async (req) => {
       const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
       const { data: u } = await sb.auth.getUser(token)
       if (!u?.user) return json({ error: 'Sign in required' }, 401)
-      const { data: subs } = await sb.from('push_subscriptions').select('id,user_id,endpoint,p256dh,auth').eq('user_id', u.user.id)
+      const { data: subs } = await sb.from('push_subscriptions').select(SUB_COLUMNS).eq('user_id', u.user.id)
       const sent = await sendTo((subs || []) as Sub[], { title: 'Reminders are on', body: 'This is how your planner will reach you.', url: '/more', tag: 'test' })
       return json({ devices: (subs || []).length, sent })
     }
