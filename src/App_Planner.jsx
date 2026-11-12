@@ -545,6 +545,7 @@ const defaultData = {
     onboardingComplete: false,
     showCompletedTasks: false,
     compactCalendar: false,
+    notifications: {},
   },
 }
 
@@ -734,7 +735,7 @@ async function loadSupabaseAll(userId) {
     ...mapped,
     budget: budgetRows?.[0] ? { weeklyTarget: Number(budgetRows[0].weekly_target) } : defaultData.budget,
     profile: profileRows?.[0] ? { displayName: profileRows[0].display_name, timezone: profileRows[0].timezone, plannerMode: profileRows[0].planner_mode } : defaultData.profile,
-    settings: settingsRows?.[0] ? { onboardingComplete: settingsRows[0].onboarding_complete, showCompletedTasks: settingsRows[0].show_completed_tasks, compactCalendar: settingsRows[0].compact_calendar } : defaultData.settings,
+    settings: settingsRows?.[0] ? { onboardingComplete: settingsRows[0].onboarding_complete, showCompletedTasks: settingsRows[0].show_completed_tasks, compactCalendar: settingsRows[0].compact_calendar, notifications: settingsRows[0].notifications || {} } : defaultData.settings,
   }
 }
 
@@ -900,10 +901,10 @@ const plannerService = {
       writeLocal(localKeys.settings, settings)
       return settings
     }
-    const row = { user_id: userId, onboarding_complete: settings.onboardingComplete, show_completed_tasks: settings.showCompletedTasks, compact_calendar: settings.compactCalendar }
+    const row = { user_id: userId, onboarding_complete: settings.onboardingComplete, show_completed_tasks: settings.showCompletedTasks, compact_calendar: settings.compactCalendar, notifications: settings.notifications || {} }
     const { data, error } = await supabase.from('planner_settings').upsert(row, { onConflict: 'user_id' }).select().single()
     if (error) throw error
-    return { onboardingComplete: data.onboarding_complete, showCompletedTasks: data.show_completed_tasks, compactCalendar: data.compact_calendar }
+    return { onboardingComplete: data.onboarding_complete, showCompletedTasks: data.show_completed_tasks, compactCalendar: data.compact_calendar, notifications: data.notifications || {} }
   },
 }
 
@@ -1362,9 +1363,9 @@ function AuthPage() {
     { icon: CalendarDays, title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
     { icon: Target, title: 'Goals & Habits', desc: 'Break goals and projects into steps you check off, build routines, and watch your Life Score rise.' },
     { icon: Wallet, title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
-    { icon: Leaf, title: 'Health & Wellness', desc: 'Mood, sleep, journal, medications, and daily routines.' },
-    { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, a focus timer, and cleaning schedules.' },
-    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes, trips, birthdays, and gifts.' },
+    { icon: Leaf, title: 'Health & Wellness', desc: 'Training, recovery, nutrition, sleep, mood, journal, vitals, and medications.' },
+    { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, and a focus timer.' },
+    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes, cleaning, trips, birthdays, and gifts.' },
   ]
 
   // ── Welcome screen ──────────────────────────────────────────────────────
@@ -3346,9 +3347,9 @@ function WelcomeProBanner({ onDismiss }) {
 const PRO_TABS = {
   faith: ['fasting', 'sermons', 'goals', 'reading'],
   finance: ['income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
-  lifestyle: ['recipes', 'trips', 'birthdays', 'gifts'],
-  productivity: ['checklists', 'focus', 'cleaning'],
-  wellness: ['training', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'reading', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
+  lifestyle: ['recipes', 'trips', 'birthdays', 'gifts', 'cleaning'],
+  productivity: ['checklists', 'focus'],
+  wellness: ['training', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
 function ProTabGate({ isPro, onUpgrade, children }) {
@@ -5299,6 +5300,32 @@ function useWellnessKey(key, fallback) {
   return value
 }
 
+// Read + write one page_data key from any component (used when a tracker moves
+// between pages but keeps its stored data where it was).
+function usePageKey(page, key, fallback, localKeys) {
+  const { user } = useAuth()
+  const keys = Array.isArray(localKeys) ? localKeys : [localKeys]
+  const [value, setValue] = useState(() => {
+    for (const k of keys) { try { const v = localStorage.getItem(k); if (v != null) return JSON.parse(v) } catch {} }
+    return fallback
+  })
+  useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    let alive = true
+    supabase.from('page_data').select('data_value').eq('user_id', user.id).eq('page', page).eq('data_key', key).maybeSingle()
+      .then(({ data }) => { if (alive && data) { setValue(data.data_value ?? fallback); try { localStorage.setItem(keys[0], JSON.stringify(data.data_value)) } catch {} } })
+    return () => { alive = false }
+  }, [user?.id, page, key])
+  const save = React.useCallback((v) => {
+    setValue(v)
+    try { localStorage.setItem(keys[0], JSON.stringify(v)) } catch {}
+    if (!user || !hasSupabaseEnv) return
+    supabase.from('page_data').upsert({ user_id: user.id, page, data_key: key, data_value: v, updated_at: new Date().toISOString() }, { onConflict: 'user_id,page,data_key' })
+      .then(({ error }) => { if (error) console.error('Sync error:', error) })
+  }, [user?.id, page, key])
+  return [value, save]
+}
+
 // Readiness 0–100 from last night's sleep, energy, soreness, stress and pain.
 function readinessOf(c) {
   if (!c) return null
@@ -5818,6 +5845,12 @@ function CareTab({ vitals, onSaveVitals, appts, onSaveAppts, labs, onSaveLabs, o
   )
 }
 
+const WELLNESS_GROUPS = [
+  { label: 'Body', ids: ['training', 'recovery', 'nutrition', 'sleep', 'metrics'] },
+  { label: 'Mind', ids: ['mood', 'journal', 'routine', 'anxiety', 'coping'] },
+  { label: 'Care', ids: ['care', 'meds', 'migraines'] },
+]
+
 function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent }) {
   const { user } = useAuth()
 
@@ -5840,7 +5873,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
-          if (row.data_key === 'books') setBooks(row.data_value || [])
           if (row.data_key === 'routine') setRoutine(row.data_value || [])
           if (row.data_key === 'meds') setMeds(row.data_value || [])
           if (row.data_key === 'anxiety') setAnxiety(row.data_value || [])
@@ -5885,8 +5917,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
 
   // ── Wellness state ──────────────────────────────────────────────────────
 
-  const [books, setBooks] = useState(() => lsGet('books', []))
-  const [newBook, setNewBook] = useState({ title: '', author: '', status: 'Reading' })
   const [routine, setRoutine] = useState(() => lsGet('routine', []))
   const [newRoutineItem, setNewRoutineItem] = useState({ time: '', label: '', type: 'morning' })
   const [routineLog, setRoutineLog] = useState(() => lsGet('routineLog', {}))
@@ -5895,7 +5925,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
   const [journalText, setJournalText] = useState('')
   const [journalPrompt, setJournalPrompt] = useState(0)
 
-  const saveBooks = (b) => { setBooks(b); syncPageData('books', b) }
   const saveRoutine = (r) => { setRoutine(r); syncPageData('routine', r) }
   const saveLog = (l) => { setRoutineLog(l); syncPageData('routineLog', l) }
   const saveWellness = (w) => { setWellnessLog(w); syncPageData('wellnessLog', w) }
@@ -5931,7 +5960,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
     'What would I tell my future self about today?',
   ]
 
-  const STATUS_COLORS = { Reading: 'var(--teal)', Completed: 'var(--success)', 'Want to Read': 'var(--brass)' }
 
 
   // ── Health state ────────────────────────────────────────────────────────
@@ -6013,7 +6041,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
   const TABS = [
     {id:'mood',label:'😊 Mood'},{id:'training',label:'Training'},{id:'recovery',label:'Recovery'},{id:'nutrition',label:'Nutrition'},{id:'sleep',label:'😴 Sleep'},
     {id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},
-    {id:'reading',label:'📚 Reading'},{id:'meds',label:'💊 Medications'},
+    {id:'meds',label:'💊 Medications'},
     {id:'metrics',label:'📈 Body Metrics'},{id:'care',label:'Vitals & Care'},{id:'anxiety',label:'🧘 Anxiety'},
     {id:'migraines',label:'🤕 Migraines'},{id:'coping',label:'🛡 Coping Skills'},
   ]
@@ -6022,7 +6050,12 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
     <div className="screen-stack">
       <PageHeader icon={Leaf} title="Health & Wellness" subtitle="Care for the whole person" />
 
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
+      {WELLNESS_GROUPS.map((g) => (
+        <div key={g.label} className="tab-group">
+          <p className="tab-group-label">{g.label}</p>
+          <QuickAccessGrid tabs={g.ids.map((id) => TABS.find((t) => t.id === id)).filter(Boolean)} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
+        </div>
+      ))}
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
       {tab === 'training' && (
@@ -6033,6 +6066,33 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
       {tab === 'recovery' && <RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} />}
       {tab === 'nutrition' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+          <section className="card" style={{marginBottom:14}}>
+          {/* Water Intake */}
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',margin:0}}>Water today</p>
+              <strong style={{fontSize:'.85rem',color:'var(--brass2)'}}>{waterLog[TODAY] || 0} / 8 cups</strong>
+            </div>
+            <div style={{display:'flex',gap:6,marginBottom:8}}>
+              {Array.from({length: 8}).map((_, i) => {
+                const filled = (waterLog[TODAY] || 0) > i
+                return (
+                  <button key={i} onClick={() => {
+                    const current = waterLog[TODAY] || 0
+                    saveWaterLog({...waterLog, [TODAY]: i+1 <= current ? i : i+1})
+                  }} style={{
+                    flex:1, aspectRatio:'1', borderRadius:8, cursor:'pointer',
+                    background: filled ? 'var(--ink)' : 'transparent',
+                    border: filled ? '1.5px solid var(--ink)' : '1.5px solid var(--border2)',
+                    color: filled ? 'var(--brass)' : 'var(--muted)',
+                    fontSize:'.9rem',padding:0,
+                  }}>{filled ? '●' : ''}</button>
+                )
+              })}
+            </div>
+            <p className="muted" style={{fontSize:'.74rem',margin:0,fontStyle:'italic'}}>Tap to log each cup (8oz). Goal: 64oz daily.</p>
+          </div>
+          </section>
           <NutritionTab meals={meals} onSaveMeals={saveMeals} targets={nutritionTargets} onSaveTargets={saveTargets} water={waterLog[TODAY]} />
         </ProTabGate>
       )}
@@ -6045,31 +6105,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
       {tab === 'mood' && (
         <div>
           <section className="card">
-          {/* Water Intake */}
-          <div style={{marginBottom:16}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',margin:0}}>💧 Water Today</p>
-              <strong style={{fontSize:'.85rem',color:'var(--teal)'}}>{waterLog[TODAY] || 0} / 8 cups</strong>
-            </div>
-            <div style={{display:'flex',gap:6,marginBottom:8}}>
-              {Array.from({length: 8}).map((_, i) => {
-                const filled = (waterLog[TODAY] || 0) > i
-                return (
-                  <button key={i} onClick={() => {
-                    const current = waterLog[TODAY] || 0
-                    saveWaterLog({...waterLog, [TODAY]: i+1 <= current ? i : i+1})
-                  }} style={{
-                    flex:1, aspectRatio:'1', borderRadius:8, cursor:'pointer',
-                    background: filled ? 'var(--teal)' : 'transparent',
-                    border: '1.5px solid var(--teal)',
-                    color: filled ? 'white' : 'var(--teal)',
-                    fontSize:'1.2rem',padding:0,
-                  }}>{filled ? '💧' : ''}</button>
-                )
-              })}
-            </div>
-            <p className="muted" style={{fontSize:'.74rem',margin:0,fontStyle:'italic'}}>Tap to log each cup (8oz). Goal: 64oz daily.</p>
-          </div>
 
             <p className="eyebrow">Daily Check-In</p>
             <h3 style={{margin:'4px 0 14px'}}>How are you feeling today?</h3>
@@ -6222,46 +6257,6 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
       </ProTabGate>)}
 
       {/* ── Reading ──────────────────────────────────────────────── */}
-      {tab === 'reading' && (
-        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <section className="card">
-          <div className="section-title-row">
-            <div><p className="eyebrow">Reading Tracker</p><h3>Your Library</h3></div>
-          </div>
-          {books.map((book,i) => (
-            <div key={i} style={{padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-                <div style={{flex:1}}>
-                  <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{book.title}</div>
-                  <div style={{fontSize:'.75rem',color:'var(--muted)',marginTop:2}}>{book.author}</div>
-                </div>
-                <div style={{display:'flex',gap:6,flexShrink:0,alignItems:'center'}}>
-                  <span style={{fontSize:'.68rem',padding:'2px 8px',borderRadius:999,background:(STATUS_COLORS[book.status]||'var(--muted)')+'22',color:STATUS_COLORS[book.status]||'var(--muted)',fontWeight:700}}>{book.status}</span>
-                  <button onClick={()=>saveBooks(books.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
-                </div>
-              </div>
-            </div>
-          ))}
-          {books.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="📚" title="No books yet" message="Add what you're reading or want to read." /></p>}
-          <div style={{display:'grid',gap:8,marginTop:12}}>
-            <input placeholder="Book title" value={newBook.title} onChange={e=>setNewBook(p=>({...p,title:e.target.value}))}
-              style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
-            <div style={{display:'flex',gap:8}}>
-              <input placeholder="Author" value={newBook.author} onChange={e=>setNewBook(p=>({...p,author:e.target.value}))}
-                style={{flex:1,padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}} />
-              <select value={newBook.status} onChange={e=>setNewBook(p=>({...p,status:e.target.value}))}
-                style={{flex:1,padding:'9px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem',background:'var(--stone)',color:'var(--text)'}}>
-                <option>Reading</option><option>Want to Read</option><option>Completed</option>
-              </select>
-            </div>
-            <button className="primary-btn" onClick={()=>{
-              if(!newBook.title)return
-              saveBooks([...books,{...newBook,id:Date.now()}])
-              setNewBook({title:'',author:'',status:'Reading'})
-            }}>Add Book</button>
-          </div>
-        </section>
-      </ProTabGate>)}
 
       {tab === 'meds' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -6698,7 +6693,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
         </div>
       </ProTabGate>)}
 
-      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <TabNav tabs={WELLNESS_GROUPS.flatMap((g) => g.ids).map((id) => TABS.find((t) => t.id === id)).filter(Boolean)} activeTab={tab} onSelect={setTab} />
     </div>
   )
 }
@@ -6749,7 +6744,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
-    try { localStorage.setItem(key, JSON.stringify(value)) } catch {}
+    try { localStorage.setItem('planner.p.' + key, JSON.stringify(value)) } catch {}
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
@@ -6767,33 +6762,27 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
         if (error || !data) return
         data.forEach(row => {
           if (row.data_key === 'checklists') setChecklists(row.data_value || [])
-          if (row.data_key === 'cleaningLog') setCleaningLog(row.data_value || {})
           if (row.data_key === 'brainDump') setBrainDump(row.data_value || [])
         })
       })
   }, [user?.id])
 
   const TABS = [
-    { id: 'tasks', label: '✓ Tasks' },
     { id: 'braindump', label: '🧠 Brain Dump' },
     { id: 'notes', label: '📝 Notes' },
     { id: 'checklists', label: '📋 Checklists' },
     { id: 'focus', label: '⏱ Focus Timer' },
-    { id: 'cleaning', label: '🧹 Cleaning' },
     { id: 'tips', label: '💡 Tips' },
   ]
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useState('tasks')
+  const [tab, setTab] = useState('braindump')
   const [noteQuery, setNoteQuery] = useState('')
   const notes = propNotes || []
   // notes now come from Supabase via props - use saveItem
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
-  const [cleaningLog, saveCleaningLogDirect] = useState(() => lsGet('cleaning_log_v2', {}))
-  const saveCleaningLog2 = (updated) => { saveCleaningLogDirect(updated); syncPageData('cleaningLog', updated) }
-  const [cleaningFreq, setCleaningFreq] = useState('daily')
-  const [brainDump, setBrainDump] = useState(() => { try { return localStorage.getItem('planner.p.braindump')||'' } catch { return '' } })
+  const [brainDump, setBrainDump] = useState(() => { try { const v = localStorage.getItem('planner.p.brainDump'); return v != null ? JSON.parse(v) : (localStorage.getItem('planner.p.braindump') || '') } catch { return '' } })
   const saveBrainDump = (v) => { setBrainDump(v); syncPageData('brainDump', v) }
   const WORK_MINS = 25
   const BREAK_MINS = 5
@@ -6832,45 +6821,6 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const focusProgress = Math.round(((focusTotal - focusTimeLeft) / focusTotal) * 100)
   const focusReset = () => { clearInterval(focusRef.current); setFocusRunning(false); setFocusTimeLeft(focusCustomMins * 60); setFocusMode('work') }
 
-  const CLEANING_SCHEDULE = {
-    daily: [
-      'Make beds', 'Do laundry', 'Take out trash', 'Load/unload dishwasher',
-      'Clean countertops', 'Pick up & tidy shared spaces', 'Wipe down sinks & toilets', 'Spot vacuuming'
-    ],
-    weekly: [
-      'Sweep/Vacuum/Mop all floors', 'Wash bedding', 'Clean mirrors', 'Dust & polish furniture',
-      'Sweep/Mop kitchen', 'Clean stovetop', 'Wipe down kitchen appliances', 'Clean microwave',
-      'Wipe down kitchen cabinets', 'Wash dish towels', 'Clean bathroom sinks & faucets',
-      'Scrub toilets', 'Clean shower doors', 'Vacuum rugs & upholstery',
-      'Clean windows & blinds', 'Empty all trash cans', 'Straighten closets & drawers',
-      'Vacuum & sweep stairs', 'Clean handrails', 'Wipe down washer & dryer exterior'
-    ],
-    monthly: [
-      'Clean out fridge & freezer', 'Purge & tidy pantry', 'Wash bath mats & shower curtains',
-      'Wipe down all cabinet fronts', 'Clean doors & walls', 'Dust ceiling fans & light fixtures',
-      'Clean baseboards', 'Organize junk drawer', 'Deep clean shower head',
-      'Restock toiletries', 'Purge & organize bathroom cabinets', 'Clean dryer lint trap thoroughly',
-      'Flip sofa cushions & pillows', 'Wash blankets', 'Clean under couch',
-      'Purge & organize toys or office supplies', 'Replenish cleaning supplies'
-    ],
-    quarterly: [
-      'Clean/wash windows inside & out', 'Purge closets & clutter', 'Flip mattresses',
-      'Deep clean oven', 'Deep clean fridge/freezer interior', 'Organize inside cabinets',
-      'Replace sink sponges', 'Deep clean trash cans', 'Wash comforters & duvets',
-      'Vacuum heating & cooling vents', 'Scrub tile grout', 'Air out rooms & drapes',
-      'Sort and clean closets — donate items', 'Clean & check pantry for expired items',
-      'Wipe switches, door handles & frames'
-    ],
-    yearly: [
-      'Clean carpets professionally', 'Dust refrigerator vent', 'Give AC a tune-up',
-      'Wash walls', 'Rinse window screens', 'Wash windowsills', 'Take off and scrub blinds',
-      'Deep clean dishwasher & freezer', 'Polish wood cabinets', 'Clean fireplace',
-      'Clean dryer vent hose', 'Clean washer gasket', 'Purge & organize laundry supplies',
-      'Wash light fixtures', 'Clean dryer vent'
-    ]
-  }
-  const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly' }
-  const FREQ_KEY_PREFIX = { daily:'d', weekly:'w', monthly:'m', quarterly:'q', yearly:'y' }
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
 
@@ -6882,26 +6832,6 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
       <PageHeader icon={Zap} title="Productivity" subtitle="Do the work that matters" />
       <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
 
-      {tab === 'tasks' && (
-        <section className="card">
-          <div className="section-title-row">
-            <div><p className="eyebrow">Productivity</p><h3>Tasks</h3></div>
-            <button className="primary-btn" style={{ fontSize: '.82rem', padding: '8px 14px' }} onClick={() => onQuickCreate('task')}>+ Task</button>
-          </div>
-          {tasks.filter(t => !t.completed || settings.showCompletedTasks).slice(0, 20).map(task => (
-            <div key={task.id} className="metric-row card-row" style={{ alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: '.9rem', textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'var(--muted)' : 'var(--text)' }}>{task.title}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{task.category} • {task.date}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button className={task.completed ? 'secondary-btn' : 'primary-btn'} style={{ fontSize: '.78rem', padding: '5px 10px' }} onClick={() => onToggle(task.id)}>{task.completed ? '✓ Done' : 'Complete'}</button>
-                <button className="ghost-btn" style={{ fontSize: '.78rem', padding: '5px 10px' }} onClick={() => onEdit('task', task)}>Edit</button>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
 
       {tab === 'braindump' && (
         <section className="card">
@@ -7025,96 +6955,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
         </>
       </ProTabGate>)}
 
-      {tab === 'cleaning' && (
-        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <div>
-          <section className="card" style={{padding:'12px 14px'}}>
-            <p className="eyebrow">Home Cleaning Tracker</p>
-            <h3 style={{margin:'4px 0 10px'}}>Keeping a Clean Home</h3>
-            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-              {Object.keys(CLEANING_SCHEDULE).map(freq => {
-                const tasks = CLEANING_SCHEDULE[freq]
-                const prefix = FREQ_KEY_PREFIX[freq]
-                const done = tasks.filter(t => cleaningLog[prefix+'_'+t])
-                return (
-                  <button key={freq} onClick={() => setCleaningFreq(freq)} style={{
-                    padding:'6px 12px',borderRadius:999,border:'1.5px solid',fontSize:'.78rem',
-                    cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
-                    borderColor: cleaningFreq===freq ? 'var(--brass)' : 'var(--border2)',
-                    background: cleaningFreq===freq ? 'var(--brass-dim)' : 'transparent',
-                    color: cleaningFreq===freq ? 'var(--brass)' : 'var(--muted)',
-                    position:'relative'
-                  }}>
-                    {FREQ_LABELS[freq]}
-                    {done.length > 0 && (
-                      <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass)':'var(--success)',fontWeight:700}}>
-                        {done.length + '/' + tasks.length}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </section>
 
-          <section className="card">
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <div>
-                <p className="eyebrow">{FREQ_LABELS[cleaningFreq]}</p>
-                <h3 style={{margin:'2px 0 0'}}>
-                  {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length} of {CLEANING_SCHEDULE[cleaningFreq].length} done
-                </h3>
-              </div>
-              <button onClick={() => {
-                const prefix = FREQ_KEY_PREFIX[cleaningFreq]
-                const tasks = CLEANING_SCHEDULE[cleaningFreq]
-                const allDone = tasks.every(t => cleaningLog[prefix+'_'+t])
-                const updated = {...cleaningLog}
-                tasks.forEach(t => { allDone ? delete updated[prefix+'_'+t] : (updated[prefix+'_'+t] = true) })
-                saveCleaningLog2(updated)
-              }} className="ghost-btn" style={{fontSize:'.75rem',padding:'5px 10px'}}>
-                {CLEANING_SCHEDULE[cleaningFreq].every(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]) ? 'Uncheck All' : 'Check All'}
-              </button>
-            </div>
-
-            {CLEANING_SCHEDULE[cleaningFreq].map(task => {
-              const key = FREQ_KEY_PREFIX[cleaningFreq] + '_' + task
-              const done = !!cleaningLog[key]
-              return (
-                <div key={task} onClick={() => {
-                  const updated = {...cleaningLog}
-                  done ? delete updated[key] : (updated[key] = true)
-                  saveCleaningLog2(updated)
-                }} style={{
-                  display:'flex',alignItems:'center',gap:10,padding:'10px 0',
-                  borderBottom:'1px solid var(--stone2)',cursor:'pointer'
-                }}>
-                  <div style={{
-                    width:22,height:22,borderRadius:6,border:'2px solid',flexShrink:0,
-                    borderColor: done ? 'var(--success)' : 'var(--border2)',
-                    background: done ? 'var(--success)' : 'var(--warm-white)',
-                    display:'grid',placeItems:'center',transition:'all .15s'
-                  }}>
-                    {done && <span style={{color:'white',fontSize:'.72rem',fontWeight:800}}>✓</span>}
-                  </div>
-                  <span style={{
-                    fontSize:'.88rem',flex:1,
-                    color: done ? 'var(--muted)' : 'var(--ink)',
-                    textDecoration: done ? 'line-through' : 'none',
-                    transition:'all .15s'
-                  }}>{task}</span>
-                </div>
-              )
-            })}
-
-            {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length === CLEANING_SCHEDULE[cleaningFreq].length && (
-              <div style={{marginTop:12,padding:'10px 14px',background:'rgba(52,168,83,.08)',borderRadius:'var(--radius-sm)',textAlign:'center',fontSize:'.85rem',color:'var(--success)',fontWeight:600}}>
-                ✓ All {FREQ_LABELS[cleaningFreq].toLowerCase()} tasks complete!
-              </div>
-            )}
-          </section>
-        </div>
-      </ProTabGate>)}
 
             {tab === 'notes' && (
         <section className="card">
@@ -7209,6 +7050,140 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 }
 
 // ── LIFESTYLE PAGE ─────────────────────────────────────────────────────────
+// Home cleaning tracker — lives in Lifestyle; data stays under page 'productivity'.
+function CleaningTracker() {
+  const [cleaningLog, saveCleaningLog2] = usePageKey('productivity', 'cleaningLog', {}, ['planner.p.cleaningLog', 'planner.p.cleaning_log_v2', 'cleaningLog'])
+  const [cleaningFreq, setCleaningFreq] = useState('daily')
+  const CLEANING_SCHEDULE = {
+    daily: [
+      'Make beds', 'Do laundry', 'Take out trash', 'Load/unload dishwasher',
+      'Clean countertops', 'Pick up & tidy shared spaces', 'Wipe down sinks & toilets', 'Spot vacuuming'
+    ],
+    weekly: [
+      'Sweep/Vacuum/Mop all floors', 'Wash bedding', 'Clean mirrors', 'Dust & polish furniture',
+      'Sweep/Mop kitchen', 'Clean stovetop', 'Wipe down kitchen appliances', 'Clean microwave',
+      'Wipe down kitchen cabinets', 'Wash dish towels', 'Clean bathroom sinks & faucets',
+      'Scrub toilets', 'Clean shower doors', 'Vacuum rugs & upholstery',
+      'Clean windows & blinds', 'Empty all trash cans', 'Straighten closets & drawers',
+      'Vacuum & sweep stairs', 'Clean handrails', 'Wipe down washer & dryer exterior'
+    ],
+    monthly: [
+      'Clean out fridge & freezer', 'Purge & tidy pantry', 'Wash bath mats & shower curtains',
+      'Wipe down all cabinet fronts', 'Clean doors & walls', 'Dust ceiling fans & light fixtures',
+      'Clean baseboards', 'Organize junk drawer', 'Deep clean shower head',
+      'Restock toiletries', 'Purge & organize bathroom cabinets', 'Clean dryer lint trap thoroughly',
+      'Flip sofa cushions & pillows', 'Wash blankets', 'Clean under couch',
+      'Purge & organize toys or office supplies', 'Replenish cleaning supplies'
+    ],
+    quarterly: [
+      'Clean/wash windows inside & out', 'Purge closets & clutter', 'Flip mattresses',
+      'Deep clean oven', 'Deep clean fridge/freezer interior', 'Organize inside cabinets',
+      'Replace sink sponges', 'Deep clean trash cans', 'Wash comforters & duvets',
+      'Vacuum heating & cooling vents', 'Scrub tile grout', 'Air out rooms & drapes',
+      'Sort and clean closets — donate items', 'Clean & check pantry for expired items',
+      'Wipe switches, door handles & frames'
+    ],
+    yearly: [
+      'Clean carpets professionally', 'Dust refrigerator vent', 'Give AC a tune-up',
+      'Wash walls', 'Rinse window screens', 'Wash windowsills', 'Take off and scrub blinds',
+      'Deep clean dishwasher & freezer', 'Polish wood cabinets', 'Clean fireplace',
+      'Clean dryer vent hose', 'Clean washer gasket', 'Purge & organize laundry supplies',
+      'Wash light fixtures', 'Clean dryer vent'
+    ]
+  }
+  const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly' }
+  const FREQ_KEY_PREFIX = { daily:'d', weekly:'w', monthly:'m', quarterly:'q', yearly:'y' }
+  return (
+        <div>
+          <section className="card" style={{padding:'12px 14px'}}>
+            <p className="eyebrow">Home Cleaning Tracker</p>
+            <h3 style={{margin:'4px 0 10px'}}>Keeping a Clean Home</h3>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+              {Object.keys(CLEANING_SCHEDULE).map(freq => {
+                const tasks = CLEANING_SCHEDULE[freq]
+                const prefix = FREQ_KEY_PREFIX[freq]
+                const done = tasks.filter(t => cleaningLog[prefix+'_'+t])
+                return (
+                  <button key={freq} onClick={() => setCleaningFreq(freq)} style={{
+                    padding:'6px 12px',borderRadius:999,border:'1.5px solid',fontSize:'.78rem',
+                    cursor:'pointer',fontFamily:'var(--sans)',fontWeight:600,
+                    borderColor: cleaningFreq===freq ? 'var(--brass)' : 'var(--border2)',
+                    background: cleaningFreq===freq ? 'var(--brass-dim)' : 'transparent',
+                    color: cleaningFreq===freq ? 'var(--brass)' : 'var(--muted)',
+                    position:'relative'
+                  }}>
+                    {FREQ_LABELS[freq]}
+                    {done.length > 0 && (
+                      <span style={{marginLeft:4,fontSize:'.65rem',color:cleaningFreq===freq?'var(--brass)':'var(--success)',fontWeight:700}}>
+                        {done.length + '/' + tasks.length}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          <section className="card">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+              <div>
+                <p className="eyebrow">{FREQ_LABELS[cleaningFreq]}</p>
+                <h3 style={{margin:'2px 0 0'}}>
+                  {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length} of {CLEANING_SCHEDULE[cleaningFreq].length} done
+                </h3>
+              </div>
+              <button onClick={() => {
+                const prefix = FREQ_KEY_PREFIX[cleaningFreq]
+                const tasks = CLEANING_SCHEDULE[cleaningFreq]
+                const allDone = tasks.every(t => cleaningLog[prefix+'_'+t])
+                const updated = {...cleaningLog}
+                tasks.forEach(t => { allDone ? delete updated[prefix+'_'+t] : (updated[prefix+'_'+t] = true) })
+                saveCleaningLog2(updated)
+              }} className="ghost-btn" style={{fontSize:'.75rem',padding:'5px 10px'}}>
+                {CLEANING_SCHEDULE[cleaningFreq].every(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]) ? 'Uncheck All' : 'Check All'}
+              </button>
+            </div>
+
+            {CLEANING_SCHEDULE[cleaningFreq].map(task => {
+              const key = FREQ_KEY_PREFIX[cleaningFreq] + '_' + task
+              const done = !!cleaningLog[key]
+              return (
+                <div key={task} onClick={() => {
+                  const updated = {...cleaningLog}
+                  done ? delete updated[key] : (updated[key] = true)
+                  saveCleaningLog2(updated)
+                }} style={{
+                  display:'flex',alignItems:'center',gap:10,padding:'10px 0',
+                  borderBottom:'1px solid var(--stone2)',cursor:'pointer'
+                }}>
+                  <div style={{
+                    width:22,height:22,borderRadius:6,border:'2px solid',flexShrink:0,
+                    borderColor: done ? 'var(--success)' : 'var(--border2)',
+                    background: done ? 'var(--success)' : 'var(--warm-white)',
+                    display:'grid',placeItems:'center',transition:'all .15s'
+                  }}>
+                    {done && <span style={{color:'white',fontSize:'.72rem',fontWeight:800}}>✓</span>}
+                  </div>
+                  <span style={{
+                    fontSize:'.88rem',flex:1,
+                    color: done ? 'var(--muted)' : 'var(--ink)',
+                    textDecoration: done ? 'line-through' : 'none',
+                    transition:'all .15s'
+                  }}>{task}</span>
+                </div>
+              )
+            })}
+
+            {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length === CLEANING_SCHEDULE[cleaningFreq].length && (
+              <div style={{marginTop:12,padding:'10px 14px',background:'rgba(52,168,83,.08)',borderRadius:'var(--radius-sm)',textAlign:'center',fontSize:'.85rem',color:'var(--success)',fontWeight:600}}>
+                ✓ All {FREQ_LABELS[cleaningFreq].toLowerCase()} tasks complete!
+              </div>
+            )}
+          </section>
+        </div>
+  )
+}
+
 function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -7273,6 +7248,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
     { id: 'trips', label: '✈ Trips' },
     { id: 'birthdays', label: '🎂 Birthdays' },
     { id: 'gifts', label: '🎁 Gifts' },
+    { id: 'cleaning', label: '🧹 Cleaning' },
   ]
 
   const SimpleList = ({ items, onDelete, renderItem }) => items.length === 0
@@ -7462,6 +7438,12 @@ function LifestylePage({ isPro = false, onUpgrade = () => {} }) {
             ))
           })()}
         </section>
+        </ProTabGate>
+      )}
+
+      {tab === 'cleaning' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
+          <CleaningTracker />
         </ProTabGate>
       )}
 
@@ -8105,7 +8087,49 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
 }
 
 
-function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget }) {
+// Reading list — lives in Growth; data stays under page 'wellness', key 'books'.
+const BOOK_STATUS = { Reading: { color: 'var(--brass2)', bg: 'var(--brass-dim)' }, 'Want to Read': { color: 'var(--ink2)', bg: 'var(--stone2)' }, Completed: { color: 'var(--success)', bg: 'rgba(34,197,94,.12)' } }
+function ReadingList() {
+  const [books, saveBooks] = usePageKey('wellness', 'books', [], ['planner.hw.books', 'books'])
+  const [b, setB] = useState({ title: '', author: '', status: 'Reading' })
+  const order = { Reading: 0, 'Want to Read': 1, Completed: 2 }
+  const sorted = (books || []).map((book, i) => ({ ...book, _i: i })).sort((x, y) => (order[x.status] ?? 3) - (order[y.status] ?? 3))
+  const cycle = (i) => { const next = { Reading: 'Completed', Completed: 'Want to Read', 'Want to Read': 'Reading' }; saveBooks(books.map((x, j) => j === i ? { ...x, status: next[x.status] || 'Reading' } : x)) }
+  return (
+    <section className="card">
+      <div className="section-title-row" style={{ marginBottom: 6 }}>
+        <div><p className="eyebrow">Reading</p><h3>Your library</h3></div>
+        <span className="status-pill" style={{ fontSize: '.72rem' }}>{(books || []).filter((x) => x.status === 'Completed').length} finished</span>
+      </div>
+      {sorted.length === 0 && <p className="muted" style={{ fontSize: '.85rem' }}>Add what you're reading or want to read.</p>}
+      {sorted.map((book) => {
+        const st = BOOK_STATUS[book.status] || BOOK_STATUS['Want to Read']
+        return (
+          <div key={book.id || book._i} className="metric-row card-row">
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: '.9rem', color: 'var(--ink)' }}>{book.title}</div>
+              {book.author && <div className="muted" style={{ fontSize: '.75rem' }}>{book.author}</div>}
+            </div>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+              <button onClick={() => cycle(book._i)} title="Tap to change status" style={{ fontSize: '.68rem', padding: '3px 9px', borderRadius: 999, border: 'none', cursor: 'pointer', background: st.bg, color: st.color, fontWeight: 700 }}>{book.status}</button>
+              <button className="time-card-del" aria-label="Remove book" onClick={() => saveBooks(books.filter((_, j) => j !== book._i))}>✕</button>
+            </div>
+          </div>
+        )
+      })}
+      <div className="wl-form">
+        <input placeholder="Book title" value={b.title} onChange={(e) => setB((p) => ({ ...p, title: e.target.value }))} />
+        <div className="wl-grid3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <input placeholder="Author" value={b.author} onChange={(e) => setB((p) => ({ ...p, author: e.target.value }))} />
+          <select value={b.status} onChange={(e) => setB((p) => ({ ...p, status: e.target.value }))}><option>Reading</option><option>Want to Read</option><option>Completed</option></select>
+        </div>
+        <button className="primary-btn" onClick={() => { if (!b.title.trim()) return; saveBooks([...(books || []), { ...b, title: b.title.trim(), id: Date.now() }]); setB({ title: '', author: '', status: 'Reading' }) }}>Add book</button>
+      </div>
+    </section>
+  )
+}
+
+function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
@@ -8414,17 +8438,15 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
         ))}
       </section>
 
-      {/* ── Weekly Spending Target (kept for score linkage) ──────────────── */}
-      <section className="card">
-        <p className="eyebrow">Finance</p>
-        <h3 style={{margin:'4px 0 6px'}}>Weekly Spending Target</h3>
-        <p className="muted" style={{fontSize:'.8rem',marginBottom:10}}>Discretionary only — bills and rent do not count. Used to calculate your Finance score.</p>
-        <div style={{display:'flex',gap:10,alignItems:'center'}}>
-          <input type="number" value={budget.weeklyTarget}
-            onChange={(e) => setBudget({ weeklyTarget: Number(e.target.value) })}
-            style={{flex:1,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem'}} />
-          <span className="muted" style={{fontSize:'.85rem'}}>/week</span>
-        </div>
+      {/* ── Reading (moved from Wellness) ─────────────────────────────────── */}
+      {isPro ? <ReadingList /> : (
+        <section className="card"><ProTabGate isPro={false} onUpgrade={onUpgrade}><ReadingList /></ProTabGate></section>
+      )}
+
+      <section className="card" style={{ padding: '12px 16px' }}>
+        <Link to="/finance" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textDecoration: 'none', color: 'var(--ink2)', fontSize: '.85rem', fontWeight: 600 }}>
+          <span>Weekly spending target is in Finance → Budget Plan</span><span style={{ color: 'var(--brass2)' }}>→</span>
+        </Link>
       </section>
       <PageNav />
     </div>
@@ -8881,13 +8903,13 @@ function PlannerApp() {
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
-          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, body metrics, and more.")} />} />
-          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists, focus timer, and cleaning schedule.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
-          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipes, trips, birthdays, and gift ideas.")} />} />
+          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists and the focus timer.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipes, cleaning tracker, trips, birthdays, and gift ideas.")} />} />
           <Route path="/faith" element={<FaithPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
-          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, body metrics, and more.")} />} />
+          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal

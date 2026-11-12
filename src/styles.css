@@ -1637,3 +1637,11 @@ button.profile-pill:active { transform: scale(.97); }
 .home-protein .nut-protein-top strong { font-size: 1.2rem; }
 .care-check { display: flex !important; align-items: center; gap: 8px; font-weight: 500 !important; }
 .care-check input { width: 18px !important; height: 18px; accent-color: var(--ink); }
+
+/* ── Grouped tab grids (Wellness: Body / Mind / Care) ──────────────── */
+.tab-group { margin-bottom: 4px; }
+.tab-group-label {
+  margin: 0 0 6px 2px; font-size: .6rem; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--brass2);
+}
+.tab-group > div { margin-bottom: 10px !important; }
