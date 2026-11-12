@@ -1,6 +1,6 @@
 // The Living Planner — reminder service.
 // Runs every 5 minutes (pg_cron → pg_net) and sends web push reminders:
-//   • timed tasks & events, N minutes before (default 15)
+//   • timed tasks & events (incl. repeating events), N minutes before (default 15)
 //   • health appointments: evening before (6 PM) and 1 hour before
 //   • daily: devotional 6:00, today's tasks 7:30, habits 8:00, birthdays 8:00,
 //     overdue 9:00, evening reflection 19:00
@@ -82,6 +82,24 @@ const fmt12 = (t: string) => {
 }
 const isTime = (t?: string | null) => !!t && /^\d{1,2}:\d{2}/.test(t)
 
+// Repeating events: one row per series → the occurrences that fall in [from, to]
+function expandEvents(rows: Array<Record<string, any>>, from: string, to: string) {
+  const out: Array<Record<string, any>> = []
+  for (const ev of rows) {
+    const r = ev.recurrence || 'none'
+    if (r === 'none') { if (ev.date >= from && ev.date <= to) out.push(ev); continue }
+    const skip = new Set<string>(Array.isArray(ev.skip_dates) ? ev.skip_dates : [])
+    const end = ev.recurrence_until && ev.recurrence_until < to ? ev.recurrence_until : to
+    for (let d = from; d <= end; d = addDays(d, 1)) {
+      if (d < ev.date || skip.has(d)) continue
+      const gap = Math.round((Date.parse(d + 'T12:00:00Z') - Date.parse(ev.date + 'T12:00:00Z')) / 86400000)
+      const hit = r === 'daily' ? true : r === 'weekly' ? gap % 7 === 0 : r === 'biweekly' ? gap % 14 === 0 : r === 'monthly' ? d.slice(8) === ev.date.slice(8) : false
+      if (hit) out.push({ ...ev, date: d })
+    }
+  }
+  return out
+}
+
 type Reminder = { key: string; at: number; title: string; body: string; url: string; tag?: string }
 
 // ── Build the reminders that are due for one user ───────────────────────
@@ -104,7 +122,8 @@ async function remindersFor(userId: string, now: number) {
   if (on.tasks) {
     const [{ data: tasks }, { data: events }, { data: appts }] = await Promise.all([
       sb.from('tasks').select('id,title,date,time,completed').eq('user_id', userId).in('date', [today, tomorrow]).eq('completed', false),
-      sb.from('events').select('id,title,date,time').eq('user_id', userId).in('date', [today, tomorrow]),
+      sb.from('events').select('id,title,date,time,recurrence,recurrence_until,skip_dates').eq('user_id', userId).lte('date', tomorrow)
+        .or(`recurrence.neq.none,date.in.(${today},${tomorrow})`),
       sb.from('page_data').select('data_value').eq('user_id', userId).eq('page', 'wellness').eq('data_key', 'appointments').maybeSingle(),
     ])
     for (const t of tasks || []) {
@@ -112,7 +131,7 @@ async function remindersFor(userId: string, now: number) {
       out.push({ key: `task:${t.id}:${t.date}T${t.time}`, at: zonedToUtc(t.date, t.time, tz) - lead * 60000,
         title: lead ? `In ${lead} min · ${fmt12(t.time)}` : `Now · ${fmt12(t.time)}`, body: t.title, url: '/calendar', tag: `task-${t.id}` })
     }
-    for (const e of events || []) {
+    for (const e of expandEvents(events || [], today, tomorrow)) {
       if (!isTime(e.time)) continue
       out.push({ key: `event:${e.id}:${e.date}T${e.time}`, at: zonedToUtc(e.date, e.time, tz) - lead * 60000,
         title: lead ? `In ${lead} min · ${fmt12(e.time)}` : `Now · ${fmt12(e.time)}`, body: e.title, url: '/calendar', tag: `event-${e.id}` })
