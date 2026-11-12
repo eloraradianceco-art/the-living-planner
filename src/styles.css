@@ -22,11 +22,13 @@
   /* Accent */
   --brass:      #B8965A;
   --brass2:     #9E7D45;
+  --brass-text: #7D6230; /* brass for small text on light backgrounds (5:1) */
   --brass-dim:  rgba(184,150,90,.12);
   --brass-glow: rgba(184,150,90,.22);
-  --teal:       #2A9D8F;
-  --teal2:      #21887B;
+  --teal:       #23786D; /* deepened from #2A9D8F so white text on it and teal text on white both read at 5:1 */
+  --teal2:      #1C6359;
   --teal-dim:   rgba(42,157,143,.10);
+  --teal-bright: #2FB3A3; /* teal text on dark cards */
 
   /* Semantic */
   --text:       #1C1C1E;
@@ -129,7 +131,7 @@ img { max-width: 100%; }
   letter-spacing: .12em;
   font-size: .65rem;
   font-weight: 600;
-  color: var(--brass);
+  color: var(--brass-text);
   margin: 0 0 3px;
 }
 .muted { color: var(--slate); font-size: .88rem; }
@@ -1078,7 +1080,7 @@ h3 {
   font-size: .68rem;
   font-weight: 700;
   letter-spacing: .14em;
-  color: var(--brass);
+  color: var(--brass-text);
   margin-bottom: 6px;
 }
 
@@ -1516,7 +1518,7 @@ button.profile-pill:active { transform: scale(.97); }
   background: var(--brass-dim); color: var(--brass2); border: 1px solid var(--brass-glow);
 }
 .home-faith-verse { margin: 0; font-family: var(--serif); font-style: italic; font-size: 1.02rem; line-height: 1.45; color: var(--ink); }
-.home-faith-ref { margin: 6px 0 0; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brass2); }
+.home-faith-ref { margin: 6px 0 0; font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brass-text); }
 
 /* Home: next steps */
 .home-step-link { flex: 1; min-width: 0; display: grid; gap: 1px; text-decoration: none; padding: 2px 0; }

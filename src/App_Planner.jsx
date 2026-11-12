@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import Reviews from "./Reviews"
 import { createClient } from '@supabase/supabase-js'
+import AccountPrivacy from './AccountPrivacy.jsx'
+import ScriptureCredits from './ScriptureCredits.jsx'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Banknote, CreditCard, PiggyBank, TrendingDown, HeartHandshake, ClipboardList, CircleSlash,
@@ -1877,7 +1879,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
       style.textContent = `
         body { background: var(--ink, #0d1f33); }
         .topbar, .premium-topbar, .living-planner-topbar {
-          padding-top: calc(env(safe-area-inset-top) + 12px) !important;
+          padding-top: calc(var(--safe-top, env(safe-area-inset-top)) + 12px) !important;
           padding-left: max(env(safe-area-inset-left), 14px);
           padding-right: max(env(safe-area-inset-right), 14px);
         }
@@ -2249,7 +2251,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                 border: `1px solid ${avg >= 7 ? 'rgba(52,168,83,.35)' : avg >= 5 ? 'rgba(42,157,143,.35)' : 'rgba(184,150,90,.35)'}`,
                 display:'flex',alignItems:'center',gap:6,
               }}>
-                <span style={{fontSize:'.7rem',color: avg >= 7 ? '#4ade80' : avg >= 5 ? 'var(--teal)' : 'var(--brass)',fontWeight:700}}>Life Score</span>
+                <span style={{fontSize:'.7rem',color: avg >= 7 ? '#4ade80' : avg >= 5 ? 'var(--teal-bright)' : 'var(--brass)',fontWeight:700}}>Life Score</span>
                 <span style={{fontSize:'.85rem',fontWeight:800,color:'white'}}>{avg}/10</span>
               </div>
               <span style={{fontSize:'.72rem',color:'rgba(255,255,255,.35)'}}>
@@ -8769,6 +8771,12 @@ function BackupButton() {
   )
 }
 
+const PLANNER_SETTINGS_THEME = {
+  text: 'var(--ink)', muted: 'var(--muted)', card: 'var(--surface)', border: 'var(--border2)',
+  danger: '#9B2C2C', dangerF: 'rgba(155,44,44,.08)', dangerB: 'rgba(155,44,44,.35)', dark: false,
+  body: 'var(--sans)', heading: 'var(--sans)',
+}
+
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut, user } = useAuth()
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
@@ -8948,10 +8956,10 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         <h3 style={{margin:'4px 0 6px'}}>More from Elora Radiance Co.</h3>
         <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:14}}>Scripture-based tools for the whole Christian life.</p>
         {[
-          { label:'Armed & Anchored', desc:'Spiritual warfare training', url:'https://armedandanchored.vercel.app/', icon:'⚔️' },
-          { label:'Anchored Steps · Year 1', desc:'Daily devotional · Year 1', url:'https://anchored-steps.vercel.app/', icon:'⚓' },
-          { label:'Anchored Steps · Year 2', desc:'Daily devotional · Year 2', url:'https://anchored-steps-year2.vercel.app/', icon:'⚓' },
-          { label:'The Red Letters', desc:'The words of Jesus — free', url:'https://redletters.vercel.app/', icon:'✦' },
+          { label:'Armed & Anchored', desc:'Spiritual warfare training — 26 weapons', url:'https://armedandanchored.vercel.app/', icon:'⚔️' },
+          { label:'Anchored Steps · Year 1', desc:'52 weeks of faith in action', url:'https://anchored-steps.vercel.app/', icon:'⚓' },
+          { label:'Anchored Steps · Year 2', desc:'52 weeks of deeper study', url:'https://anchored-steps-year2.vercel.app/', icon:'⚓' },
+          { label:'The Red Letters', desc:'The words of Jesus by theme — free', url:'https://redletters.vercel.app/', icon:'✦' },
           { label:'Anchored Verse', desc:'Scripture for every emotion — free', url:'https://anchoredverse.vercel.app/', icon:'📖' },
         ].map(app => (
           <a key={app.url} href={app.url} target="_blank" rel="noopener noreferrer" style={{
@@ -8967,6 +8975,19 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <span style={{color:'var(--brass)',fontSize:'.95rem',flexShrink:0}}>↗</span>
           </a>
         ))}
+      </section>
+
+      {/* ── Privacy, account deletion and Scripture credits ──────────── */}
+      <section>
+        <AccountPrivacy
+          supabase={supabase}
+          theme={PLANNER_SETTINGS_THEME}
+          deletes="This permanently deletes your Living Planner account and everything in it: tasks, events, goals, habits, notes, journal, finances, faith and wellness entries, and settings. It can't be undone. Your account in the other Elora Radiance apps is separate and isn't affected."
+        />
+        <ScriptureCredits
+          notices={['NIV_ALL', 'ESV', 'NKJV', 'KJV']}
+          theme={PLANNER_SETTINGS_THEME}
+        />
       </section>
 
       {/* ── Support & Contact ──────────────────────────────────────── */}
@@ -9149,14 +9170,15 @@ class AppErrorBoundary extends React.Component {
 // ── FAITH PAGE ───────────────────────────────────────────────────────────────
 
 // ── Verse of the Day Library ──────────────────────────────────────────────
+// Scripture is NIV unless the reference names another translation (see Scripture Credits).
 const VERSE_LIBRARY = [
-  {v: "Trust in the Lord with all your heart, and do not lean on your own understanding.", r: "Proverbs 3:5"},
-  {v: "I can do all things through Christ who strengthens me.", r: "Philippians 4:13"},
+  {v: "Trust in the Lord with all your heart, and do not lean on your own understanding.", r: "Proverbs 3:5 ESV"},
+  {v: "I can do all things through Christ who strengthens me.", r: "Philippians 4:13 NKJV"},
   {v: "For God so loved the world that he gave his one and only Son.", r: "John 3:16"},
-  {v: "Be still, and know that I am God.", r: "Psalm 46:10"},
+  {v: "Be still, and know that I am God.", r: "Psalm 46:10 KJV"},
   {v: "And we know that in all things God works for the good of those who love him.", r: "Romans 8:28"},
-  {v: "The Lord is my shepherd; I shall not want.", r: "Psalm 23:1"},
-  {v: "Wait on the Lord; be of good courage, and He shall strengthen your heart.", r: "Psalm 27:14"},
+  {v: "The Lord is my shepherd; I shall not want.", r: "Psalm 23:1 KJV"},
+  {v: "Wait on the Lord; be of good courage, and He shall strengthen your heart.", r: "Psalm 27:14 NKJV"},
   {v: "Do not be anxious about anything, but in every situation by prayer and petition present your requests to God.", r: "Philippians 4:6"},
   {v: "Cast all your anxiety on him because he cares for you.", r: "1 Peter 5:7"},
   {v: "Therefore do not worry about tomorrow, for tomorrow will worry about itself.", r: "Matthew 6:34"},
@@ -9170,7 +9192,7 @@ const VERSE_LIBRARY = [
   {v: "Many are the plans in a person's heart, but it is the Lord's purpose that prevails.", r: "Proverbs 19:21"},
   {v: "She is clothed with strength and dignity; she can laugh at the days to come.", r: "Proverbs 31:25"},
   {v: "In their hearts humans plan their course, but the Lord establishes their steps.", r: "Proverbs 16:9"},
-  {v: "Train up a child in the way he should go; even when he is old he will not depart from it.", r: "Proverbs 22:6"},
+  {v: "Train up a child in the way he should go; even when he is old he will not depart from it.", r: "Proverbs 22:6 ESV"},
   {v: "Two are better than one, because they have a good return for their labor.", r: "Ecclesiastes 4:9"},
   {v: "There is a time for everything, and a season for every activity under the heavens.", r: "Ecclesiastes 3:1"},
   {v: "Now faith is confidence in what we hope for and assurance about what we do not see.", r: "Hebrews 11:1"},
@@ -9179,7 +9201,7 @@ const VERSE_LIBRARY = [
   {v: "Where your treasure is, there your heart will be also.", r: "Matthew 6:21"},
   {v: "Whatever you do, work at it with all your heart, as working for the Lord, not for human masters.", r: "Colossians 3:23"},
   {v: "Be kind and compassionate to one another, forgiving each other, just as in Christ God forgave you.", r: "Ephesians 4:32"},
-  {v: "Therefore, my beloved brothers, be steadfast, immovable, always abounding in the work of the Lord.", r: "1 Corinthians 15:58"},
+  {v: "Therefore, my beloved brothers, be steadfast, immovable, always abounding in the work of the Lord.", r: "1 Corinthians 15:58 ESV"},
   {v: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you.", r: "Jeremiah 29:11"},
 ]
 
@@ -9408,10 +9430,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <p className="eyebrow" style={{color:'var(--brass)',marginBottom:6}}>Today's Anchor</p>
             {[
               '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
-              '"I can do all things through Christ who strengthens me." — Philippians 4:13',
+              '"I can do all things through Christ who strengthens me." — Philippians 4:13 NKJV',
               '"Be still and know that I am God." — Psalm 46:10',
               '"For I know the plans I have for you, declares the Lord, plans to prosper you." — Jeremiah 29:11',
-              '"The Lord is my shepherd; I shall not want." — Psalm 23:1',
+              '"The Lord is my shepherd; I shall not want." — Psalm 23:1 KJV',
               '"Let your light shine before others, that they may see your good deeds." — Matthew 5:16',
               '"And we know that in all things God works for the good of those who love him." — Romans 8:28',
             ][new Date().getDay() % 7].split('—').map((part, i) => (
@@ -9636,7 +9658,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           <p className="eyebrow">Bible Reading</p>
           <h3 style={{margin:'4px 0 8px'}}>Daily Reading</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
-            "Man shall not live by bread alone, but by every word from the mouth of God." — Matthew 4:4
+            "Man shall not live by bread alone, but by every word that comes from the mouth of God." — Matthew 4:4 ESV
           </p>
 
           {/* Plan selector */}
