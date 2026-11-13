@@ -1701,6 +1701,7 @@ const SEARCH_SOURCES = [
   ['faith', 'prayers', 'Prayer', '/faith?tab=prayer'],
   ['faith', 'scriptures', 'Scripture', '/faith?tab=scripture'],
   ['faith', 'gratitude', 'Gratitude', '/faith?tab=gratitude'],
+  ['faith', 'reflections', 'Reflection', '/faith?tab=devotional'],
 ]
 const LOCAL_PREFIX = { wellness: 'planner.hw.', lifestyle: 'planner.l.', productivity: 'planner.p.', faith: 'planner.faith.' }
 const TITLE_FIELDS = ['title', 'name', 'who', 'test', 'reference', 'text', 'request', 'label', 'type', 'verse']
@@ -7271,7 +7272,7 @@ function NoteComposer({ onSave }) {
 
   const save = () => {
     if (!title.trim()) return
-    onSave({ id: Date.now(), title: title.trim(), content: body.trim(), category, date: new Date().toISOString().slice(0,10) })
+    onSave({ id: Date.now(), title: title.trim(), content: body.trim(), category, date: TODAY })
     setTitle(''); setBody(''); setOpen(false)
   }
 
@@ -8508,18 +8509,17 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
             
             // Calculate current streak (from today backwards)
             let current = 0
-            let d = new Date()
-            const todayStr = d.toISOString().slice(0,10)
+            let day = TODAY   // local date (was UTC, a day ahead after 6 PM in the US)
             // Allow today OR yesterday as the start (gives forgiveness on first day)
-            if (!completedDates.includes(todayStr)) {
-              d.setDate(d.getDate() - 1)
-              if (!completedDates.includes(d.toISOString().slice(0,10))) {
+            if (!completedDates.includes(day)) {
+              day = addDays(day, -1)
+              if (!completedDates.includes(day)) {
                 return { current: 0, longest: calculateLongest(completedDates) }
               }
             }
-            while (completedDates.includes(d.toISOString().slice(0,10))) {
+            while (completedDates.includes(day)) {
               current++
-              d.setDate(d.getDate() - 1)
+              day = addDays(day, -1)
             }
             return { current, longest: Math.max(current, calculateLongest(completedDates)) }
             
@@ -9692,6 +9692,13 @@ function PlannerApp() {
 
   const [modalState, setModalState] = useState(modalEmpty)
   const [toasts, setToasts] = useState([])
+  // TODAY is fixed when the app loads. Home Screen apps can sit in the background overnight, so when the app
+  // comes back on a new day, reload it (pending saves were already sent when it went to the background). 2026-11-13
+  useEffect(() => {
+    const check = () => { if (document.visibilityState === 'visible' && getTodayString() !== TODAY) window.location.reload() }
+    document.addEventListener('visibilitychange', check); window.addEventListener('pageshow', check); window.addEventListener('focus', check)
+    return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('pageshow', check); window.removeEventListener('focus', check) }
+  }, [])
 
   const openCreate = (type = 'task', prefill = null) => setModalState({ open: true, type, mode: 'create', item: prefill })
   const openEdit = (type, item) => setModalState({ open: true, type, mode: 'edit', item })
@@ -9845,6 +9852,78 @@ function getVerseOfDay() {
 
 const FAITH_AREAS = ['Spiritual Growth', 'Prayer Life', 'Scripture Study', 'Community/Church', 'Service', 'Fasting', 'Evangelism', 'Discipleship']
 
+// Today's Anchor verse, by day of the week (also labels each past reflection)
+const FAITH_ANCHORS = [
+  '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
+  '"I can do all things through Christ who strengthens me." — Philippians 4:13 NKJV',
+  '"Be still and know that I am God." — Psalm 46:10',
+  '"For I know the plans I have for you, declares the Lord, plans to prosper you." — Jeremiah 29:11',
+  '"The Lord is my shepherd; I shall not want." — Psalm 23:1 KJV',
+  '"Let your light shine before others, that they may see your good deeds." — Matthew 5:16',
+  '"And we know that in all things God works for the good of those who love him." — Romans 8:28',
+]
+const anchorFor = (ymd) => FAITH_ANCHORS[new Date(ymd + 'T12:00:00').getDay() % 7]
+// Reflections: one entry per day, newest first ([{ date, text }]). Older builds kept only today's ({ text, date }).
+const sortReflections = (list) => [...list].sort((a, b) => String(b.date).localeCompare(String(a.date)))
+function mergeReflections(list, ...more) {
+  const out = [...(Array.isArray(list) ? list : [])]
+  for (const extra of more) {
+    const items = Array.isArray(extra) ? extra : (extra && extra.date ? [extra] : [])
+    for (const r of items) if (r && r.date && String(r.text || '').trim() && !out.some((x) => x.date === r.date)) out.push({ date: r.date, text: r.text })
+  }
+  return sortReflections(out)
+}
+
+function PastReflections({ items, onDelete }) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(() => new Set())
+  const [limit, setLimit] = useState(10)
+  const [copied, setCopied] = useState('')
+  const ql = q.trim().toLowerCase()
+  const shown = ql ? items.filter((r) => String(r.text).toLowerCase().includes(ql)) : items
+  const toggle = (d) => setOpen((prev) => { const n = new Set(prev); n.has(d) ? n.delete(d) : n.add(d); return n })
+  const label = (d) => formatDateLabel(d, { weekday: 'long', month: 'short', day: 'numeric', ...(d.slice(0, 4) !== TODAY.slice(0, 4) ? { year: 'numeric' } : {}) })
+  const copy = async (r) => { try { await navigator.clipboard.writeText(`${label(r.date)}\n\n${r.text}`); setCopied(r.date); setTimeout(() => setCopied(''), 1500) } catch {} }
+  return (
+    <div className="reflect-past">
+      <div className="reflect-past-head">
+        <h4>Past Reflections</h4>
+        {items.length > 0 && <span className="muted">{items.length} day{items.length === 1 ? '' : 's'}</span>}
+      </div>
+      {items.length === 0 ? (
+        <p className="muted reflect-empty">Each day's reflection is kept here, newest first.</p>
+      ) : (<>
+        {items.length > 5 && (
+          <div className="recipe-search"><Search size={15} /><input value={q} onChange={(e) => { setQ(e.target.value); setLimit(10) }} placeholder="Search your reflections" aria-label="Search reflections" /></div>
+        )}
+        <ul className="reflect-list">
+          {shown.slice(0, limit).map((r) => {
+            const isOpen = open.has(r.date)
+            const ref = (anchorFor(r.date).split('—')[1] || '').trim()
+            return (
+              <li key={r.date} className={'reflect-item' + (isOpen ? ' open' : '')}>
+                <button type="button" className="reflect-item-head" onClick={() => toggle(r.date)} aria-expanded={isOpen}>
+                  <span className="reflect-date">{label(r.date)}</span>
+                  {ref && <span className="reflect-anchor">{ref}</span>}
+                </button>
+                <p className="reflect-text" onClick={() => toggle(r.date)}>{r.text}</p>
+                {isOpen && (
+                  <div className="reflect-actions">
+                    <button type="button" onClick={() => copy(r)}><Copy size={13} /> {copied === r.date ? 'Copied' : 'Copy'}</button>
+                    <button type="button" className="danger" onClick={() => { if (window.confirm(`Delete your reflection from ${label(r.date)}?`)) onDelete(r.date) }}><Trash2 size={13} /> Delete</button>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {ql && shown.length === 0 && <p className="muted reflect-empty">No reflections match "{q.trim()}".</p>}
+        {shown.length > limit && <button type="button" className="ghost-btn reflect-more" onClick={() => setLimit(limit + 20)}>Show older reflections</button>}
+      </>)}
+    </div>
+  )
+}
+
 function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = [], projects = [], onCreateGoal, onEdit }) {
   const { user } = useAuth()
 
@@ -9898,10 +9977,20 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
         if (use('faithGoals'))   setFaithGoals(latest.faithGoals.data_value || [])
         if (use('sermons'))      setSermons(latest.sermons.data_value || [])
         if (use('bibleReading')) setBibleReading(latest.bibleReading.data_value || { plan: "M'Cheyne", completedDates: [], notes: {} })
+        // Reflections: the account list is the source of truth once it exists (so a delete on one device sticks).
+        // First time only: build it from the old single-day value and this device's copy, then save it.
+        if (!own.isStale('reflections', latest.reflections?.updated_at)) {
+          if (latest.reflections) setReflections(sortReflections(Array.isArray(latest.reflections.data_value) ? latest.reflections.data_value : []))
+          else {
+            const merged = mergeReflections(lsGet('reflections', []), latest.devotional?.data_value, lsGet('devotional', null))
+            setReflections(merged)
+            if (merged.length) syncFaith('reflections', merged)
+          }
+        }
 
         // ── One-time migration: push any localStorage data that never made it to Supabase ──
         // Runs silently — if Supabase already has the key, upsert will update it only if localStorage is newer
-        const FAITH_KEYS = ['prayers','scriptures','gratitude','devotional','fasting','faithGoals','sermons','bibleReading']
+        const FAITH_KEYS = ['prayers','scriptures','gratitude','devotional','fasting','faithGoals','sermons','bibleReading','reflections']
         FAITH_KEYS.forEach(key => {
           if (!latest[key]) {
             // Nothing in Supabase for this key — check if localStorage has data to push up
@@ -9930,6 +10019,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
       }, payload => {
         const row = payload.new
         if (!row || own.isStale(row.data_key, row.updated_at)) return   // our own save coming back
+        if (row.data_key === 'reflections')  setReflections(sortReflections(Array.isArray(row.data_value) ? row.data_value : []))
         if (row.data_key === 'prayers')      setPrayers(row.data_value || [])
         if (row.data_key === 'scriptures')   setScriptures(row.data_value || [])
         if (row.data_key === 'gratitude')    setGratitude(row.data_value || [])
@@ -9967,6 +10057,15 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   // Devotional journal
   const [devotional, setDevotional] = useState(() => lsGet('devotional', { text: '', date: '' }))
   const saveDevotional = (v, delay = 0) => { setDevotional(v); syncFaith('devotional', v, delay) }
+  // Every day's reflection is kept (2026-11-13); the old single-day value is folded in
+  const [reflections, setReflections] = useState(() => { const local = lsGet('reflections', null); return Array.isArray(local) ? sortReflections(local) : mergeReflections([], lsGet('devotional', null)) })
+  const todayReflection = (reflections.find((r) => r.date === TODAY) || {}).text || ''
+  const saveTodayReflection = (text) => {
+    const rest = reflections.filter((r) => r.date !== TODAY)
+    const next = String(text).trim() ? sortReflections([{ date: TODAY, text }, ...rest]) : rest
+    setReflections(next); syncFaith('reflections', next, 600)
+  }
+  const deleteReflection = (date) => { const next = reflections.filter((r) => r.date !== date); setReflections(next); syncFaith('reflections', next) }
 
   // Fasting tracker
   const [fasting, setFasting] = useState(() => lsGet('fasting', { active: false, startDate: '', endDate: '', intention: '', log: [] }))
@@ -9998,10 +10097,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   const saveBibleReading = (v, delay = 0) => { setBibleReading(v); syncFaith('bibleReading', v, delay) }
   const [readingNote, setReadingNote] = useState('')
   const [revealedVerse, setRevealedVerse] = useState(null)
-  const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
+  const [newSermon, setNewSermon] = useState({ date: TODAY, speaker: '', title: '', notes: '', application: '' })
   const saveSermons = (v) => { setSermons(v); syncFaith('sermons', v) }
 
-  const TODAY = new Date().toISOString().slice(0,10)
   const todayGratitude = gratitude.filter(g => g.date === TODAY)
   const answeredPrayers = prayers.filter(p => p.answered).length
 
@@ -10077,28 +10175,21 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           {/* Daily verse prompt */}
           <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
             <p className="eyebrow" style={{color:'var(--brass-fg)',marginBottom:6}}>Today's Anchor</p>
-            {[
-              '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
-              '"I can do all things through Christ who strengthens me." — Philippians 4:13 NKJV',
-              '"Be still and know that I am God." — Psalm 46:10',
-              '"For I know the plans I have for you, declares the Lord, plans to prosper you." — Jeremiah 29:11',
-              '"The Lord is my shepherd; I shall not want." — Psalm 23:1 KJV',
-              '"Let your light shine before others, that they may see your good deeds." — Matthew 5:16',
-              '"And we know that in all things God works for the good of those who love him." — Romans 8:28',
-            ][new Date().getDay() % 7].split('—').map((part, i) => (
+            {anchorFor(TODAY).split('—').map((part, i) => (
               i === 0
                 ? <p key={i} style={{color:'white',fontSize:'.95rem',fontFamily:'var(--serif)',lineHeight:1.7,fontStyle:'italic',margin:'0 0 6px'}}>"{part.trim()}"</p>
                 : <p key={i} style={{color:'var(--brass-fg)',fontSize:'.78rem',fontWeight:600,margin:0}}>— {part.trim()}</p>
             ))}
           </div>
 
-          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Today's Reflection — {TODAY}</p>
-          <textarea value={devotional.date === TODAY ? devotional.text : ''}
-            onChange={e => saveDevotional({ text: e.target.value, date: TODAY }, 600)}
+          <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Today's Reflection — {formatDateLabel(TODAY, { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+          <textarea value={todayReflection} aria-label="Today's reflection"
+            onChange={e => saveTodayReflection(e.target.value)}
             placeholder="What is God speaking to you today? What did you read? What are you sensing?"
             style={{width:'100%',minHeight:200,padding:'12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
             fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
-          <p className="muted" style={{fontSize:'.75rem',marginTop:6}}>Saved automatically.</p>
+          <p className="muted" style={{fontSize:'.75rem',marginTop:6}}>Saved automatically. A fresh page each morning; past days stay below.</p>
+          <PastReflections items={reflections.filter((r) => r.date !== TODAY)} onDelete={deleteReflection} />
         </section>
       )}
 
@@ -10359,13 +10450,11 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               const dates = (bibleReading.completedDates || []).sort()
               // Current streak
               let current = 0
-              let d = new Date()
-              if (!dates.includes(d.toISOString().slice(0,10))) {
-                d.setDate(d.getDate() - 1)
-              }
-              while (dates.includes(d.toISOString().slice(0,10))) {
+              let day = TODAY
+              if (!dates.includes(day)) day = addDays(day, -1)
+              while (dates.includes(day)) {
                 current++
-                d.setDate(d.getDate() - 1)
+                day = addDays(day, -1)
               }
               // Longest streak
               let longest = 0, run = 0
@@ -10393,7 +10482,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           <p style={{fontSize:'.72rem',color:'var(--ink2)',fontWeight:600,letterSpacing:'.06em',textTransform:'uppercase',marginBottom:8}}>Last 30 Days</p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(10, 1fr)',gap:4}}>
             {Array.from({length: 30}).map((_, i) => {
-              const date = new Date(Date.now() - (29-i) * 86400000).toISOString().slice(0,10)
+              const date = addDays(TODAY, -(29 - i))
               const done = (bibleReading.completedDates || []).includes(date)
               return (
                 <div key={i} title={date} style={{

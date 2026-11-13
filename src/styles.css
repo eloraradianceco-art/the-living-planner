@@ -1907,3 +1907,22 @@ button.profile-pill:active { transform: scale(.97); }
 .top3-today-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .top3-today-item.done .top3-today-text { text-decoration: line-through; opacity: .6; }
 .top3-today-item.done .top3-today-num { background: #4CC46A; color: #fff; }
+
+/* ── Past reflections (2026-11-13) ────────────────────────────────── */
+.reflect-past { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+.reflect-past-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.reflect-past-head h4 { margin: 0; font-family: var(--serif); font-size: 1.2rem; color: var(--ink); }
+.reflect-past-head .muted { font-size: .76rem; }
+.reflect-empty { font-size: .82rem; margin: 4px 0 0; }
+.reflect-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.reflect-item { background: var(--stone); border-radius: 12px; padding: 12px 14px; border: 1px solid var(--border); }
+.reflect-item-head { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; background: none; border: none; padding: 0; margin: 0 0 6px; cursor: pointer; font: inherit; text-align: left; }
+.reflect-date { font-size: .8rem; font-weight: 700; color: var(--ink); }
+.reflect-anchor { font-size: .7rem; font-weight: 600; color: var(--brass-fg); }
+.reflect-text { margin: 0; font-family: var(--serif); font-size: .92rem; line-height: 1.65; color: var(--ink2); white-space: pre-wrap; overflow-wrap: anywhere; cursor: pointer;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.reflect-item.open .reflect-text { display: block; -webkit-line-clamp: unset; overflow: visible; color: var(--ink); }
+.reflect-actions { display: flex; gap: 8px; margin-top: 10px; }
+.reflect-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font-size: .76rem; font-weight: 600; cursor: pointer; background: var(--warm-white); color: var(--ink2); border: 1.5px solid var(--border2); }
+.reflect-actions button.danger { color: var(--danger); }
+.reflect-more { margin-top: 12px; width: 100%; }
