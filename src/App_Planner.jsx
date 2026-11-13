@@ -2662,9 +2662,11 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         )}
 
         {(() => {
-          // Pick top task: priority high, due today/overdue, not completed
+          // Top task comes only from today (or overdue). Once today's list is done, it says so instead of
+          // reaching into tomorrow or later (2026-11-13).
+          const todaysTasks = tasks.filter(t => isToday(t.date))
           const topTask = tasks
-            .filter(t => !t.completed)
+            .filter(t => !t.completed && (isToday(t.date) || isOverdue(t.date)))
             .sort((a, b) => {
               const aP = (a.priority?.toLowerCase() === 'high' ? 3 : a.priority?.toLowerCase() === 'medium' ? 2 : 1)
               const bP = (b.priority?.toLowerCase() === 'high' ? 3 : b.priority?.toLowerCase() === 'medium' ? 2 : 1)
@@ -2703,6 +2705,18 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                     </div>
                   </div>
                 </div>
+              ) : todaysTasks.length > 0 ? (
+                <div style={{
+                  background:'rgba(34,197,94,.15)', padding:'7px 10px',
+                  borderRadius:9, display:'flex', alignItems:'center', gap:9,
+                  border:'1px solid rgba(34,197,94,.3)',
+                }}>
+                  <div style={{fontSize:'1rem'}}>✓</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'.58rem', color:'var(--success)', fontWeight:700, letterSpacing:'.05em'}}>TODAY'S TASKS DONE</div>
+                    <div style={{fontSize:'.78rem', marginTop:1}}>{todaysTasks.length === 1 ? 'Your task for today is checked off' : todaysTasks.length === 2 ? "Both of today's tasks checked off" : `All ${todaysTasks.length} of today's tasks checked off`} 🔥</div>
+                  </div>
+                </div>
               ) : (
                 <Link to="/tasks" style={{
                   background:'rgba(255,255,255,.05)', padding:'7px 10px',
@@ -2712,7 +2726,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   <div style={{fontSize:'1rem', opacity:.5}}>✓</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP TASK</div>
-                    <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>A blank page awaits — add your first</div>
+                    <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>{tasks.length ? 'Nothing due today' : 'A blank page awaits — add your first'}</div>
                   </div>
                 </Link>
               )}
@@ -2835,21 +2849,20 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     </>
   )
 
-  const B_schedule = (
+  // Today's timed tasks and events. Shows only when something is on the clock; adding lives in the + button (2026-11-13).
+  const B_schedule = todaySchedule.length === 0 ? null : (
     <>
       {/* ── Today's schedule ──────────────────────────────────────── */}
       <section className="card">
         <div className="section-title-row">
           <div><p className="eyebrow">Today Timeline</p><h3>What's on the clock</h3></div>
-          <button className="ghost-btn" style={{fontSize:'.8rem'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
+          <Link className="ghost-btn" to="/calendar" style={{fontSize:'.8rem'}}>Calendar →</Link>
         </div>
-        {todaySchedule.length === 0
-          ? <p className="muted" style={{fontSize:'.85rem'}}>Nothing scheduled yet today. <button onClick={() => onQuickCreate('task', { date: TODAY })} style={{background:'none', border:'none', color:'var(--teal)', cursor:'pointer', fontFamily:'inherit', fontWeight:600, padding:0}}>Add a task →</button></p>
-          : todaySchedule.slice(0, 6).map((item) => (
+        {todaySchedule.slice(0, 6).map((item) => (
             <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
               <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600, whiteSpace:'nowrap'}}>{fmtRange(item.startTime, item.endTime)}</strong>
-              <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
+              <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color: item.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none'}}>{item.title}</span>
               <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
           ))}
