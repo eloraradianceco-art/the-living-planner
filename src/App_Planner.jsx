@@ -2553,7 +2553,6 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const firstName = rawFirst && rawFirst.toLowerCase() !== 'planner' ? rawFirst : ''
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-  const focusCopy = openTasks.filter(t => isToday(t.date) && !t.completed).slice(0, 2).map(t => t.title)
   const topGoals = goals.filter((g) => !g.completed).slice(0, 3)
 
   const SECTIONS = [
@@ -2574,25 +2573,14 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       <div className="hero-focus-card">
         <p className="eyebrow">{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'})}</p>
         <h2 style={{fontSize:'1.5rem', marginBottom:6}}>{greeting}{firstName ? `, ${firstName}` : '.'}</h2>
-        <p className="muted" style={{fontSize:'.9rem', lineHeight:1.5}}>
-          {focusCopy.length > 0
-            ? `Today: ${focusCopy.join(' · ')}`
-            : overdueTasks.length > 0
-            ? `You have ${overdueTasks.length} overdue item${overdueTasks.length > 1 ? 's' : ''} waiting.`
-            : 'A clear day. What will you make of it?'}
-        </p>
-        <div className="hero-focus-actions" style={{marginTop:14}}>
-          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('task', { date: TODAY })}>+ Task</button>
-          <button style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, cursor:'pointer'}} onClick={() => onQuickCreate('event', { date: TODAY })}>+ Event</button>
-          <Link to="/calendar" style={{fontSize:'.82rem', padding:'8px 16px', borderRadius:999, background:'rgba(184,150,90,.18)', color:'var(--brass-fg)', border:'1px solid rgba(184,150,90,.35)', fontWeight:600, textDecoration:'none', display:'inline-block'}}>Day View</Link>
-        </div>
+        {/* Date, name and Life Score only: + Task / + Event live in the + button, Day View in the Calendar tab (2026-11-13) */}
         {/* Overall score pill */}
         {(() => {
           const life = lifeScoreOf(scores)
           const avg = life == null ? null : Math.round(life)
           if (!avg) return null
           return (
-            <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
+            <div style={{marginTop:10,display:'flex',alignItems:'center',gap:8}}>
               <div style={{
                 padding:'5px 12px',borderRadius:999,
                 background: avg >= 7 ? 'rgba(52,168,83,.2)' : avg >= 5 ? 'rgba(42,157,143,.2)' : 'rgba(184,150,90,.2)',
