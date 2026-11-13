@@ -1926,3 +1926,31 @@ button.profile-pill:active { transform: scale(.97); }
 .reflect-actions button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font-size: .76rem; font-weight: 600; cursor: pointer; background: var(--warm-white); color: var(--ink2); border: 1.5px solid var(--border2); }
 .reflect-actions button.danger { color: var(--danger); }
 .reflect-more { margin-top: 12px; width: 100%; }
+
+/* ── Life Score: 6 areas (2026-11-13) ─────────────────────────────── */
+.score-snap-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+@media (min-width: 640px) { .score-snap-grid { grid-template-columns: repeat(6, 1fr); } }
+.score-snap { text-align: center; padding: 8px 4px; background: var(--surface); border-radius: var(--radius-sm); }
+.score-snap-label { font-size: .64rem; color: var(--muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.score-snap-label span { font-size: .8rem; }
+.score-snap-value { font-size: 1.1rem; font-weight: 700; }
+.score-snap-bar { height: 3px; border-radius: 999px; background: var(--border2); margin-top: 4px; overflow: hidden; }
+.score-snap-bar > div { height: 100%; border-radius: 999px; }
+.score-snap-note { font-size: .7rem; margin: 8px 0 0; }
+.score-explain { margin-top: 14px; border-top: 1px solid var(--surface); padding-top: 14px; }
+.score-explain-lead { font-size: .78rem; line-height: 1.5; margin: 0 0 8px; }
+.score-explain-area { padding: 10px 0; border-bottom: 1px solid var(--surface); }
+.score-explain-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .86rem; }
+.score-explain-head > span { font-size: .78rem; font-weight: 700; color: var(--brass-fg); }
+.score-explain-how { font-size: .75rem; color: var(--muted); line-height: 1.5; margin: 2px 0 6px; }
+.score-explain-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.score-explain-parts li { display: grid; grid-template-columns: minmax(0, 1fr) 64px; grid-template-areas: "label meter" "detail detail"; column-gap: 10px; row-gap: 1px; align-items: center; font-size: .8rem; }
+.score-explain-parts li > span:first-child { grid-area: label; font-weight: 600; }
+.score-explain-parts li .muted { grid-area: detail; font-size: .74rem; }
+.score-explain-parts li .score-explain-meter { grid-area: meter; }
+@media (min-width: 640px) {
+  .score-explain-parts li { grid-template-columns: 150px minmax(0, 1fr) 80px; grid-template-areas: "label detail meter"; }
+}
+.score-explain-meter { height: 5px; border-radius: 999px; background: var(--border2); overflow: hidden; }
+.score-explain-meter > span { display: block; height: 100%; background: var(--teal); border-radius: 999px; }
+.score-explain-empty { font-size: .75rem; color: var(--muted); font-style: italic; }
