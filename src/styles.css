@@ -1889,3 +1889,11 @@ button.profile-pill:active { transform: scale(.97); }
   .money-move-fields, .sav-new-row, .sav-edit-grid { grid-template-columns: 1fr; }
 }
 .home-quick-emoji { font-size: 1.4rem; line-height: 1; }
+
+/* ── Emoji in the menus (2026-11-12) ──────────────────────────────── */
+.side-emoji { width: 20px; flex-shrink: 0; text-align: center; font-size: 1.05rem; line-height: 1; }
+.menu-emoji { font-size: 1.55rem; line-height: 1; }
+.mode-option-emoji { font-size: 1.3rem; line-height: 1; }
+.menu-foot-link span[aria-hidden] { font-size: 1rem; line-height: 1; }
+.nav-item .nav-emoji { font-size: 1.3rem; opacity: .72; filter: saturate(.85); transition: opacity .15s, transform .15s, filter .15s; }
+.nav-item.active .nav-emoji { opacity: 1; filter: none; transform: translateY(-1px) scale(1.08); }

@@ -1511,10 +1511,10 @@ function AuthPage() {
 
 // Phone bottom bar. The last slot opens the Menu sheet with every section.
 const tabs = [
-  { to: '/', label: 'Home', icon: House },
-  { to: '/tasks', label: 'Tasks', icon: SquareCheck },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-  { to: '/growth', label: 'Growth', icon: TrendingUp },
+  { to: '/', label: 'Home', icon: House, emoji: '🏠' },
+  { to: '/tasks', label: 'Tasks', icon: SquareCheck, emoji: '✅' },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays, emoji: '📅' },
+  { to: '/growth', label: 'Growth', icon: TrendingUp, emoji: '📈' },
 ]
 
 // Additional routes not in bottom nav
@@ -1523,23 +1523,23 @@ const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity'
 // Every section of the planner — drives the iPad/desktop side nav and Home's Quick Access.
 const NAV_GROUPS = [
   { label: 'Plan', items: [
-    { to: '/',          label: 'Home',      icon: House },
-    { to: '/tasks',     label: 'Tasks',     icon: SquareCheck },
-    { to: '/calendar',  label: 'Calendar',  icon: CalendarDays },
-    { to: '/projects',  label: 'Projects',  icon: Folder },
+    { to: '/',          label: 'Home',      icon: House, emoji: '🏠' },
+    { to: '/tasks',     label: 'Tasks',     icon: SquareCheck, emoji: '✅' },
+    { to: '/calendar',  label: 'Calendar',  icon: CalendarDays, emoji: '📅' },
+    { to: '/projects',  label: 'Projects',  icon: Folder, emoji: '📁' },
   ]},
   { label: 'Grow', items: [
-    { to: '/habits',    label: 'Habits',    icon: Repeat },
-    { to: '/goals',     label: 'Goals',     icon: Target },
-    { to: '/growth',    label: 'Growth',    icon: TrendingUp },
+    { to: '/habits',    label: 'Habits',    icon: Repeat, emoji: '🔁' },
+    { to: '/goals',     label: 'Goals',     icon: Target, emoji: '🎯' },
+    { to: '/growth',    label: 'Growth',    icon: TrendingUp, emoji: '📈' },
   ]},
   { label: 'Life', items: [
-    { to: '/finance',      label: 'Finance',           icon: Wallet },
-    { to: '/calculator',   label: 'Calculator',        icon: Calculator },
-    { to: '/wellness',     label: 'Health & Wellness', icon: Leaf, also: ['/health'] },
-    { to: '/productivity', label: 'Productivity',      icon: Zap },
-    { to: '/lifestyle',    label: 'Lifestyle',         icon: Compass },
-    { to: '/faith',        label: 'Faith',             icon: Cross },
+    { to: '/finance',      label: 'Finance',           icon: Wallet, emoji: '💰' },
+    { to: '/calculator',   label: 'Calculator',        icon: Calculator, emoji: '🧮' },
+    { to: '/wellness',     label: 'Health & Wellness', icon: Leaf, emoji: '❤️', also: ['/health'] },
+    { to: '/productivity', label: 'Productivity',      icon: Zap, emoji: '⚡' },
+    { to: '/lifestyle',    label: 'Lifestyle',         icon: Compass, emoji: '🏡' },
+    { to: '/faith',        label: 'Faith',             icon: Cross, emoji: '🙏' },
   ]},
 ]
 const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
@@ -1547,10 +1547,10 @@ const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
 // Planner modes reorder Home around a season's priority. Nothing is hidden,
 // and the Life Score is calculated the same way in every mode.
 const PLANNER_MODES = [
-  { id: 'Balanced',  icon: Compass,    line: 'Everything in its place: today, faith, goals and your score in balance.' },
-  { id: 'Execution', icon: Zap,        line: 'Leads with your schedule, anything overdue, and the next step on every project.' },
-  { id: 'Wellness',  icon: Leaf,       line: "Leads with today's habits and your body: training, sleep, recovery." },
-  { id: 'Growth',    icon: TrendingUp, line: 'Leads with your goals, their next steps, and your weekly review.' },
+  { id: 'Balanced',  icon: Compass,    emoji: '⚖️',    line: 'Everything in its place: today, faith, goals and your score in balance.' },
+  { id: 'Execution', icon: Zap,        emoji: '🚀',        line: 'Leads with your schedule, anything overdue, and the next step on every project.' },
+  { id: 'Wellness',  icon: Leaf,       emoji: '🌿',       line: "Leads with today's habits and your body: training, sleep, recovery." },
+  { id: 'Growth',    icon: TrendingUp, emoji: '📈', line: 'Leads with your goals, their next steps, and your weekly review.' },
 ]
 const modeOf = (profile) => PLANNER_MODES.find((m) => m.id === profile?.plannerMode) || PLANNER_MODES[0]
 
@@ -1580,11 +1580,10 @@ function ModeSheet({ open, current, onPick, onClose }) {
         <p className="mode-sheet-sub">Changes what Home shows first. Nothing is hidden, and your Life Score is measured the same way.</p>
         <div className="mode-options">
           {PLANNER_MODES.map((m) => {
-            const Icon = m.icon
             const active = m.id === current
             return (
               <button key={m.id} className={'mode-option' + (active ? ' active' : '')} onClick={() => onPick(m.id)} aria-pressed={active}>
-                <span className="mode-option-icon"><Icon size={20} strokeWidth={1.7} /></span>
+                <span className="mode-option-icon mode-option-emoji" aria-hidden="true">{m.emoji}</span>
                 <span className="mode-option-text"><strong>{m.id}</strong><small>{m.line}</small></span>
                 {active && <Check size={18} strokeWidth={2.4} className="mode-option-check" />}
               </button>
@@ -1651,10 +1650,9 @@ function MenuSheet({ open, onClose, onQuickAdd }) {
             <div className="menu-grid">
               {group.items.filter((item) => item.to !== '/').map((item) => {   // Home is already in the bottom bar
                 const active = isNavActive(item, pathname)
-                const Icon = item.icon
                 return (
                   <Link key={item.to} to={item.to} onClick={onClose} className={'menu-tile' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
-                    <Icon size={22} strokeWidth={active ? 1.9 : 1.6} />
+                    <span className="menu-emoji" aria-hidden="true">{item.emoji}</span>
                     <span>{item.label}</span>
                   </Link>
                 )
@@ -1664,7 +1662,7 @@ function MenuSheet({ open, onClose, onQuickAdd }) {
         ))}
         <div className="menu-foot">
           <Link to="/more" onClick={onClose} className={'menu-foot-link' + (pathname === '/more' ? ' active' : '')}>
-            <Ellipsis size={18} /> More &amp; Settings
+            <span aria-hidden="true">⚙️</span> More &amp; Settings
           </Link>
           <button className="menu-foot-add" onClick={() => { onClose(); onQuickAdd() }}>
             <Plus size={17} strokeWidth={2.2} /> Quick Add
@@ -1833,10 +1831,9 @@ function SideNav({ onQuickAdd }) {
           <p className="side-group-label">{group.label}</p>
           {group.items.map((item) => {
             const active = isNavActive(item, pathname)
-            const Icon = item.icon
             return (
               <Link key={item.to} to={item.to} className={'side-link' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
-                <Icon size={18} strokeWidth={active ? 2 : 1.7} />
+                <span className="side-emoji" aria-hidden="true">{item.emoji}</span>
                 <span>{item.label}</span>
               </Link>
             )
@@ -1845,7 +1842,7 @@ function SideNav({ onQuickAdd }) {
       ))}
       <div className="side-group side-foot">
         <Link to="/more" className={'side-link' + (pathname === '/more' ? ' active' : '')} aria-current={pathname === '/more' ? 'page' : undefined}>
-          <Ellipsis size={18} strokeWidth={1.7} />
+          <span className="side-emoji" aria-hidden="true">⚙️</span>
           <span>More &amp; Settings</span>
         </Link>
       </div>
@@ -1963,17 +1960,16 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
         <nav className="bottom-nav premium-nav">
           {tabs.map((tab) => {
             const active = !menuOpen && location.pathname === tab.to
-            const Icon = tab.icon
             return (
               <Link key={tab.to} to={tab.to} className={active ? 'nav-item active' : 'nav-item'} aria-current={active ? 'page' : undefined}>
-                <span className="nav-icon"><Icon size={21} strokeWidth={active ? 2 : 1.7} /></span>
+                <span className="nav-icon nav-emoji" aria-hidden="true">{tab.emoji}</span>
                 <span className="nav-label">{tab.label}</span>
               </Link>
             )
           })}
           <button type="button" className={menuOpen || !onTabRoute ? 'nav-item active' : 'nav-item'}
             onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} aria-label="Menu — all sections">
-            <span className="nav-icon"><LayoutGrid size={21} strokeWidth={menuOpen || !onTabRoute ? 2 : 1.7} /></span>
+            <span className="nav-icon nav-emoji" aria-hidden="true">🗂️</span>
             <span className="nav-label">Menu</span>
           </button>
         </nav>
@@ -2269,7 +2265,6 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
   const SECTIONS = [
     ...NAV_ITEMS.filter((n) => n.to !== '/').map((n) => ({
-      emoji: SECTION_EMOJI[n.to],
       ...n,
       count: n.to === '/tasks' ? (openTasks.length || null)
         : n.to === '/calendar' ? (todaySchedule.length || null)
@@ -4113,11 +4108,6 @@ const emojiOf = (label = '') => {
   const m = String(label).match(/^([^\p{L}\p{N}\s]+)\s/u)
   if (!m) return ''
   return [...m[1]].length === 1 ? m[1] + '\uFE0F' : m[1] // single symbol: ask for the color version
-}
-// Home Quick Access tiles (same emoji as the website's section list)
-const SECTION_EMOJI = {
-  '/tasks': '✅', '/calendar': '📅', '/projects': '📁', '/habits': '🔁', '/goals': '🎯', '/growth': '📈',
-  '/finance': '💰', '/calculator': '🧮', '/wellness': '❤️', '/productivity': '⚡', '/lifestyle': '🏡', '/faith': '🙏',
 }
 const withEmoji = (label = '') => { const e = emojiOf(label); return e ? `${e} ${stripEmoji(label)}` : label }
 
