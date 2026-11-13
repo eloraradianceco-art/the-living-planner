@@ -241,41 +241,235 @@ function sortByTime(a, b) {
 }
 
 
-// ── Scoring ───────────────────────────────────────────────────────────────
-function computeScores({ tasks, expenses, habits, habitLogs, budget }) {
-  const taskByCategory = {}
-  for (const task of tasks) {
-    if (!taskByCategory[task.category]) taskByCategory[task.category] = { total: 0, completed: 0 }
-    taskByCategory[task.category].total += 1
-    if (task.completed) taskByCategory[task.category].completed += 1
-  }
+// ── Scoring (rebuilt 2026-11-13) ──────────────────────────────────────────
+// Each area is scored 1–10 from what you actually did in the last 7 days, using the data from its own
+// section (not just task categories). A part only counts once you use it (e.g. water counts after you log
+// water in the past 30 days), and an area with nothing to measure shows "—" instead of a fake 5 and is
+// left out of the Life Score average.
+const SCORE_DOMAINS = ['Faith', 'Health', 'Wellness', 'Lifestyle', 'Productivity', 'Finances']
+const DOMAIN_META = {
+  Faith: { emoji: '🙏', short: 'Faith' },
+  Health: { emoji: '💪', short: 'Health' },
+  Wellness: { emoji: '🌿', short: 'Wellness' },
+  Lifestyle: { emoji: '🏡', short: 'Lifestyle' },
+  Productivity: { emoji: '⚡', short: 'Work' },
+  Finances: { emoji: '💰', short: 'Money' },
+}
+const SCORE_WINDOW_DAYS = 7
+const scoreWindow = (end = TODAY) => Array.from({ length: SCORE_WINDOW_DAYS }, (_, i) => addDays(end, i - (SCORE_WINDOW_DAYS - 1)))
+const usedRecently = (dates) => { const from = addDays(TODAY, -29); return dates.some((d) => d && d >= from && d <= TODAY) }
+const meanOf = (xs) => { const v = xs.filter((x) => Number.isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
+const clamp01 = (x) => Math.max(0, Math.min(1, x))
+const dateKeys = (obj) => Object.keys(obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {}).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k))
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-  const habitMap = Object.fromEntries(habits.map((h) => [h.id, h]))
-  const habitByCategory = {}
-  for (const log of habitLogs) {
-    const habit = habitMap[log.habitId]
-    if (!habit) continue
-    if (!habitByCategory[habit.category]) habitByCategory[habit.category] = { total: 0, completed: 0 }
-    habitByCategory[habit.category].total += 1
-    if (log.completed) habitByCategory[habit.category].completed += 1
+// Days in the window since you started this practice (so starting something never lowers a score)
+const activeDaysSince = (dates, days) => {
+  const first = dates.filter((d) => d && d >= addDays(TODAY, -29) && d <= TODAY).sort()[0]
+  return first ? Math.max(1, days.filter((d) => d >= first).length) : days.length
+}
+// Days in the window with at least one entry, against a weekly target scaled to the days you've been at it
+function daysPart(label, dates, days, perWeek, noun = 'day') {
+  if (!usedRecently(dates)) return null
+  const active = activeDaysSince(dates, days)
+  const expected = perWeek >= 7 ? active : Math.max(1, Math.round((perWeek * active) / 7))
+  const n = new Set(dates.filter((d) => days.includes(d))).size
+  return { label, detail: `${plural(Math.min(n, expected), noun)} of ${expected}`, value: clamp01(n / expected) }
+}
+// "Do cardio 3x per week" expects 3 check-ins a week; everything else is daily
+const habitTimesPerWeek = (h) => {
+  const m = String(h.name || '').match(/(\d+)\s*(?:x|times?)\s*(?:per|a|each|\/)\s*week/i) || String(h.frequency || '').match(/(\d+)\s*(?:x|times?)?\s*(?:per|a|\/)?\s*week/i)
+  return m ? Math.min(7, Math.max(1, Number(m[1]))) : 7
+}
+function habitsPart(category, habits, habitLogs, days) {
+  const hs = habits.filter((h) => h.category === category)
+  if (!hs.length) return null
+  const ids = new Set(hs.map((h) => h.id))
+  const logs = habitLogs.filter((l) => ids.has(l.habitId) && l.completed)
+  if (!usedRecently(logs.map((l) => l.date))) return null   // counts once you start checking these habits off
+  const activeDays = activeDaysSince(logs.map((l) => l.date), days)
+  let expected = 0, done = 0
+  for (const h of hs) {
+    const perWeek = habitTimesPerWeek(h)
+    const exp = perWeek >= 7 ? activeDays : Math.max(1, Math.round((perWeek * activeDays) / 7))
+    const got = new Set(logs.filter((l) => l.habitId === h.id && days.includes(l.date)).map((l) => l.date)).size
+    expected += exp
+    done += Math.min(got, exp)
   }
+  return { label: `${category} habits`, detail: `${done} of ${expected} check-ins`, value: clamp01(done / expected) }
+}
+function tasksPart(label, tasks, days, test) {
+  const due = tasks.filter((t) => test(t) && t.date && t.date >= days[0] && t.date <= TODAY)
+  if (!due.length) return null
+  const done = due.filter((t) => t.completed).length
+  return { label, detail: `${done} of ${plural(due.length, 'task')} due`, value: done / due.length }
+}
 
-  // Finance score based on savings progress, not weekly spend (bills shouldn't hurt score)
-  const discretionary = expenses.filter(e => !['Bills','Utilities','Rent','Insurance'].includes(e.category)).reduce((sum, item) => sum + Number(item.amount || 0), 0)
-  const financeScore = Math.max(1, Math.min(10, Math.round(((budget.weeklyTarget - discretionary) / Math.max(budget.weeklyTarget, 1)) * 10 + 7)))
+function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs = [], budget = {}, goals = [], projects = [] }, src = {}) {
+  const days = scoreWindow()
+  const W = src.wellness || {}, F = src.faith || {}, P = src.productivity || {}, M = src.finance || {}
+  const otherAreas = new Set(['Health', 'Lifestyle', 'Wellness', 'Finances', 'Faith'])
+  const parts = {}
 
-  const scoreFromCompletion = (group) => {
-    if (!group || group.total === 0) return 5
-    return Math.max(1, Math.min(10, Math.round((group.completed / group.total) * 10)))
+  // Faith: reflection, Bible reading, prayer & gratitude, Faith habits/tasks
+  const reflectionDates = [...(Array.isArray(F.reflections) ? F.reflections.map((r) => r.date) : []), F.devotional && String(F.devotional.text || '').trim() ? F.devotional.date : null].filter(Boolean)
+  const prayerDates = [...(Array.isArray(F.gratitude) ? F.gratitude.map((g) => g.date) : []), ...(Array.isArray(F.prayers) ? F.prayers.map((p) => p.date) : [])].filter(Boolean)
+  parts.Faith = [
+    daysPart('Daily reflection', reflectionDates, days, 7),
+    daysPart('Bible reading', (F.bibleReading && F.bibleReading.completedDates) || [], days, 7),
+    daysPart('Prayer & gratitude', prayerDates, days, 5),
+    habitsPart('Faith', habits, habitLogs, days),
+    tasksPart('Faith tasks', tasks, days, (t) => t.category === 'Faith'),
+  ]
+
+  // Health: training, sleep, water, recovery energy, meals, Health habits/tasks
+  const workouts = Array.isArray(W.workouts) ? W.workouts : []
+  const sleepLog = (Array.isArray(W.sleep) ? W.sleep : []).filter((e) => e && e.date && Number.isFinite(Number(e.quality)))
+  const sleepWin = sleepLog.filter((e) => days.includes(e.date))
+  const water = W.waterLog || {}
+  const recovery = W.recovery || {}
+  const recWin = dateKeys(recovery).filter((d) => days.includes(d) && Number.isFinite(Number(recovery[d] && recovery[d].energy)))
+  const meals = W.meals || {}
+  parts.Health = [
+    daysPart('Workouts', workouts.map((w) => w.date), days, 4, 'workout'),
+    sleepWin.length ? { label: 'Sleep quality', detail: `avg ${meanOf(sleepWin.map((e) => Number(e.quality))).toFixed(1)}/10 over ${plural(sleepWin.length, 'night')}`, value: clamp01(meanOf(sleepWin.map((e) => Number(e.quality))) / 10) } : null,
+    (() => { const logged = days.filter((d) => Number(water[d]) > 0); if (!logged.length) return null; const avg = meanOf(logged.map((d) => Number(water[d]))); return { label: 'Water', detail: `avg ${avg.toFixed(1)} of 8 glasses on ${plural(logged.length, 'day')} logged`, value: clamp01(avg / 8) } })(),
+    recWin.length ? (() => { const e = meanOf(recWin.map((d) => Number(recovery[d].energy))); return { label: 'Recovery energy', detail: `avg ${e.toFixed(1)}/5`, value: clamp01((e - 1) / 4) } })() : null,
+    daysPart('Meals logged', dateKeys(meals).filter((d) => (meals[d] || []).length), days, 7),
+    habitsPart('Health', habits, habitLogs, days),
+    tasksPart('Health tasks', tasks, days, (t) => t.category === 'Health'),
+  ]
+
+  // Wellness: mood check-ins, calm (anxiety), journal, routine, Wellness habits/tasks
+  const wlog = W.wellnessLog || {}
+  const moodDays = dateKeys(wlog).filter((d) => Number.isFinite(Number(wlog[d] && wlog[d].mood)))
+  const moodWin = moodDays.filter((d) => days.includes(d))
+  const anxWin = (Array.isArray(W.anxiety) ? W.anxiety : []).filter((a) => a && days.includes(a.date) && Number.isFinite(Number(a.level)))
+  const routine = Array.isArray(W.routine) ? W.routine : []
+  const routineLog = W.routineLog || {}
+  parts.Wellness = [
+    usedRecently(moodDays) ? (() => {
+      const avg = meanOf(moodWin.map((d) => Number(wlog[d].mood)))
+      const active = activeDaysSince(moodDays, days)
+      const consistency = clamp01(moodWin.length / active)
+      return { label: 'Mood check-ins', detail: `${plural(moodWin.length, 'day')} of ${active}${avg != null ? ` · avg mood ${avg.toFixed(1)}/5` : ''}`, value: clamp01(avg != null ? 0.5 * consistency + 0.5 * ((avg - 1) / 4) : 0) }
+    })() : null,
+    anxWin.length ? (() => { const a = meanOf(anxWin.map((x) => Number(x.level))); return { label: 'Calm', detail: `avg anxiety ${a.toFixed(1)}/10`, value: clamp01((10 - a) / 9) } })() : null,
+    daysPart('Journal', (Array.isArray(W.journalEntries) ? W.journalEntries : []).map((j) => j.date), days, 4),
+    routine.length && usedRecently(dateKeys(routineLog).filter((d) => (routineLog[d] || []).length)) ? (() => {
+      const v = meanOf(days.map((d) => clamp01((routineLog[d] || []).length / routine.length)))
+      return { label: 'Daily routine', detail: `${Math.round(v * 100)}% of routine steps`, value: v }
+    })() : null,
+    habitsPart('Wellness', habits, habitLogs, days),
+    tasksPart('Wellness tasks', tasks, days, (t) => t.category === 'Wellness'),
+  ]
+
+  // Lifestyle: home care (cleaning), Lifestyle habits/tasks
+  const clean = P.cleaningLog || {}
+  const choreDays = Object.keys(clean).filter((k) => clean[k] && k.startsWith('d:')).map((k) => k.slice(2, 12))
+  const weekKey = 'w:' + startOfWeek(TODAY)
+  const weeklyDone = Object.keys(clean).filter((k) => clean[k] && k.startsWith(weekKey + '_')).length
+  const usedWeekly = Object.keys(clean).some((k) => k.startsWith('w:') && k.slice(2, 12) >= addDays(TODAY, -56))
+  parts.Lifestyle = [
+    daysPart('Daily chores', choreDays, days, 7),
+    usedWeekly ? { label: 'Weekly chores', detail: `${weeklyDone} done this week`, value: clamp01(weeklyDone / 5) } : null,
+    habitsPart('Lifestyle', habits, habitLogs, days),
+    tasksPart('Lifestyle tasks', tasks, days, (t) => t.category === 'Lifestyle'),
+  ]
+
+  // Productivity: work tasks due this week, overdue load, goal/project steps, Productivity habits
+  const workTask = (t) => !otherAreas.has(t.category)
+  const overdue = tasks.filter((t) => workTask(t) && !t.completed && t.date && t.date < TODAY).length
+  const stepDates = [...goals, ...projects].flatMap((x) => normalizeSteps(x.steps)).filter((st) => st.done && st.doneAt).map((st) => String(st.doneAt).slice(0, 10))
+  const anyWork = tasks.some(workTask)
+  parts.Productivity = [
+    tasksPart('Tasks done', tasks, days, workTask),
+    anyWork ? { label: 'Overdue', detail: overdue ? `${plural(overdue, 'task')} past due` : 'nothing past due', value: clamp01(1 - overdue / 5) } : null,
+    usedRecently(stepDates) ? { label: 'Goal & project steps', detail: `${stepDates.filter((d) => days.includes(d)).length} checked off`, value: clamp01(stepDates.filter((d) => days.includes(d)).length / 3) } : null,
+    habitsPart('Productivity', habits, habitLogs, days),
+  ]
+
+  // Finances: spending vs weekly target (when you log spending), saving, Finance habits/tasks
+  const spentWin = expenses.filter((e) => e.date && days.includes(e.date))
+  const discretionary = spentWin.filter((e) => !['Bills', 'Utilities', 'Rent', 'Insurance'].includes(e.category)).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const target = Number(budget.weeklyTarget) || 0
+  const savingHistory = [...(Array.isArray(M.savingsGoals) ? M.savingsGoals : []), ...(Array.isArray(M.sinkingFunds) ? M.sinkingFunds : [])].flatMap((g) => g.history || [])
+  const depositDates = savingHistory.filter((h) => Number(h.amount) > 0).map((h) => h.date)
+  parts.Finances = [
+    spentWin.length && target > 0 ? { label: 'Spending', detail: `$${Math.round(discretionary)} of $${Math.round(target)} weekly target`, value: clamp01(discretionary <= target ? 1 : 2 - discretionary / target) } : null,
+    usedRecently(depositDates) ? { label: 'Saving', detail: `${plural(depositDates.filter((d) => days.includes(d)).length, 'deposit')} this week`, value: depositDates.some((d) => days.includes(d)) ? 1 : 0 } : null,
+    habitsPart('Finances', habits, habitLogs, days),
+    tasksPart('Finance tasks', tasks, days, (t) => t.category === 'Finances'),
+  ]
+
+  const out = {}
+  for (const d of SCORE_DOMAINS) {
+    const list = parts[d].filter(Boolean)
+    const avg = meanOf(list.map((x) => x.value))
+    out[d] = { score: avg == null ? null : Math.max(1, Math.min(10, Math.round(1 + 9 * avg))), parts: list }
   }
+  return out
+}
+// Plain { Domain: score|null } map used across the app
+const computeScores = (collections, sources) => Object.fromEntries(Object.entries(computeScoreDetails(collections, sources)).map(([k, v]) => [k, v.score]))
+const lifeScoreOf = (scores) => { const v = Object.values(scores || {}).filter((x) => Number.isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 
-  return {
-    Health: Math.round((scoreFromCompletion(taskByCategory.Health) + scoreFromCompletion(habitByCategory.Health)) / 2),
-    Lifestyle: scoreFromCompletion(taskByCategory.Lifestyle),
-    Productivity: scoreFromCompletion(taskByCategory.Productivity),
-    Wellness: Math.round((scoreFromCompletion(taskByCategory.Wellness) + scoreFromCompletion(habitByCategory.Wellness)) / 2),
-    Finances: financeScore,
+// The section data the scores read. Each section's save calls emitPlannerData(...), so scores update the
+// moment you log something; the account copy is re-read on open and whenever the app comes back.
+const SCORE_SOURCE_KEYS = {
+  wellness: ['workouts', 'sleep', 'waterLog', 'recovery', 'meals', 'wellnessLog', 'anxiety', 'journalEntries', 'routine', 'routineLog'],
+  productivity: ['cleaningLog'],
+  finance: ['savingsGoals', 'sinkingFunds'],
+  faith: ['reflections', 'devotional', 'bibleReading', 'gratitude', 'prayers'],
+}
+const SOURCE_PREFIX = { wellness: 'planner.hw.', productivity: 'planner.p.', finance: 'planner.f.', faith: 'planner.faith.' }
+function emitPlannerData(page, key, value) {
+  try { window.dispatchEvent(new CustomEvent('planner-data', { detail: { page, key, value } })) } catch {}
+}
+function readSourceCache() {
+  const out = {}
+  for (const [page, keys] of Object.entries(SCORE_SOURCE_KEYS)) {
+    out[page] = {}
+    for (const k of keys) { try { const v = localStorage.getItem(SOURCE_PREFIX[page] + k); if (v != null) out[page][k] = JSON.parse(v) } catch {} }
   }
+  return out
+}
+function useScoreSources(user) {
+  const [sources, setSources] = useState(readSourceCache)
+  useEffect(() => {
+    const onData = (e) => {
+      const { page, key, value } = e.detail || {}
+      if (!SCORE_SOURCE_KEYS[page]?.includes(key)) return
+      setSources((prev) => ({ ...prev, [page]: { ...prev[page], [key]: value } }))
+    }
+    window.addEventListener('planner-data', onData)
+    return () => window.removeEventListener('planner-data', onData)
+  }, [])
+  useEffect(() => {
+    if (!user || !hasSupabaseEnv) return
+    let alive = true
+    const load = () => {
+      const pages = ['wellness', 'productivity', 'finance']
+      const keys = pages.flatMap((p) => SCORE_SOURCE_KEYS[p])
+      Promise.all([
+        supabase.from('page_data').select('page, data_key, data_value').eq('user_id', user.id).in('page', pages).in('data_key', keys),
+        supabase.from('faith_data').select('data_key, data_value').eq('user_id', user.id).in('data_key', SCORE_SOURCE_KEYS.faith),
+      ]).then(([pd, fd]) => {
+        if (!alive) return
+        setSources((prev) => {
+          const next = { ...prev }
+          for (const row of pd.data || []) if (SCORE_SOURCE_KEYS[row.page]?.includes(row.data_key)) next[row.page] = { ...next[row.page], [row.data_key]: row.data_value }
+          for (const row of fd.data || []) next.faith = { ...next.faith, [row.data_key]: row.data_value }
+          return next
+        })
+      })
+    }
+    load()
+    const onVis = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { alive = false; document.removeEventListener('visibilitychange', onVis) }
+  }, [user?.id])
+  return sources
 }
 
 // ── Steps (checklists on goals & projects) ───────────────────────────────
@@ -1108,37 +1302,36 @@ function usePlannerData() {
     return () => { document.removeEventListener('visibilitychange', refresh); window.removeEventListener('pageshow', refresh) }
   }, [isAuthenticated, user?.id])
 
-  const scores = useMemo(() => computeScores(collections), [collections])
+  const scoreSources = useScoreSources(user)
+  const scoreDetails = useMemo(() => computeScoreDetails(collections, scoreSources), [collections, scoreSources])
+  const scores = useMemo(() => Object.fromEntries(Object.entries(scoreDetails).map(([k, v]) => [k, v.score])), [scoreDetails])
   const [scoreHistory, setScoreHistory] = useState([])
 
-  // Snapshot today's score to Supabase once per day
+  // Keep today's snapshot current: saved whenever the scores change (it used to be saved once, at the first
+  // open of the day, so the history showed your morning score). Debounced; skipped when nothing changed.
+  const lastSnapRef = React.useRef('')
   useEffect(() => {
-    if (!user || !scores || loading) return
-    const today = TODAY
-    const lastSnapshot = localStorage.getItem('planner_last_score_snapshot')
-    if (lastSnapshot === today) return
-    if (!hasSupabaseEnv) return
-
-    const overall = Math.round(Object.values(scores).reduce((s, v) => s + v, 0) / Object.keys(scores).length)
-    const snapshot = {
-      user_id: user.id,
-      date: today,
-      overall_score: overall,
-      scores: scores,
-    }
-
-    supabase.from('score_history').upsert(snapshot, { onConflict: 'user_id,date' })
-      .then(({ error }) => {
-        if (!error) {
-          try { localStorage.setItem('planner_last_score_snapshot', today) } catch {}
-        }
-      })
+    if (!user || !scores || loading || !hasSupabaseEnv) return
+    const life = lifeScoreOf(scores)
+    if (life == null) return
+    const snapshot = { user_id: user.id, date: TODAY, overall_score: Math.round(life), scores }
+    const sig = JSON.stringify([TODAY, snapshot.overall_score, scores])
+    if (sig === lastSnapRef.current) return
+    const t = setTimeout(() => {
+      supabase.from('score_history').upsert(snapshot, { onConflict: 'user_id,date' })
+        .then(({ error }) => {
+          if (error) return
+          lastSnapRef.current = sig
+          setScoreHistory((prev) => [...prev.filter((d) => d.date !== TODAY), { date: TODAY, overall_score: snapshot.overall_score, scores }].sort((a, b) => String(a.date).localeCompare(String(b.date))))
+        })
+    }, 1500)
+    return () => clearTimeout(t)
   }, [scores, user?.id, loading])
 
   // Load score history on mount
   useEffect(() => {
     if (!user || !hasSupabaseEnv) return
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+    const thirtyDaysAgo = addDays(TODAY, -30)
     supabase.from('score_history')
       .select('date, overall_score, scores')
       .eq('user_id', user.id)
@@ -1316,7 +1509,7 @@ function usePlannerData() {
   }
 
   return {
-    ...collections, scores, scoreHistory, loading, syncing, error,
+    ...collections, scores, scoreDetails, scoreHistory, loading, syncing, error,
     saveItem, deleteItem, toggleTask, toggleHabit, saveSteps,
     updateBudget, updateProfile, updateSettings,
   }
@@ -2300,7 +2493,8 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
         </div>
         {/* Overall score pill */}
         {(() => {
-          const avg = scores ? Math.round(Object.values(scores).reduce((s,v)=>s+v,0) / Object.keys(scores).length) : null
+          const life = lifeScoreOf(scores)
+          const avg = life == null ? null : Math.round(life)
           if (!avg) return null
           return (
             <div style={{marginTop:12,display:'flex',alignItems:'center',gap:8}}>
@@ -2659,17 +2853,19 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           <div><p className="eyebrow">Life Balance</p><h3>Score snapshot</h3></div>
           <Link className="ghost-btn" to="/growth" style={{fontSize:'.8rem'}}>Details →</Link>
         </div>
-        <div style={{display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6}}>
-          {Object.entries(scores).map(([key, value]) => (
-            <div key={key} style={{textAlign:'center', padding:'8px 4px', background:'var(--surface)', borderRadius:'var(--radius-sm)'}}>
-              <div style={{fontSize:'.65rem', color:'var(--muted)', marginBottom:3, textTransform:'uppercase', letterSpacing:'.05em'}}>{key.slice(0,4)}</div>
-              <div style={{fontSize:'1.1rem', fontWeight:700, color: value >= 8 ? 'var(--success)' : value >= 6 ? 'var(--teal)' : value >= 4 ? 'var(--warning)' : 'var(--danger)'}}>{value}</div>
-              <div style={{height:3, borderRadius:999, background:'var(--border2)', marginTop:4, overflow:'hidden'}}>
-                <div style={{height:'100%', width:`${value*10}%`, background: value >= 8 ? 'var(--success)' : value >= 6 ? 'var(--teal)' : value >= 4 ? 'var(--warning)' : 'var(--danger)', borderRadius:999}} />
+        <div className="score-snap-grid">
+          {Object.entries(scores).map(([key, value]) => {
+            const tone = value == null ? 'var(--muted)' : value >= 8 ? 'var(--success)' : value >= 6 ? 'var(--teal)' : value >= 4 ? 'var(--warning)' : 'var(--danger)'
+            return (
+              <div key={key} className="score-snap" title={value == null ? `${key}: nothing logged in the last 7 days` : `${key}: ${value}/10`}>
+                <div className="score-snap-label"><span aria-hidden="true">{DOMAIN_META[key]?.emoji}</span> {DOMAIN_META[key]?.short || key}</div>
+                <div className="score-snap-value" style={{ color: tone }}>{value == null ? '—' : value}</div>
+                <div className="score-snap-bar"><div style={{ width: `${(value || 0) * 10}%`, background: tone }} /></div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
+        <p className="muted score-snap-note">Last 7 days · "—" means nothing logged there yet</p>
       </section>
     </>
   )
@@ -4556,6 +4752,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const ownFin = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.f.' + key, JSON.stringify(value)) } catch {}
+    emitPlannerData('finance', key, value)
     const at = ownFin.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
@@ -5884,6 +6081,7 @@ function usePageKey(page, key, fallback, localKeys) {
   const save = React.useCallback((v) => {
     setValue(v)
     try { localStorage.setItem(keys[0], JSON.stringify(v)) } catch {}
+    emitPlannerData(page, key, v)
     if (!user || !hasSupabaseEnv) return
     supabase.from('page_data').upsert({ user_id: user.id, page, data_key: key, data_value: v, updated_at: new Date().toISOString() }, { onConflict: 'user_id,page,data_key' })
       .then(({ error }) => { if (error) console.error('Sync error:', error) })
@@ -6421,6 +6619,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
 
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem(HW_PREFIX + key, JSON.stringify(value)); localStorage.setItem(HW_PREFIX + key + '.at', String(Date.now())) } catch {}
+    emitPlannerData('wellness', key, value)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
@@ -7307,6 +7506,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.p.' + key, JSON.stringify(value)) } catch {}
+    emitPlannerData('productivity', key, value)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
@@ -7654,7 +7854,21 @@ function CleaningTracker() {
     ]
   }
   const FREQ_LABELS = { daily:'Daily', weekly:'Weekly', monthly:'Monthly', quarterly:'Quarterly', yearly:'Yearly' }
-  const FREQ_KEY_PREFIX = { daily:'d', weekly:'w', monthly:'m', quarterly:'q', yearly:'y' }
+  // Each check-off belongs to its period, so lists reset on their own: daily each day, weekly each week, etc.
+  // (Before 2026-11-13 keys had no date and stayed checked forever.)
+  const periodOf = (freq) => {
+    if (freq === 'daily') return 'd:' + TODAY
+    if (freq === 'weekly') return 'w:' + startOfWeek(TODAY)
+    if (freq === 'monthly') return 'm:' + TODAY.slice(0, 7)
+    if (freq === 'quarterly') return 'q:' + TODAY.slice(0, 4) + '-Q' + (Math.floor((Number(TODAY.slice(5, 7)) - 1) / 3) + 1)
+    return 'y:' + TODAY.slice(0, 4)
+  }
+  const ck = (freq, task) => periodOf(freq) + '_' + task
+  // Keep 60 days of daily history (for streaks and scores); drop old undated keys
+  const saveClean = (log) => {
+    const cutoff = 'd:' + addDays(TODAY, -60)
+    saveCleaningLog2(Object.fromEntries(Object.entries(log).filter(([k, v]) => v && /^[dwmqy]:/.test(k) && !(k.startsWith('d:') && k.slice(0, 12) < cutoff))))
+  }
   return (
         <div>
           <section className="card" style={{padding:'12px 14px'}}>
@@ -7663,8 +7877,7 @@ function CleaningTracker() {
             <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
               {Object.keys(CLEANING_SCHEDULE).map(freq => {
                 const tasks = CLEANING_SCHEDULE[freq]
-                const prefix = FREQ_KEY_PREFIX[freq]
-                const done = tasks.filter(t => cleaningLog[prefix+'_'+t])
+                const done = tasks.filter(t => cleaningLog[ck(freq, t)])
                 return (
                   <button key={freq} onClick={() => setCleaningFreq(freq)} style={{
                     padding:'6px 12px',borderRadius:999,border:'1.5px solid',fontSize:'.78rem',
@@ -7691,29 +7904,28 @@ function CleaningTracker() {
               <div>
                 <p className="eyebrow">{FREQ_LABELS[cleaningFreq]}</p>
                 <h3 style={{margin:'2px 0 0'}}>
-                  {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length} of {CLEANING_SCHEDULE[cleaningFreq].length} done
+                  {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[ck(cleaningFreq, t)]).length} of {CLEANING_SCHEDULE[cleaningFreq].length} done
                 </h3>
               </div>
               <button onClick={() => {
-                const prefix = FREQ_KEY_PREFIX[cleaningFreq]
                 const tasks = CLEANING_SCHEDULE[cleaningFreq]
-                const allDone = tasks.every(t => cleaningLog[prefix+'_'+t])
+                const allDone = tasks.every(t => cleaningLog[ck(cleaningFreq, t)])
                 const updated = {...cleaningLog}
-                tasks.forEach(t => { allDone ? delete updated[prefix+'_'+t] : (updated[prefix+'_'+t] = true) })
-                saveCleaningLog2(updated)
+                tasks.forEach(t => { allDone ? delete updated[ck(cleaningFreq, t)] : (updated[ck(cleaningFreq, t)] = true) })
+                saveClean(updated)
               }} className="ghost-btn" style={{fontSize:'.75rem',padding:'5px 10px'}}>
-                {CLEANING_SCHEDULE[cleaningFreq].every(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]) ? 'Uncheck All' : 'Check All'}
+                {CLEANING_SCHEDULE[cleaningFreq].every(t => cleaningLog[ck(cleaningFreq, t)]) ? 'Uncheck All' : 'Check All'}
               </button>
             </div>
 
             {CLEANING_SCHEDULE[cleaningFreq].map(task => {
-              const key = FREQ_KEY_PREFIX[cleaningFreq] + '_' + task
+              const key = ck(cleaningFreq, task)
               const done = !!cleaningLog[key]
               return (
                 <div key={task} onClick={() => {
                   const updated = {...cleaningLog}
                   done ? delete updated[key] : (updated[key] = true)
-                  saveCleaningLog2(updated)
+                  saveClean(updated)
                 }} style={{
                   display:'flex',alignItems:'center',gap:10,padding:'10px 0',
                   borderBottom:'1px solid var(--stone2)',cursor:'pointer'
@@ -7736,7 +7948,7 @@ function CleaningTracker() {
               )
             })}
 
-            {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[FREQ_KEY_PREFIX[cleaningFreq]+'_'+t]).length === CLEANING_SCHEDULE[cleaningFreq].length && (
+            {CLEANING_SCHEDULE[cleaningFreq].filter(t => cleaningLog[ck(cleaningFreq, t)]).length === CLEANING_SCHEDULE[cleaningFreq].length && (
               <div style={{marginTop:12,padding:'10px 14px',background:'rgba(52,168,83,.08)',borderRadius:'var(--radius-sm)',textAlign:'center',fontSize:'.85rem',color:'var(--success)',fontWeight:600}}>
                 ✓ All {FREQ_LABELS[cleaningFreq].toLowerCase()} tasks complete!
               </div>
@@ -8887,7 +9099,7 @@ function ReadingList() {
   )
 }
 
-function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
+function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
@@ -8942,24 +9154,26 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
   ]
 
   const weeklyReview = {
-    win: scores.Productivity >= 7 ? 'You protected momentum well this week.' : 'There is room to tighten follow-through next week.',
-    recovery: scores.Wellness < 6 ? 'Wellness is trailing. Build in recovery and reflection blocks.' : 'Wellness held strong — protect this.',
-    money: scores.Finances >= 7 ? 'Finances stayed inside the guardrails.' : 'Finances need a closer reset and review.',
+    win: scores.Productivity == null ? 'Give tasks due dates so your week can be measured.' : scores.Productivity >= 7 ? 'You protected momentum well this week.' : 'There is room to tighten follow-through next week.',
+    recovery: scores.Wellness == null ? 'Log your mood or routine on the Wellness page to see this.' : scores.Wellness < 6 ? 'Wellness is trailing. Build in recovery and reflection blocks.' : 'Wellness held strong — protect this.',
+    money: scores.Finances == null ? 'Log spending or add to a savings goal to track this.' : scores.Finances >= 7 ? 'Finances stayed inside the guardrails.' : 'Finances need a closer reset and review.',
   }
 
-  const SCORE_GUIDE = [
-    { name: 'Health', color: '#E85555', how: 'Health category task completion + Health habit logs.' },
-    { name: 'Lifestyle', color: '#F0B429', how: 'Lifestyle category task completion.' },
-    { name: 'Productivity', color: '#00C2B3', how: 'Productivity category task completion + project progress.' },
-    { name: 'Wellness', color: '#22C55E', how: 'Wellness task completion + Wellness habit logs.' },
-    { name: 'Finances', color: '#6366F1', how: 'Discretionary spending vs your weekly target.' },
-  ]
+  // What each area measures (the live breakdown under "How scores work" shows what counted this week)
+  const SCORE_GUIDE = {
+    Faith: 'Daily reflection, Bible reading, prayer & gratitude, plus Faith habits and tasks.',
+    Health: 'Workouts, sleep quality, water, recovery energy, meals logged, plus Health habits and tasks.',
+    Wellness: 'Mood check-ins, calm (anxiety log), journal, daily routine, plus Wellness habits and tasks.',
+    Lifestyle: 'Daily and weekly chores in the cleaning tracker, plus Lifestyle habits and tasks.',
+    Productivity: 'Work and business tasks done when due, nothing piling up overdue, goal and project steps checked off, plus Productivity habits.',
+    Finances: 'Spending vs your weekly target (when you log spending), adding to savings, plus Finance habits and tasks.',
+  }
 
-  // Overall life score (average)
-  const scoreValues = Object.values(scores)
-  const overallScore = scoreValues.length > 0 ? (scoreValues.reduce((s,v)=>s+v,0)/scoreValues.length).toFixed(1) : 0
-  const scoreLabel = overallScore >= 8 ? 'Thriving' : overallScore >= 6 ? 'On Track' : overallScore >= 4 ? 'Needs Attention' : 'Reset Needed'
-  const scoreColor = overallScore >= 8 ? 'var(--success)' : overallScore >= 6 ? 'var(--teal)' : overallScore >= 4 ? 'var(--brass-fg)' : 'var(--danger)'
+  // Overall life score (average of the areas you're tracking)
+  const life = lifeScoreOf(scores)
+  const overallScore = life == null ? '—' : life.toFixed(1)
+  const scoreLabel = life == null ? 'Start logging' : life >= 8 ? 'Thriving' : life >= 6 ? 'On Track' : life >= 4 ? 'Needs Attention' : 'Reset Needed'
+  const scoreColor = life == null ? 'var(--muted)' : life >= 8 ? 'var(--success)' : life >= 6 ? 'var(--teal)' : life >= 4 ? 'var(--brass-fg)' : 'var(--danger)'
 
   // Streak calculations
   const todayHabitsDone = habits.filter(h => weekLogs.find(l => l.habitId===h.id && l.completed && l.date===TODAY)).length
@@ -8999,38 +9213,46 @@ function GrowthPage({ scores, scoreHistory = [], habits, habitLogs, goals, tasks
           </div>
         </div>
 
-        {Object.entries(scores).map(([name, value]) => (
-          <div key={name} className="score-line" style={{gap:10}}>
-            <span style={{minWidth:90,fontSize:'.88rem',color:'var(--text2)',fontWeight:500}}>{name}</span>
-            <div className="score-bar" style={{flex:1}}>
-              <div style={{
-                width:`${value * 10}%`,
-                background: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)',
-                height:'100%',borderRadius:999,transition:'width .4s'
-              }} />
+        {Object.entries(scores).map(([name, value]) => {
+          const tone = value == null ? 'var(--muted)' : value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)'
+          return (
+            <div key={name} className="score-line" style={{gap:10}}>
+              <span style={{minWidth:110,fontSize:'.88rem',color:'var(--text2)',fontWeight:500}}><span aria-hidden="true">{DOMAIN_META[name]?.emoji}</span> {name}</span>
+              <div className="score-bar" style={{flex:1}}>
+                <div style={{ width:`${(value || 0) * 10}%`, background: tone, height:'100%',borderRadius:999,transition:'width .4s' }} />
+              </div>
+              <strong style={{minWidth:40,textAlign:'right',fontSize:'.9rem',color: tone}}>{value == null ? '—' : value + '/10'}</strong>
             </div>
-            <strong style={{minWidth:32,textAlign:'right',fontSize:'.9rem',
-              color: value >= 7 ? 'var(--success)' : value >= 5 ? 'var(--teal)' : 'var(--danger)'}}>
-              {value + '/10'}
-            </strong>
-          </div>
-        ))}
+          )
+        })}
 
         {showScoreInfo && (
-          <div style={{marginTop:14,borderTop:'1px solid var(--surface)',paddingTop:14}}>
-            <p className="eyebrow" style={{marginBottom:10}}>How Each Score Is Calculated</p>
-            {SCORE_GUIDE.map(s => (
-              <div key={s.name} style={{display:'flex',gap:10,padding:'8px 0',borderBottom:'1px solid var(--surface)'}}>
-                <div style={{width:10,height:10,borderRadius:'50%',background:s.color,flexShrink:0,marginTop:4}} />
-                <div>
-                  <div style={{fontWeight:700,fontSize:'.85rem',marginBottom:2}}>{s.name}</div>
-                  <div style={{fontSize:'.78rem',color:'var(--muted)',lineHeight:1.5}}>{s.how}</div>
+          <div className="score-explain">
+            <p className="eyebrow" style={{marginBottom:6}}>How Each Score Is Calculated</p>
+            <p className="muted score-explain-lead">Each area is scored 1–10 from the last 7 days in its own section. A part counts once you start using it; an area with nothing logged shows "—" and is left out of your Life Score.</p>
+            {SCORE_DOMAINS.map((d) => {
+              const det = scoreDetails[d] || { parts: [] }
+              return (
+                <div key={d} className="score-explain-area">
+                  <div className="score-explain-head">
+                    <strong><span aria-hidden="true">{DOMAIN_META[d].emoji}</span> {d}</strong>
+                    <span>{det.score == null ? 'not tracked yet' : det.score + '/10'}</span>
+                  </div>
+                  <div className="score-explain-how">{SCORE_GUIDE[d]}</div>
+                  {det.parts.length > 0 ? (
+                    <ul className="score-explain-parts">
+                      {det.parts.map((part) => (
+                        <li key={part.label}>
+                          <span>{part.label}</span>
+                          <span className="muted">{part.detail}</span>
+                          <span className="score-explain-meter"><span style={{ width: `${Math.round(part.value * 100)}%` }} /></span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <div className="score-explain-empty">Nothing logged here in the last 7 days.</div>}
                 </div>
-              </div>
-            ))}
-            <div style={{marginTop:10,padding:10,background:'var(--teal-dim)',borderRadius:'var(--radius-sm)',fontSize:'.78rem',color:'var(--muted)'}}>
-              💡 Scores update automatically as you complete tasks, log habits, and manage spending. 5 = halfway, 10 = full execution.
-            </div>
+              )
+            })}
           </div>
         )}
       </section>
@@ -9675,7 +9897,7 @@ function ScrollToTop() {
 }
 
 function PlannerApp() {
-  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreDetails, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
   // Subscription
   const subscription = useSubscription(user)
@@ -9747,7 +9969,7 @@ function PlannerApp() {
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/calculator" element={<CalculatorPage onQuickCreate={openCreate} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
@@ -9935,6 +10157,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   const faithPending = React.useRef({})
   const syncFaith = React.useCallback((key, value, delay = 0) => {
     try { localStorage.setItem('planner.faith.' + key, JSON.stringify(value)) } catch {}
+    emitPlannerData('faith', key, value)
     const at = own.mark(key)
     if (!user || !hasSupabaseEnv) return
     const send = () => {
