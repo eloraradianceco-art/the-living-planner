@@ -269,6 +269,23 @@ const activeDaysSince = (dates, days) => {
   return first ? Math.max(1, days.filter((d) => d >= first).length) : days.length
 }
 // Days in the window with at least one entry, against a weekly target scaled to the days you've been at it
+// Sleep: quality /10, blended 50/50 with duration when bed/wake (or Recovery hours) exist. 7–9h = full marks.
+const sleepDurationScore = (h) => h < 5 ? 0.2 : h < 6 ? 0.45 : h < 7 ? 0.7 : h <= 9 ? 1 : 0.85
+function sleepPart(sleepWin, recovery, days) {
+  const nights = days.map((d) => {
+    const e = sleepWin.find((x) => x.date === d)
+    const span = e ? sleepSpan(e.bed, e.wake) : null
+    const rec = Number(recovery[d] && recovery[d].sleepHours)
+    return { q: e ? Number(e.quality) : null, hours: span ? span.hours : rec > 0 && rec <= SLEEP_MAX_HOURS ? rec : null }
+  }).filter((n) => Number.isFinite(n.q) || n.hours != null)
+  if (!nights.length) return null
+  const q = meanOf(nights.map((n) => n.q))
+  const timed = nights.filter((n) => n.hours != null)
+  const h = meanOf(timed.map((n) => n.hours))
+  const value = meanOf([q != null ? q / 10 : null, timed.length ? meanOf(timed.map((n) => sleepDurationScore(n.hours))) : null])
+  const detail = [q != null ? `quality ${q.toFixed(1)}/10` : '', h != null ? `avg ${fmtHours(Math.round(h * 2) / 2)}` : '', `${plural(nights.length, 'night')}`].filter(Boolean).join(' · ')
+  return { label: 'Sleep', detail, value: clamp01(value) }
+}
 function daysPart(label, dates, days, perWeek, noun = 'day') {
   if (!usedRecently(dates)) return null
   const active = activeDaysSince(dates, days)
@@ -332,7 +349,7 @@ function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs
   const meals = W.meals || {}
   parts.Health = [
     daysPart('Workouts', workouts.map((w) => w.date), days, 4, 'workout'),
-    sleepWin.length ? { label: 'Sleep quality', detail: `avg ${meanOf(sleepWin.map((e) => Number(e.quality))).toFixed(1)}/10 over ${plural(sleepWin.length, 'night')}`, value: clamp01(meanOf(sleepWin.map((e) => Number(e.quality))) / 10) } : null,
+    sleepPart(sleepWin, recovery, days),
     (() => { const logged = days.filter((d) => Number(water[d]) > 0); if (!logged.length) return null; const avg = meanOf(logged.map((d) => Number(water[d]))); return { label: 'Water', detail: `avg ${avg.toFixed(1)} of 8 glasses on ${plural(logged.length, 'day')} logged`, value: clamp01(avg / 8) } })(),
     recWin.length ? (() => { const e = meanOf(recWin.map((d) => Number(recovery[d].energy))); return { label: 'Recovery energy', detail: `avg ${e.toFixed(1)}/5`, value: clamp01((e - 1) / 4) } })() : null,
     daysPart('Meals logged', dateKeys(meals).filter((d) => (meals[d] || []).length), days, 7),
@@ -6093,7 +6110,7 @@ function usePageKey(page, key, fallback, localKeys) {
 function readinessOf(c) {
   if (!c) return null
   const h = Number(c.sleepHours)
-  const sleepPart = !h ? 0.6 : h < 5 ? 0.2 : h < 6 ? 0.45 : h < 7 ? 0.7 : h <= 9 ? 1 : 0.85
+  const sleepPart = !h || h > SLEEP_MAX_HOURS ? 0.6 : sleepDurationScore(h)
   const energy = ((Number(c.energy) || 3) - 1) / 4
   const sore = (5 - (Number(c.soreness) || 3)) / 4
   const stress = (5 - (Number(c.stress) || 3)) / 4
@@ -6106,13 +6123,25 @@ function readinessBand(score) {
   if (score >= 50) return { label: 'Train light', tone: 'mid', advice: 'Moderate volume, longer warm-up, leave a rep or two in the tank.' }
   return { label: 'Recover', tone: 'low', advice: 'Walk, stretch, hydrate, sleep early. Growth happens in recovery.' }
 }
-const sleepHoursFrom = (bed, wake) => {
-  if (!bed || !wake) return ''
-  const [bh, bm] = bed.split(':').map(Number), [wh, wm] = wake.split(':').map(Number)
+// Bedtime → wake span. iOS time pickers make it easy to save 9:30 AM for 9:30 PM;
+// anything over 16h is read as an AM/PM slip and corrected (bed +12h, or wake −12h).
+const hhmm = (h, m) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+function sleepSpan(bed, wake) {
+  const b = String(bed || '').match(/^(\d{1,2}):(\d{2})/), w = String(wake || '').match(/^(\d{1,2}):(\d{2})/)
+  if (!b || !w) return null
+  let bh = Number(b[1]), wh = Number(w[1]); const bm = Number(b[2]), wm = Number(w[2])
   let mins = (wh * 60 + wm) - (bh * 60 + bm)
   if (mins <= 0) mins += 24 * 60
-  return Math.round(mins / 30) / 2
+  let fixed = ''
+  if (mins > 16 * 60) {
+    if (bh < 12) { bh += 12; fixed = 'bed' } else if (wh >= 12) { wh -= 12; fixed = 'wake' }
+    if (fixed) mins -= 12 * 60
+  }
+  return { hours: Math.round(mins / 30) / 2, bed: hhmm(bh, bm), wake: hhmm(wh, wm), fixed }
 }
+const sleepHoursFrom = (bed, wake) => sleepSpan(bed, wake)?.hours ?? ''
+const fmtHours = (h) => { const n = Number(h); if (!Number.isFinite(n) || n <= 0) return ''; const H = Math.floor(n), M = Math.round((n - H) * 60); return M ? `${H}h ${M}m` : `${H}h` }
+const SLEEP_MAX_HOURS = 16
 const PAIN_AREAS = ['Neck', 'Shoulders', 'Upper back', 'Low back', 'Hips', 'Knees', 'Ankles/feet', 'Elbows/wrists']
 const TRAINING_TYPES = ['Strength', 'Hypertrophy', 'Conditioning', 'Calisthenics', 'Mobility', 'Combat', 'Cardio', 'HIIT', 'Running', 'Walking', 'Sports', 'Other']
 const exKey = (n) => String(n || '').trim().toLowerCase()
@@ -6256,14 +6285,15 @@ function TrainingTab({ workouts, onSave }) {
 function RecoveryTab({ checkins, onSave, sleep }) {
   const today = checkins[TODAY]
   const lastSleep = (sleep || []).find((e) => e.date === TODAY)
-  const prefillSleep = lastSleep ? sleepHoursFrom(lastSleep.bed, lastSleep.wake) : ''
+  const prefillSleep = lastSleep ? (sleepHoursFrom(lastSleep.bed, lastSleep.wake) || '') : ''
   const blank = () => ({ sleepHours: prefillSleep, energy: 0, soreness: 0, stress: 0, pain: [], note: '' })
   const [editing, setEditing] = useState(!today)
   const [f, setF] = useState(() => today ? { ...blank(), ...today } : blank())
   const live = readinessOf({ ...f, energy: f.energy || 3, soreness: f.soreness || 3, stress: f.stress || 3 })
   const score = today ? readinessOf(today) : null
   const band = readinessBand(score)
-  const ready = f.energy && f.soreness && f.stress
+  const hoursOk = f.sleepHours === '' || f.sleepHours == null || (Number(f.sleepHours) >= 0 && Number(f.sleepHours) <= SLEEP_MAX_HOURS)
+  const ready = f.energy && f.soreness && f.stress && hoursOk
 
   const last7 = Array.from({ length: 7 }, (_, i) => addDays(TODAY, i - 6)).map((d) => ({ d, v: readinessOf(checkins[d]) }))
   const painCounts = {}
@@ -6286,7 +6316,7 @@ function RecoveryTab({ checkins, onSave, sleep }) {
               </div>
             </div>
             <div className="readiness-inputs">
-              {today.sleepHours ? <span>Sleep {today.sleepHours}h</span> : null}
+              {Number(today.sleepHours) > 0 && Number(today.sleepHours) <= SLEEP_MAX_HOURS ? <span>Sleep {fmtHours(today.sleepHours)}</span> : null}
               <span>Energy {today.energy}/5</span><span>Soreness {today.soreness}/5</span><span>Stress {today.stress}/5</span>
               {(today.pain || []).length > 0 && <span>Pain: {today.pain.join(', ')}</span>}
             </div>
@@ -6295,7 +6325,8 @@ function RecoveryTab({ checkins, onSave, sleep }) {
         ) : (
           <div className="wl-form" style={{ marginTop: 0 }}>
             <label>Sleep last night (hours){lastSleep ? <small className="muted" style={{ fontWeight: 400 }}> · from your sleep log</small> : null}
-              <input type="number" step="0.5" inputMode="decimal" value={f.sleepHours} placeholder="7.5" onChange={(e) => setF((p) => ({ ...p, sleepHours: e.target.value }))} />
+              <input type="number" step="0.5" min="0" max={SLEEP_MAX_HOURS} inputMode="decimal" value={f.sleepHours} placeholder="7.5" onChange={(e) => setF((p) => ({ ...p, sleepHours: e.target.value }))} />
+              {!hoursOk && <small className="field-error">Enter 0–{SLEEP_MAX_HOURS} hours</small>}
             </label>
             <ScaleRow label="Energy" low="drained" high="charged" value={f.energy} onChange={(n) => setF((p) => ({ ...p, energy: n }))} />
             <ScaleRow label="Soreness" low="fresh" high="beat up" value={f.soreness} onChange={(n) => setF((p) => ({ ...p, soreness: n }))} />
@@ -6312,8 +6343,8 @@ function RecoveryTab({ checkins, onSave, sleep }) {
             </div>
             <input placeholder="Note (optional)" value={f.note} onChange={(e) => setF((p) => ({ ...p, note: e.target.value }))} />
             <button className="primary-btn" disabled={!ready} style={{ opacity: ready ? 1 : .5 }}
-              onClick={() => { onSave({ ...checkins, [TODAY]: { ...f, at: new Date().toISOString() } }); setEditing(false) }}>
-              {ready ? `Save · readiness ${live}` : 'Rate energy, soreness and stress'}
+              onClick={() => { onSave({ ...checkins, [TODAY]: { ...f, sleepHours: f.sleepHours === '' ? '' : Number(f.sleepHours), at: new Date().toISOString() } }); setEditing(false) }}>
+              {ready ? `Save · readiness ${live}` : !hoursOk ? 'Check sleep hours' : 'Rate energy, soreness and stress'}
             </button>
             {today && <button className="secondary-btn" onClick={() => setEditing(false)}>Cancel</button>}
           </div>
@@ -7160,19 +7191,34 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
               </label>
               <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--teal)', minWidth: 24 }}>{form.sleepQ || 5}</span>
             </div>
+            {(() => {
+              const span = sleepSpan(form.sleepBed, form.sleepWake)
+              if (!span) return null
+              return (
+                <div className={'sleep-preview' + (span.fixed ? ' fixed' : '')}>
+                  <strong>{fmtHours(span.hours)} of sleep</strong>
+                  <span>{fmt12(span.bed)} → {fmt12(span.wake)}{span.fixed ? ` · ${span.fixed === 'bed' ? 'bedtime switched to PM' : 'wake time switched to AM'}` : ''}</span>
+                </div>
+              )
+            })()}
             <input placeholder="Notes (dreams, woke up, restless...)" value={form.sleepNote || ''} onChange={e => setForm(p => ({ ...p, sleepNote: e.target.value }))}
               style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
+            {sleep.some((e) => e.date === TODAY) && <small className="muted">Logging again replaces last night's entry.</small>}
             <button className="primary-btn" onClick={() => {
-              const entry = { date: TODAY, bed: form.sleepBed, wake: form.sleepWake, quality: form.sleepQ || 5, notes: form.sleepNote }
-              saveSleep([entry, ...sleep].slice(0, 30))
+              const span = sleepSpan(form.sleepBed, form.sleepWake)
+              const entry = { date: TODAY, bed: span ? span.bed : (form.sleepBed || ''), wake: span ? span.wake : (form.sleepWake || ''), hours: span ? span.hours : '', quality: form.sleepQ || 5, notes: form.sleepNote || '' }
+              saveSleep([entry, ...sleep.filter((e) => e.date !== TODAY)].slice(0, 60))
               setForm(p => ({ ...p, sleepBed: '', sleepWake: '', sleepQ: 5, sleepNote: '' }))
             }}>Log Sleep</button>
           </div>
-          {sleep.slice(0, 7).map((entry, i) => (
-            <div key={i} className="metric-row card-row">
+          {sleep.slice(0, 7).map((entry, i) => {
+            const span = sleepSpan(entry.bed, entry.wake)
+            const line = [span ? `${fmt12(span.bed)} → ${fmt12(span.wake)} · ${fmtHours(span.hours)}` : '', entry.notes || ''].filter(Boolean).join(' · ')
+            return (
+            <div key={entry.date + '-' + i} className="metric-row card-row">
               <div>
-                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{entry.date}</div>
-                <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{entry.bed} → {entry.wake}{entry.notes ? ' · ' + entry.notes : ''}</div>
+                <div style={{ fontWeight: 600, fontSize: '.88rem' }}>{formatDateLabel(entry.date, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
+                {line && <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{line}</div>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: entry.quality >= 7 ? 'rgba(34,197,94,.15)' : entry.quality >= 5 ? 'rgba(240,180,41,.15)' : 'rgba(232,85,85,.15)', display: 'grid', placeItems: 'center' }}>
@@ -7180,7 +7226,8 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </section>
       </ProTabGate>)}
 
@@ -9162,7 +9209,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habi
   // What each area measures (the live breakdown under "How scores work" shows what counted this week)
   const SCORE_GUIDE = {
     Faith: 'Daily reflection, Bible reading, prayer & gratitude, plus Faith habits and tasks.',
-    Health: 'Workouts, sleep quality, water, recovery energy, meals logged, plus Health habits and tasks.',
+    Health: 'Workouts, sleep (quality + hours), water, recovery energy, meals logged, plus Health habits and tasks.',
     Wellness: 'Mood check-ins, calm (anxiety log), journal, daily routine, plus Wellness habits and tasks.',
     Lifestyle: 'Daily and weekly chores in the cleaning tracker, plus Lifestyle habits and tasks.',
     Productivity: 'Work and business tasks done when due, nothing piling up overdue, goal and project steps checked off, plus Productivity habits.',
