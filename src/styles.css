@@ -197,7 +197,6 @@ img { max-width: 100%; }
   margin-bottom: 8px;
 }
 .hero-focus-card p { color: rgba(255,255,255,.55); font-size: .88rem; line-height: 1.6; }
-.hero-focus-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* ── Metrics strip ──────────────────────────────────────────────── */
 .home-metrics-strip {
