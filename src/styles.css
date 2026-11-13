@@ -1992,3 +1992,14 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .smart-guide > summary::-webkit-details-marker { display: none; }
 .smart-guide > summary::after { content: '▾'; position: absolute; right: 0; top: 50%; transform: translateY(-50%); color: var(--brass-fg); font-size: 1rem; transition: transform .2s; }
 .smart-guide:not([open]) > summary::after { transform: translateY(-50%) rotate(-90deg); }
+
+/* Growth: 30-day Life Score trend */
+.trend-chart { position: relative; height: 130px; margin: 0 0 6px 18px; border-bottom: 1px solid var(--border2); }
+.trend-grid { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); pointer-events: none; }
+.trend-grid span { position: absolute; left: -18px; top: -7px; font-size: .6rem; color: var(--muted); font-weight: 600; }
+.trend-bars { position: absolute; inset: 0; display: flex; align-items: stretch; gap: 3px; }
+.trend-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; }
+.trend-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height .3s; min-height: 3px; }
+.trend-bar.empty { height: 3px; background: var(--stone2); }
+.trend-col.today .trend-bar { box-shadow: 0 0 0 2px var(--brass-dim); }
+.trend-axis { display: flex; justify-content: space-between; margin-left: 18px; font-size: .66rem; color: var(--muted); font-weight: 600; }
