@@ -4552,16 +4552,18 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const { user } = useAuth()
 
   // Generic Supabase sync for FinancePage state
+  const ownFin = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.f.' + key, JSON.stringify(value)) } catch {}
+    const at = ownFin.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'finance', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Finance sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownFin])
 
   // Load finance data from Supabase on mount
   React.useEffect(() => {
@@ -4592,7 +4594,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
         filter: `user_id=eq.${user.id}`,
       }, payload => {
         const row = payload.new
-        if (!row || row.page !== 'finance') return
+        if (!row || row.page !== 'finance' || ownFin.isStale(row.data_key, row.updated_at)) return   // our own save coming back
         if (row.data_key === 'incomes') setIncomes(row.data_value || [])
         if (row.data_key === 'bills') setBills(row.data_value || [])
         if (row.data_key === 'debts') setDebts(row.data_value || [])
@@ -5835,6 +5837,19 @@ function useWellnessKey(key, fallback) {
     return () => { alive = false }
   }, [user?.id, key])
   return value
+}
+
+// Saves made on this device come back through live updates a moment later. Without this check that
+// late copy overwrites anything typed since (letters disappearing in the devotional, 2026-11-13).
+// We stamp each save's updated_at ourselves (no database trigger changes it), so a row that is not newer
+// than our latest save for that key is our own echo or older, and is skipped.
+const stampOf = (s) => { const t = Date.parse(String(s || '').replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00')); return Number.isFinite(t) ? t : 0 }
+function useOwnWrites() {
+  const last = React.useRef({})
+  return React.useMemo(() => ({
+    mark: (key) => { const at = new Date().toISOString(); last.current[key] = at; return at },
+    isStale: (key, updatedAt) => { const mine = last.current[key]; return !!mine && stampOf(updatedAt) <= stampOf(mine) },
+  }), [])
 }
 
 // Read + write one page_data key from any component (used when a tracker moves
@@ -9833,16 +9848,31 @@ const FAITH_AREAS = ['Spiritual Growth', 'Prayer Life', 'Scripture Study', 'Comm
 function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = [], projects = [], onCreateGoal, onEdit }) {
   const { user } = useAuth()
 
-  // Faith data sync helper — saves to Supabase + localStorage backup
-  const syncFaith = React.useCallback(async (key, value) => {
+  // Faith data sync helper — saves to Supabase + localStorage backup.
+  // Typed fields pass a delay so the account is written once you pause, not on every letter;
+  // anything still waiting is sent right away when you leave the page or the app goes to the background.
+  const own = useOwnWrites()
+  const faithTimers = React.useRef({})
+  const faithPending = React.useRef({})
+  const syncFaith = React.useCallback((key, value, delay = 0) => {
     try { localStorage.setItem('planner.faith.' + key, JSON.stringify(value)) } catch {}
+    const at = own.mark(key)
     if (!user || !hasSupabaseEnv) return
-    try {
-      await supabase.from('faith_data').upsert({
-        user_id: user.id, data_key: key, data_value: value, updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id,data_key' })
-    } catch (e) { console.error('Faith sync error:', e) }
-  }, [user?.id])
+    const send = () => {
+      delete faithPending.current[key]
+      supabase.from('faith_data').upsert({ user_id: user.id, data_key: key, data_value: value, updated_at: at }, { onConflict: 'user_id,data_key' })
+        .then(({ error }) => { if (error) console.error('Faith sync error:', error) })
+    }
+    clearTimeout(faithTimers.current[key])
+    if (delay) { faithPending.current[key] = send; faithTimers.current[key] = setTimeout(send, delay) }
+    else send()
+  }, [user?.id, own])
+  React.useEffect(() => {
+    const flush = () => Object.keys(faithPending.current).forEach((k) => { clearTimeout(faithTimers.current[k]); faithPending.current[k]?.() })
+    const onVis = () => { if (document.visibilityState === 'hidden') flush() }
+    document.addEventListener('visibilitychange', onVis); window.addEventListener('pagehide', flush)
+    return () => { flush(); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', flush) }
+  }, [syncFaith])
 
   // Load faith data from Supabase on mount
   React.useEffect(() => {
@@ -9858,14 +9888,16 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             latest[row.data_key] = row
           }
         })
-        if (latest.prayers)      setPrayers(latest.prayers.data_value || [])
-        if (latest.scriptures)   setScriptures(latest.scriptures.data_value || [])
-        if (latest.gratitude)    setGratitude(latest.gratitude.data_value || [])
-        if (latest.devotional)   setDevotional(latest.devotional.data_value || { text: '', date: '' })
-        if (latest.fasting)      setFasting(latest.fasting.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
-        if (latest.faithGoals)   setFaithGoals(latest.faithGoals.data_value || [])
-        if (latest.sermons)      setSermons(latest.sermons.data_value || [])
-        if (latest.bibleReading) setBibleReading(latest.bibleReading.data_value || { plan: "M'Cheyne", completedDates: [], notes: {} })
+        // Skip any key changed on this device while the load was in flight (keeps what you just typed)
+        const use = (k) => latest[k] && !own.isStale(k, latest[k].updated_at)
+        if (use('prayers'))      setPrayers(latest.prayers.data_value || [])
+        if (use('scriptures'))   setScriptures(latest.scriptures.data_value || [])
+        if (use('gratitude'))    setGratitude(latest.gratitude.data_value || [])
+        if (use('devotional'))   setDevotional(latest.devotional.data_value || { text: '', date: '' })
+        if (use('fasting'))      setFasting(latest.fasting.data_value || { active: false, startDate: '', endDate: '', intention: '', log: [] })
+        if (use('faithGoals'))   setFaithGoals(latest.faithGoals.data_value || [])
+        if (use('sermons'))      setSermons(latest.sermons.data_value || [])
+        if (use('bibleReading')) setBibleReading(latest.bibleReading.data_value || { plan: "M'Cheyne", completedDates: [], notes: {} })
 
         // ── One-time migration: push any localStorage data that never made it to Supabase ──
         // Runs silently — if Supabase already has the key, upsert will update it only if localStorage is newer
@@ -9897,7 +9929,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
         filter: `user_id=eq.${user.id}`,
       }, payload => {
         const row = payload.new
-        if (!row) return
+        if (!row || own.isStale(row.data_key, row.updated_at)) return   // our own save coming back
         if (row.data_key === 'prayers')      setPrayers(row.data_value || [])
         if (row.data_key === 'scriptures')   setScriptures(row.data_value || [])
         if (row.data_key === 'gratitude')    setGratitude(row.data_value || [])
@@ -9934,11 +9966,11 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
   // Devotional journal
   const [devotional, setDevotional] = useState(() => lsGet('devotional', { text: '', date: '' }))
-  const saveDevotional = (v) => { setDevotional(v); syncFaith('devotional', v) }
+  const saveDevotional = (v, delay = 0) => { setDevotional(v); syncFaith('devotional', v, delay) }
 
   // Fasting tracker
   const [fasting, setFasting] = useState(() => lsGet('fasting', { active: false, startDate: '', endDate: '', intention: '', log: [] }))
-  const saveFasting = (v) => { setFasting(v); syncFaith('fasting', v) }
+  const saveFasting = (v, delay = 0) => { setFasting(v); syncFaith('fasting', v, delay) }
 
   // Faith goals
   const [faithGoals, setFaithGoals] = useState(() => lsGet('faithGoals', []))
@@ -9963,7 +9995,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   // Sermon notes
   const [sermons, setSermons] = useState(() => lsGet('sermons', []))
   const [bibleReading, setBibleReading] = useState(() => lsGet('bibleReading', { plan: 'M\'Cheyne', completedDates: [], notes: {} }))
-  const saveBibleReading = (v) => { setBibleReading(v); syncFaith('bibleReading', v) }
+  const saveBibleReading = (v, delay = 0) => { setBibleReading(v); syncFaith('bibleReading', v, delay) }
   const [readingNote, setReadingNote] = useState('')
   const [revealedVerse, setRevealedVerse] = useState(null)
   const [newSermon, setNewSermon] = useState({ date: new Date().toISOString().slice(0,10), speaker: '', title: '', notes: '', application: '' })
@@ -10062,7 +10094,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
           <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:6}}>Today's Reflection — {TODAY}</p>
           <textarea value={devotional.date === TODAY ? devotional.text : ''}
-            onChange={e => saveDevotional({ text: e.target.value, date: TODAY })}
+            onChange={e => saveDevotional({ text: e.target.value, date: TODAY }, 600)}
             placeholder="What is God speaking to you today? What did you read? What are you sensing?"
             style={{width:'100%',minHeight:200,padding:'12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
             fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
@@ -10317,7 +10349,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               onChange={e => saveBibleReading({
                 ...bibleReading,
                 notes: {...(bibleReading.notes||{}), [TODAY]: e.target.value}
-              })}
+              }, 600)}
               style={{width:'100%',minHeight:80,padding:'10px',border:'1.5px solid rgba(184,150,90,.3)',borderRadius:8,fontSize:'.88rem',resize:'vertical',background:'white',fontFamily:'inherit'}} />
           </div>
 
@@ -10474,7 +10506,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <div style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:16,display:'grid',gap:8}}>
               <p style={{fontWeight:600,fontSize:'.85rem',margin:0}}>Begin a Fast</p>
               <input placeholder="Intention / Purpose" value={fasting.intention || ''}
-                onChange={e => saveFasting({...fasting, intention: e.target.value})}
+                onChange={e => saveFasting({...fasting, intention: e.target.value}, 600)}
                 style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.85rem'}} />
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                 <div><p className="muted" style={{fontSize:'.72rem',margin:'0 0 4px'}}>Start Date</p>
