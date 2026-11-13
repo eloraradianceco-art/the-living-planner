@@ -1712,3 +1712,33 @@ button.profile-pill:active { transform: scale(.97); }
   --warning: #F0A848;
   --muted: #A1A1A6;
 }
+
+/* ── Day view blocks: each item spans its start → end (2026-11-12) ───── */
+.timeline-grid { position: relative; }
+.timeline-grid .timeline-row { height: var(--row-h); min-height: 0; padding: 0; align-items: center; }
+.timeline-grid .timeline-row .timeline-hour { align-self: start; padding-top: 6px; }
+.timeline-grid .slot-add-btn { height: calc(var(--row-h) - 10px); }
+.timeline-blocks { position: absolute; top: 0; bottom: 0; left: 64px; right: 0; pointer-events: none; }
+.time-block {
+  position: absolute; pointer-events: auto; z-index: 2; overflow: hidden;
+  align-items: flex-start; padding: 6px 4px 6px 10px; gap: 8px;
+  box-shadow: 0 1px 2px rgba(28,28,30,.06);
+}
+/* Solid fills so the + rows underneath don't show through */
+.time-block.task { background: #F6EEDF; }
+.time-block.event { background: #EEEEEF; }
+.time-block { cursor: pointer; }
+/* Text sits at the top (a stretched button would center it and clip the title) */
+.time-block .time-card-main { align-self: flex-start; align-content: start; }
+.time-block .time-card-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Side-by-side blocks: room for the title (Delete is in the editor) */
+.time-block.narrow { padding-left: 8px; gap: 6px; }
+.time-block.narrow .time-card-del { display: none; }
+.time-block .time-card-del { width: 28px; height: 28px; }
+.time-block.short { align-items: center; padding-top: 2px; padding-bottom: 2px; }
+.time-block.short .time-card-main { display: flex; align-items: baseline; gap: 8px; align-self: center; }
+.time-block.short .time-card-title { flex: 0 1 auto; }
+.time-block.short .time-card-meta { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.time-block.repeat-delete { height: auto; align-items: center; background: #EEEEEF; }
+.timeline-now-line { position: absolute; left: -6px; right: 0; height: 0; border-top: 2px solid var(--brass); z-index: 4; pointer-events: none; }
+.timeline-now-line::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--brass); }

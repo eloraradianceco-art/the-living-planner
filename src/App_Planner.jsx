@@ -3001,14 +3001,41 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   const weekDays = getWeekDays(selectedDate)
   const monthDays = getMonthDays(selectedDate)
   const dayScheduled = scheduled.filter((item) => item.date === selectedDate)
-  // 5 AM – 8 PM always, stretched to include anything scheduled earlier or later
+  // Each item as a block: start → end (no end, or an end before the start = one half-hour)
+  const dayBlocks = useMemo(() => {
+    const list = dayScheduled.map((item) => {
+      const s = toMin(item.startTime)
+      if (s == null) return null
+      const e = toMin(item.endTime)
+      const end = e != null && e > s ? e : s + 30
+      return { item, s, end, shown: Math.max(end, s + 30) } // shown: at least one half-hour tall
+    }).filter(Boolean).sort((a, b) => a.s - b.s || b.shown - a.shown)
+    // Items that overlap sit side by side
+    const out = []; let group = [], groupEnd = -1
+    const flush = () => {
+      const cols = []
+      group.forEach((b) => { let c = cols.findIndex((colEnd) => colEnd <= b.s); if (c < 0) { c = cols.length; cols.push(0) } cols[c] = b.shown; b.col = c })
+      group.forEach((b) => { b.cols = cols.length; out.push(b) })
+      group = []
+    }
+    for (const b of list) { if (group.length && b.s >= groupEnd) flush(); group.push(b); groupEnd = Math.max(groupEnd, b.shown) }
+    if (group.length) flush()
+    return out
+  }, [dayScheduled])
+  // 5 AM – 8 PM always, stretched to cover anything scheduled earlier or later
   const hours = useMemo(() => {
     const set = new Set(Array.from({ length: 16 }, (_, i) => i + 5))
-    dayScheduled.forEach((item) => { const h = Number(String(item.startTime || '').slice(0, 2)); if (!isNaN(h) && h >= 0 && h < 24) set.add(h) })
-    return [...set].sort((a, b) => a - b).map((h) => `${String(h).padStart(2, '0')}:00`)
-  }, [dayScheduled])
+    dayBlocks.forEach((b) => { for (let h = Math.floor(b.s / 60); h <= Math.min(23, Math.floor((b.shown - 1) / 60)); h++) set.add(h) })
+    return [...set].sort((a, b) => a - b)
+  }, [dayBlocks])
+  // Fill any gaps so the grid is continuous (every half-hour row is the same height)
+  const gridHours = useMemo(() => Array.from({ length: hours[hours.length - 1] - hours[0] + 1 }, (_, i) => `${String(hours[0] + i).padStart(2, '0')}:00`), [hours])
+  const ROW_H = settings.compactCalendar ? 36 : 46
+  const gridStart = toMin(gridHours[0])
   // Each hour is split into :00 and :30 rows so you can tap straight onto 6:30
-  const slots = hours.flatMap((h) => [h, h.slice(0, 2) + ':30'])
+  const slots = gridHours.flatMap((h) => [h, h.slice(0, 2) + ':30'])
+  // Half-hours a block already covers don't get a + underneath it
+  const coveredSlots = useMemo(() => new Set(slots.filter((sl) => { const m = toMin(sl); return dayBlocks.some((b) => b.s < m + 30 && m < b.shown) })), [slots.join(), dayBlocks])
   const slotOf = (t) => { const [hh, mm] = String(t || '').split(':'); return `${hh}:${Number(mm) >= 30 ? '30' : '00'}` }
   const nowSlot = selectedDate === TODAY ? slotOf(`${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`) : null
   const confirmDelete = (item) => {
@@ -3082,51 +3109,68 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               {dayScheduled.length ? `${dayScheduled.length} scheduled` : 'Open day'}
             </span>
           </div>
-          <div className={settings.compactCalendar ? 'timeline compact-calendar' : 'timeline'}>
+          <div className={'timeline timeline-grid' + (settings.compactCalendar ? ' compact-calendar' : '')} style={{ '--row-h': ROW_H + 'px' }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              try {
+                const payload = JSON.parse(e.dataTransfer.getData('application/json'))
+                const top = e.currentTarget.getBoundingClientRect().top
+                const slot = slots[Math.max(0, Math.min(slots.length - 1, Math.floor((e.clientY - top) / ROW_H)))]
+                handleDropItem(payload, selectedDate, slot)
+              } catch {}
+            }}>
             {slots.map((hour) => {
-              const items = dayScheduled.filter((item) => item.startTime && slotOf(item.startTime) === hour)
               const isHalf = hour.endsWith(':30')
               const isNow = nowSlot === hour
               return (
                 <div className={'timeline-row' + (isHalf ? ' half' : '') + (isNow ? ' now' : '')} key={hour}>
                   <div className="timeline-hour">{isHalf ? fmt12(hour).replace(/ (AM|PM)$/, '') : hourLabel(hour)}</div>
-                  <div className="timeline-slot"
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { try { handleDropItem(JSON.parse(e.dataTransfer.getData('application/json')), selectedDate, hour) } catch {} }}>
-                    {items.length === 0
-                      ? <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {fmt12(hour)}</span></button>
-                      : items.map((item) => {
-                        const done = item.itemType === 'task' && item.completed
-                        return (
-                          pendingDelete === `${item.id}:${item.date}` ? (
-                            <div key={`${item.itemType}-${item.id}`} className="time-card event repeat-delete">
-                              <span className="time-card-title" style={{ flex: 1 }}>Remove "{item.title}"</span>
-                              <button className="repeat-del-btn" onClick={() => { setPendingDelete(null); onSkipOccurrence && onSkipOccurrence(item.id, item.date) }}>Just this day</button>
-                              <button className="repeat-del-btn danger" onClick={() => { setPendingDelete(null); onDelete('event', item.id) }}>Whole series</button>
-                              <button className="time-card-del" onClick={() => setPendingDelete(null)} aria-label="Cancel">✕</button>
-                            </div>
-                          ) : (
-                          <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card ${item.itemType}${done ? ' done' : ''}`} draggable={!item.isRepeat}
-                            onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
-                            {item.itemType === 'task' && onToggle && (
-                              <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
-                                aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
-                                {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
-                              </button>
-                            )}
-                            <button className="time-card-main" onClick={() => openItem(item)}>
-                              <span className="time-card-title">{item.title}</span>
-                              <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
-                            </button>
-                            <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
-                          </div>
-                          )
-                        )
-                      })}
+                  <div className="timeline-slot">
+                    {!coveredSlots.has(hour) && <button className="slot-add-btn" onClick={() => onQuickCreate('task', { date: selectedDate, time: hour })}><span aria-hidden="true">+</span><span className="sr-only">Add at {fmt12(hour)}</span></button>}
                   </div>
                 </div>
               )
             })}
+            {/* Blocks: each item runs from its start to its end */}
+            <div className="timeline-blocks">
+              {selectedDate === TODAY && (() => {
+                const n = new Date(), m = n.getHours() * 60 + n.getMinutes()
+                const y = (m - gridStart) / 30 * ROW_H
+                return y >= 0 && y <= slots.length * ROW_H ? <div className="timeline-now-line" style={{ top: y }} aria-hidden="true" /> : null
+              })()}
+              {dayBlocks.map(({ item, s: startMin, shown, col, cols }) => {
+                const done = item.itemType === 'task' && item.completed
+                const top = (startMin - gridStart) / 30 * ROW_H + 2
+                const height = (shown - startMin) / 30 * ROW_H - 4
+                const place = { top, left: `calc(${col} * (100% / ${cols}))`, width: `calc(100% / ${cols} - 4px)` }
+                const short = height < 56
+                return pendingDelete === `${item.id}:${item.date}` ? (
+                  <div key={`${item.itemType}-${item.id}`} className="time-card event repeat-delete time-block" style={{ ...place, minHeight: height, zIndex: 3 }}>
+                    <span className="time-card-title" style={{ flex: '1 1 100%' }}>Remove "{item.title}"</span>
+                    <button className="repeat-del-btn" onClick={() => { setPendingDelete(null); onSkipOccurrence && onSkipOccurrence(item.id, item.date) }}>Just this day</button>
+                    <button className="repeat-del-btn danger" onClick={() => { setPendingDelete(null); onDelete('event', item.id) }}>Whole series</button>
+                    <button className="time-card-del" onClick={() => setPendingDelete(null)} aria-label="Cancel">✕</button>
+                  </div>
+                ) : (
+                  <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card time-block ${item.itemType}${done ? ' done' : ''}${short ? ' short' : ''}${cols > 1 ? ' narrow' : ''}`}
+                    style={{ ...place, height }} draggable={!item.isRepeat}
+                    onClick={(e) => { if (e.target === e.currentTarget) openItem(item) }}
+                    onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
+                    {item.itemType === 'task' && onToggle && (
+                      <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
+                        aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
+                        {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+                      </button>
+                    )}
+                    <button className="time-card-main" onClick={() => openItem(item)}>
+                      <span className="time-card-title">{item.title}</span>
+                      <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
+                    </button>
+                    <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </section>
       )}
