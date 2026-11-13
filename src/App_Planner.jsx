@@ -269,8 +269,12 @@ const DOMAIN_META = {
   Finances: { emoji: '💰', short: 'Money' },
 }
 const SCORE_WINDOW_DAYS = 7
-const scoreWindow = (end = TODAY) => Array.from({ length: SCORE_WINDOW_DAYS }, (_, i) => addDays(end, i - (SCORE_WINDOW_DAYS - 1)))
-const usedRecently = (dates) => { const from = addDays(TODAY, -29); return dates.some((d) => d && d >= from && d <= TODAY) }
+const SCORE_VERSION = 2
+// The day a score is computed for: today, or a past day when the Growth chart rebuilds a missing day.
+// Set only for the duration of one synchronous computeScoreDetails() call.
+let SCORE_ASOF = TODAY
+const scoreWindow = (end = SCORE_ASOF) => Array.from({ length: SCORE_WINDOW_DAYS }, (_, i) => addDays(end, i - (SCORE_WINDOW_DAYS - 1)))
+const usedRecently = (dates) => { const from = addDays(SCORE_ASOF, -29); return dates.some((d) => d && d >= from && d <= SCORE_ASOF) }
 const meanOf = (xs) => { const v = xs.filter((x) => Number.isFinite(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 const clamp01 = (x) => Math.max(0, Math.min(1, x))
 const dateKeys = (obj) => Object.keys(obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {}).filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k))
@@ -278,7 +282,7 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`
 
 // Days in the window since you started this practice (so starting something never lowers a score)
 const activeDaysSince = (dates, days) => {
-  const first = dates.filter((d) => d && d >= addDays(TODAY, -29) && d <= TODAY).sort()[0]
+  const first = dates.filter((d) => d && d >= addDays(SCORE_ASOF, -29) && d <= SCORE_ASOF).sort()[0]
   return first ? Math.max(1, days.filter((d) => d >= first).length) : days.length
 }
 // Days in the window with at least one entry, against a weekly target scaled to the days you've been at it
@@ -345,13 +349,19 @@ function habitsPart(category, habits, habitLogs, days) {
   return { label: `${category} habits`, detail: `${done} of ${expected} check-ins`, value: clamp01(done / expected) }
 }
 function tasksPart(label, tasks, days, test) {
-  const due = tasks.filter((t) => test(t) && t.date && t.date >= days[0] && t.date <= TODAY)
+  const due = tasks.filter((t) => test(t) && t.date && t.date >= days[0] && t.date <= SCORE_ASOF)
   if (!due.length) return null
   const done = due.filter((t) => t.completed).length
   return { label, detail: `${done} of ${plural(due.length, 'task')} due`, value: done / due.length }
 }
 
-function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs = [], budget = {}, goals = [], projects = [] }, src = {}) {
+function computeScoreDetails(collections, src = {}, asOf = TODAY) {
+  const prev = SCORE_ASOF
+  SCORE_ASOF = asOf
+  try { return scoreDetailsAsOf(collections, src) } finally { SCORE_ASOF = prev }
+}
+function scoreDetailsAsOf({ tasks = [], expenses = [], habits = [], habitLogs = [], budget = {}, goals = [], projects = [] }, src = {}) {
+  const TODAY = SCORE_ASOF   // everything below measures the 7 days ending on this day
   const days = scoreWindow()
   const W = src.wellness || {}, F = src.faith || {}, P = src.productivity || {}, M = src.finance || {}
   const otherAreas = new Set(['Health', 'Lifestyle', 'Wellness', 'Finances', 'Faith'])
@@ -415,7 +425,7 @@ function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs
   const choreDays = Object.keys(clean).filter((k) => clean[k] && k.startsWith('d:')).map((k) => k.slice(2, 12))
   const weekKey = 'w:' + startOfWeek(TODAY)
   const weeklyDone = Object.keys(clean).filter((k) => clean[k] && k.startsWith(weekKey + '_')).length
-  const usedWeekly = Object.keys(clean).some((k) => k.startsWith('w:') && k.slice(2, 12) >= addDays(TODAY, -56))
+  const usedWeekly = Object.keys(clean).some((k) => k.startsWith('w:') && k.slice(2, 12) >= addDays(TODAY, -56) && k.slice(2, 12) <= TODAY)
   parts.Lifestyle = [
     daysPart('Daily chores', choreDays, days, 7),
     usedWeekly ? { label: 'Weekly chores', detail: `${weeklyDone} done this week`, value: clamp01(weeklyDone / 5) } : null,
@@ -427,7 +437,9 @@ function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs
   const workTask = (t) => !otherAreas.has(t.category)
   const overdue = tasks.filter((t) => workTask(t) && !t.completed && t.date && t.date < TODAY).length
   const stepDates = [...goals, ...projects].flatMap((x) => normalizeSteps(x.steps)).filter((st) => st.done && st.doneAt).map((st) => dateOfStamp(st.doneAt))
-  const anyWork = tasks.some(workTask)
+  // Overdue counts once you have work dated around this day (30 days back to a week ahead), so a past day
+  // before you used the planner doesn't score "nothing overdue" from tasks that didn't exist yet
+  const anyWork = tasks.some((t) => workTask(t) && t.date && t.date >= addDays(TODAY, -29) && t.date <= addDays(TODAY, 7))
   parts.Productivity = [
     tasksPart('Tasks done', tasks, days, workTask),
     anyWork ? { label: 'Overdue', detail: overdue ? `${plural(overdue, 'task')} past due` : 'nothing past due', value: clamp01(1 - overdue / 5) } : null,
@@ -1404,7 +1416,8 @@ function usePlannerData() {
     if (!user || !scores || loading || !hasSupabaseEnv) return
     const life = lifeScoreOf(scores)
     if (life == null) return
-    const snapshot = { user_id: user.id, date: TODAY, overall_score: Math.round(life), scores }
+    // _v marks snapshots taken with the current scoring (rebuilt 2026-11-13); older ones are recalculated for the chart
+    const snapshot = { user_id: user.id, date: TODAY, overall_score: Math.round(life), scores: { ...scores, _v: SCORE_VERSION } }
     const sig = JSON.stringify([TODAY, snapshot.overall_score, scores])
     if (sig === lastSnapRef.current) return
     const t = setTimeout(() => {
@@ -1412,11 +1425,27 @@ function usePlannerData() {
         .then(({ error }) => {
           if (error) return
           lastSnapRef.current = sig
-          setScoreHistory((prev) => [...prev.filter((d) => d.date !== TODAY), { date: TODAY, overall_score: snapshot.overall_score, scores }].sort((a, b) => String(a.date).localeCompare(String(b.date))))
+          setScoreHistory((prev) => [...prev.filter((d) => d.date !== TODAY), { date: TODAY, overall_score: snapshot.overall_score, scores: snapshot.scores }].sort((a, b) => String(a.date).localeCompare(String(b.date))))
         })
     }, 1500)
     return () => clearTimeout(t)
   }, [scores, user?.id, loading])
+
+  // Growth chart: one point per day for the last 30 days. A day saved with the current scoring uses its
+  // snapshot; a day saved with the old scoring, or never saved, is recalculated from what was logged
+  // up to that day; today is always live. Days with nothing tracked stay empty.
+  const scoreSeries = useMemo(() => {
+    if (loading) return []
+    const saved = Object.fromEntries((scoreHistory || []).map((d) => [d.date, d]))
+    return Array.from({ length: 30 }, (_, i) => addDays(TODAY, i - 29)).map((date) => {
+      if (date === TODAY) { const l = lifeScoreOf(scores); return { date, score: l == null ? null : Math.round(l), live: true } }
+      const snap = saved[date]
+      if (snap && Number(snap.scores?._v) >= SCORE_VERSION) return { date, score: snap.overall_score }
+      const det = computeScoreDetails(collections, scoreSources, date)
+      const l = lifeScoreOf(Object.fromEntries(Object.entries(det).map(([k, v]) => [k, v.score])))
+      return { date, score: l == null ? null : Math.round(l), rebuilt: true }
+    })
+  }, [loading, scoreHistory, scores, collections, scoreSources])
 
   // Load score history on mount
   useEffect(() => {
@@ -1599,7 +1628,7 @@ function usePlannerData() {
   }
 
   return {
-    ...collections, scores, scoreDetails, scoreHistory, loading, syncing, error,
+    ...collections, scores, scoreDetails, scoreHistory, scoreSeries, loading, syncing, error,
     saveItem, deleteItem, toggleTask, toggleHabit, saveSteps,
     updateBudget, updateProfile, updateSettings,
   }
@@ -2486,25 +2515,29 @@ function MetricTile({ label, value, helper }) {
   )
 }
 
+// Home "Execution": tasks finished per day this week. Bars sized in pixels (they overflowed the card when sized
+// in percent next to their labels) and the day is shown as a weekday with today marked. 2026-11-13
 function MiniBarChart({ data, dataKey = 'completed', maxKey = dataKey }) {
   const max = Math.max(...data.map((item) => item[maxKey] || 0), 1)
+  const BAR_MAX = 56
   return (
-    <div style={{display:'flex', alignItems:'flex-end', gap:6, height:64, padding:'0 4px'}}>
+    <div style={{display:'flex', alignItems:'flex-end', gap:6, padding:'0 4px'}}>
       {data.map((item) => {
         const val = item[dataKey] || 0
         const total = item[maxKey] || 0
-        const pct = max > 0 ? Math.max((val / max) * 100, total > 0 ? 8 : 0) : 0
+        const h = total === 0 ? 4 : Math.max(6, Math.round((val / max) * BAR_MAX))
+        const isT = item.date === TODAY
         return (
-          <div key={item.label} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end'}}>
-            <div style={{fontSize:'.65rem', color:'var(--brass-fg)', fontWeight:700}}>{val > 0 ? val : ''}</div>
-            <div style={{
-              width:'100%', borderRadius:'4px 4px 0 0',
-              height: total === 0 ? 4 : `${pct}%`,
-              background: val >= total && total > 0 ? 'var(--brass)' : val > 0 ? 'var(--brass-glow)' : 'var(--stone2)',
-              border: '1px solid var(--brass-glow)',
-              minHeight: 4, transition:'height .3s ease'
-            }} />
-            <div style={{fontSize:'.58rem', color:'var(--slate)', fontWeight:600, textAlign:'center'}}>{item.label}</div>
+          <div key={item.date || item.label} title={total ? `${val} of ${total} done` : 'Nothing due'} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4}}>
+            <div style={{fontSize:'.65rem', color:'var(--brass-fg)', fontWeight:700, minHeight:12}}>{total ? `${val}/${total}` : ''}</div>
+            <div style={{height:BAR_MAX, width:'100%', display:'flex', alignItems:'flex-end'}}>
+              <div style={{
+                width:'100%', borderRadius:'4px 4px 0 0', height: h,
+                background: val >= total && total > 0 ? 'var(--brass)' : val > 0 ? 'var(--brass-glow)' : 'var(--stone2)',
+                border: '1px solid var(--brass-glow)', transition:'height .3s ease'
+              }} />
+            </div>
+            <div style={{fontSize:'.62rem', color: isT ? 'var(--brass-fg)' : 'var(--slate)', fontWeight: isT ? 800 : 600, textAlign:'center'}}>{item.date ? formatDateLabel(item.date, { weekday: 'short' }) : item.label}</div>
           </div>
         )
       })}
@@ -9350,7 +9383,7 @@ function ReadingList() {
   )
 }
 
-function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
+function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
   const ownPage = useOwnWrites()
@@ -9515,47 +9548,47 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habi
       <section className="card">
         <p className="eyebrow">Progress Over Time</p>
         <h3 style={{margin:'4px 0 14px'}}>Score Trend — Last 30 Days</h3>
-        {scoreHistory.length === 0 ? (
-          <EmptyState icon="📈" title="No history yet" message="Your daily score snapshots will appear here as you use the app." />
-        ) : (
-          <>
-            <div style={{
-              display:'flex', alignItems:'flex-end', gap:3,
-              height:120, marginBottom:14, padding:'0 4px',
-            }}>
-              {scoreHistory.map((day, i) => {
-                const max = 10
-                const height = Math.max(2, (day.overall_score / max) * 100)
-                return (
-                  <div key={day.date} style={{flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2}}>
-                    <div style={{
-                      width:'100%', height:`${height}%`, minHeight:2,
-                      background: day.overall_score >= 7 ? 'var(--success)' : day.overall_score >= 5 ? 'var(--teal)' : 'var(--warning)',
-                      borderRadius:'3px 3px 0 0', transition:'height .3s',
-                    }} title={`${day.date}: ${day.overall_score}/10`} />
+        {/* One bar per day for 30 days. Bars used to collapse to slivers (percent heights inside columns with no
+            height) and only saved days appeared, so 4 days stretched across the whole card. 2026-11-13 */}
+        {(() => {
+          const tracked = scoreSeries.filter((d) => d.score != null)
+          if (!tracked.length) return <EmptyState icon="📈" title="No history yet" message="Your Life Score for each day will appear here as you log in your sections." />
+          const toneOf = (v) => v >= 8 ? 'var(--success)' : v >= 6 ? 'var(--teal)' : v >= 4 ? 'var(--warning)' : 'var(--danger)'
+          const avg = Math.round(tracked.reduce((n, d) => n + d.score, 0) / tracked.length * 10) / 10
+          const today = scoreSeries[scoreSeries.length - 1]
+          const best = Math.max(...tracked.map((d) => d.score))
+          const lbl = (d) => formatDateLabel(d, { month: 'short', day: 'numeric' })
+          return (<>
+            <div className="trend-chart" role="img" aria-label={`Life Score by day for the last 30 days. Average ${avg}, best ${best}.`}>
+              {[10, 5].map((g) => <div key={g} className="trend-grid" style={{ bottom: `${g * 10}%` }}><span>{g}</span></div>)}
+              <div className="trend-bars">
+                {scoreSeries.map((d) => (
+                  <div key={d.date} className={'trend-col' + (d.live ? ' today' : '')} title={`${lbl(d.date)}: ${d.score == null ? 'nothing tracked' : d.score + '/10'}`}>
+                    {d.score == null
+                      ? <div className="trend-bar empty" />
+                      : <div className="trend-bar" style={{ height: `${d.score * 10}%`, background: toneOf(d.score) }} />}
                   </div>
-                )
-              })}
+                ))}
+              </div>
             </div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:10}}>
-              {(() => {
-                const avg = scoreHistory.length ? Math.round(scoreHistory.reduce((s,d)=>s+d.overall_score,0)/scoreHistory.length*10)/10 : 0
-                const latest = scoreHistory[scoreHistory.length-1]?.overall_score || 0
-                const best = scoreHistory.length ? Math.max(...scoreHistory.map(d=>d.overall_score)) : 0
-                return [
-                  ['Average', avg.toFixed(1), 'var(--teal)'],
-                  ['Latest', latest, 'var(--brass-fg)'],
-                  ['Best', best, 'var(--success)'],
-                ].map(([label, val, color]) => (
-                  <div key={label} style={{textAlign:'center', background:'var(--stone)', borderRadius:8, padding:'10px 4px'}}>
-                    <div className="muted" style={{fontSize:'.7rem', marginBottom:2}}>{label}</div>
-                    <strong style={{color, fontSize:'1.1rem'}}>{val}</strong>
-                  </div>
-                ))
-              })()}
+            <div className="trend-axis"><span>{lbl(scoreSeries[0].date)}</span><span>{lbl(scoreSeries[14].date)}</span><span>Today</span></div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginTop:12}}>
+              {[
+                ['30-day average', avg.toFixed(1), 'var(--teal)'],
+                ['Today', today?.score ?? '—', 'var(--brass-fg)'],
+                ['Best', best, 'var(--success)'],
+              ].map(([label, val, color]) => (
+                <div key={label} style={{textAlign:'center', background:'var(--stone)', borderRadius:8, padding:'10px 4px'}}>
+                  <div className="muted" style={{fontSize:'.7rem', marginBottom:2}}>{label}</div>
+                  <strong style={{color, fontSize:'1.1rem'}}>{val}</strong>
+                </div>
+              ))}
             </div>
-          </>
-        )}
+            <p className="muted" style={{fontSize:'.72rem', margin:'10px 0 0', lineHeight:1.5}}>
+              {tracked.length} of 30 days tracked. Each day is the same 7-day Life Score you see on Home, as it stood that day. Empty days had nothing logged.
+            </p>
+          </>)
+        })()}
       </section>
 
       <section className="card premium-card">
@@ -10177,7 +10210,7 @@ function ScrollToTop() {
 }
 
 function PlannerApp() {
-  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreDetails, scoreHistory, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
+  const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreDetails, scoreHistory, scoreSeries, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
   // Subscription
   const subscription = useSubscription(user)
@@ -10264,7 +10297,7 @@ function PlannerApp() {
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { const pr = projects.find((x) => x.id === id); if (!window.confirm(`Delete the project "${pr?.title || ''}" and its steps?`)) return; await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (!window.confirm(`Delete this ${type}? Its check-in history goes with it.`)) return; await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} scoreSeries={scoreSeries} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (!window.confirm(`Delete this ${type}? Its check-in history goes with it.`)) return; await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/calculator" element={<CalculatorPage onQuickCreate={openCreate} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
