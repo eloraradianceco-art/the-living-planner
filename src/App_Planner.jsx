@@ -304,13 +304,18 @@ function getProjectProgress(project, tasks) {
   return Math.round((done / total) * 100)
 }
 
-// Goal progress = its own steps + linked tasks + linked projects (each project
+// Goal progress = its own steps + its direct tasks + linked projects (each project
 // counts as one unit, credited by its own progress so steps inside it move the goal).
+// A task inside one of the goal's projects counts once, through that project.
+function goalDirectTasks(goalId, tasks, projects) {
+  const inProjects = new Set(projects.filter((project) => project.goalId === goalId).map((project) => project.id))
+  return tasks.filter((task) => task.linkedGoalId === goalId && !inProjects.has(task.linkedProjectId))
+}
 function getGoalProgress(goal, tasks, projects) {
   const g = typeof goal === 'object' ? goal : null
   const id = g ? g.id : goal
   if (g?.completed) return 100
-  const relatedTasks = tasks.filter((task) => task.linkedGoalId === id)
+  const relatedTasks = goalDirectTasks(id, tasks, projects)
   const relatedProjects = projects.filter((project) => project.goalId === id)
   const steps = normalizeSteps(g?.steps)
   const total = relatedTasks.length + relatedProjects.length + steps.length
@@ -1148,6 +1153,12 @@ function usePlannerData() {
     if (!user) return
     setSyncing(true); setError('')
     try {
+      // A task inside a project belongs to that project's goal.
+      if (type === 'task' && payload.linkedProjectId) {
+        const project = collections.projects.find((pr) => String(pr.id) === String(payload.linkedProjectId))
+        if (project?.goalId) payload = { ...payload, linkedGoalId: project.goalId }
+      }
+      const before = type === 'project' && modeArg === 'edit' ? collections.projects.find((pr) => pr.id === payload.id) : null
       const saved = await plannerService.saveItem(type, payload, modeArg, user.id)
       setCollections((current) => {
         const key = plannerService.collectionName(type)
@@ -1155,6 +1166,12 @@ function usePlannerData() {
           return { ...current, [key]: current[key].map((item) => item.id === payload.id ? saved : item) }
         return { ...current, [key]: upsertById(current[key], saved) }
       })
+      // A project moved to another goal takes its tasks with it.
+      if (before && saved && String(before.goalId || '') !== String(saved.goalId || '')) {
+        const moved = collections.tasks.filter((t) => t.linkedProjectId === saved.id && String(t.linkedGoalId || '') !== String(saved.goalId || ''))
+        const updated = await Promise.all(moved.map((t) => plannerService.saveItem('task', { ...t, linkedGoalId: saved.goalId || '' }, 'edit', user.id)))
+        if (updated.length) setCollections((current) => ({ ...current, tasks: current.tasks.map((t) => updated.find((u) => u.id === t.id) || t) }))
+      }
       return saved
     } catch (err) {
       setError(err.message || 'Could not save.'); throw err
@@ -2104,8 +2121,14 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>High</option><option>Medium</option><option>Low</option></select></label>
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
-            <label>Goal<select value={form.linkedGoalId || ''} onChange={(e) => setForm({ ...form, linkedGoalId: e.target.value })}><option value="">None</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}</select></label>
-            <label className="full-span">Project<select value={form.linkedProjectId || ''} onChange={(e) => setForm({ ...form, linkedProjectId: e.target.value })}><option value="">None</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+            {(() => {
+              const projectGoal = projects.find((pr) => String(pr.id) === String(form.linkedProjectId || ''))?.goalId || ''
+              return (<>
+                <label>Goal<select value={projectGoal || form.linkedGoalId || ''} disabled={!!projectGoal} onChange={(e) => setForm({ ...form, linkedGoalId: e.target.value })}><option value="">None</option>{goals.map((goal) => <option key={goal.id} value={goal.id}>{goal.title}</option>)}</select>
+                  {projectGoal && <span className="muted" style={{ fontSize: '.72rem', fontWeight: 400 }}>Set by its project</span>}</label>
+                <label className="full-span">Project<select value={form.linkedProjectId || ''} onChange={(e) => { const v = e.target.value; const g = projects.find((pr) => String(pr.id) === String(v))?.goalId; setForm({ ...form, linkedProjectId: v, ...(g ? { linkedGoalId: g } : {}) }) }}><option value="">None</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+              </>)
+            })()}
           </>)}
 
           {selectedType === 'event' && (<>
@@ -3244,6 +3267,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
 
 function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate, onStepsChange, onUpdate, onToggle }) {
   const [filter, setFilter] = useState('All')
+  const [, bumpReady] = useState(0) // re-render after "Not yet" on a finished project
   const [expandedId, setExpandedId] = useState(null)
 
   const STATUS_ORDER = ['Active', 'In Progress', 'On Hold', 'Completed']
@@ -3349,11 +3373,16 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
               </div>
             )}
 
+            {project.status !== 'Completed' && onUpdate && progress >= 100 && (
+              <ReadyToComplete id={project.id} kind="project" onDismiss={() => bumpReady((n) => n + 1)} onComplete={() => onUpdate('project', { ...project, status: 'Completed' }, 'edit')} />
+            )}
+
             <StepsChecklist
               steps={steps}
               onChange={(next) => onStepsChange && onStepsChange(project.id, next)}
               onSchedule={(step) => onQuickCreate('task', { title: step.text, linkedProjectId: project.id, linkedGoalId: project.goalId || '' })}
-              completeSlot={project.status !== 'Completed' && onUpdate && (
+              hideDoneNote={progress >= 100}
+              completeSlot={project.status !== 'Completed' && onUpdate && progress < 100 && (
                 <button type="button" className="steps-complete-btn" onClick={() => onUpdate('project', { ...project, status: 'Completed' }, 'edit')}>Mark project complete</button>
               )} />
 
@@ -3368,6 +3397,10 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
                 style={{background:'none', border:'none', color:'var(--brass-fg)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>
                 + Schedule a task
               </button>
+              {project.status !== 'Completed' && onUpdate && progress >= 100 && isReadyDismissed('project', project.id) && (
+                <button onClick={() => onUpdate('project', { ...project, status: 'Completed' }, 'edit')}
+                  style={{background:'none', border:'none', color:'var(--success)', cursor:'pointer', fontSize:'.8rem', fontWeight:600, fontFamily:'inherit', padding:0}}>Mark project complete</button>
+              )}
             </div>
 
             {isExpanded && (
@@ -3717,7 +3750,29 @@ function TrialBanner({ daysLeft, onUpgrade }) {
 
 
 // ── Empty State Component ─────────────────────────────────────────────────
-function StepsChecklist({ steps, onChange, onSchedule, completeSlot, label = 'Steps', hint }) {
+// Shown when a goal or project reaches 100%: finish it, or "Not yet" (remembered on this device).
+const READY_KEY = 'planner_ready_dismissed'
+const readyDismissed = () => { try { return new Set(JSON.parse(localStorage.getItem(READY_KEY) || '[]')) } catch { return new Set() } }
+function ReadyToComplete({ id, kind, onComplete, onDismiss }) {
+  const key = `${kind}:${id}`
+  const [hidden, setHidden] = useState(() => readyDismissed().has(key))
+  if (hidden) return null
+  const notYet = () => {
+    try { const set = readyDismissed(); set.add(key); localStorage.setItem(READY_KEY, JSON.stringify([...set])) } catch {}
+    setHidden(true); onDismiss && onDismiss()
+  }
+  return (
+    <div className="steps-complete ready-complete" role="status">
+      <Flag size={15} color="var(--success)" />
+      <span>Everything for this {kind} is done.</span>
+      <button type="button" className="steps-complete-btn" onClick={onComplete}>{kind === 'goal' ? 'Mark goal achieved' : 'Mark project complete'}</button>
+      <button type="button" className="ready-not-yet" onClick={notYet}>Not yet</button>
+    </div>
+  )
+}
+const isReadyDismissed = (kind, id) => readyDismissed().has(`${kind}:${id}`)
+
+function StepsChecklist({ steps, onChange, onSchedule, completeSlot, label = 'Steps', hint, hideDoneNote = false }) {
   const list = normalizeSteps(steps)
   const [draft, setDraft] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -3796,7 +3851,7 @@ function StepsChecklist({ steps, onChange, onSchedule, completeSlot, label = 'St
         </button>
       )}
 
-      {list.length > 0 && doneCount === list.length && (
+      {list.length > 0 && doneCount === list.length && !hideDoneNote && (
         <div className="steps-complete">
           <Flag size={15} color="var(--success)" />
           <span>Every step is checked off.</span>
@@ -8080,6 +8135,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
 }
 
 function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, onStepsChange, onUpdate }) {
+  const [, bumpReady] = useState(0) // re-render after "Not yet" on a finished goal
   const { user } = useAuth()
 
   const syncPageData = React.useCallback(async (key, value) => {
@@ -8187,7 +8243,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
       {filtered.slice().sort((a, b) => Number(!!a.completed) - Number(!!b.completed)).map(goal => {
         const progress = getGoalProgress(goal, tasks, projects)
         const linkedProjects = projects.filter(p => p.goalId === goal.id)
-        const linkedTasks = tasks.filter(t => t.linkedGoalId === goal.id)
+        const linkedTasks = goalDirectTasks(goal.id, tasks, projects)
         const completedLinked = linkedTasks.filter(t => t.completed).length
         const steps = normalizeSteps(goal.steps)
         const stepsDone = steps.filter(st => st.done).length
@@ -8239,11 +8295,16 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
               </div>
             )}
 
+            {!goal.completed && onUpdate && progress >= 100 && (
+              <ReadyToComplete id={goal.id} kind="goal" onDismiss={() => bumpReady((n) => n + 1)} onComplete={() => onUpdate('goal', { ...goal, completed: true }, 'edit')} />
+            )}
+
             <StepsChecklist
               steps={steps}
               onChange={(next) => onStepsChange && onStepsChange(goal.id, next)}
               onSchedule={(step) => onQuickCreate('task', { title: step.text, linkedGoalId: goal.id, category: goal.category || 'Productivity' })}
-              completeSlot={!goal.completed && onUpdate && (
+              hideDoneNote={progress >= 100}
+              completeSlot={!goal.completed && onUpdate && progress < 100 && (
                 <button type="button" className="steps-complete-btn" onClick={() => onUpdate('goal', { ...goal, completed: true }, 'edit')}>Mark goal achieved</button>
               )} />
 
@@ -8252,6 +8313,10 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
                 style={{background:'none',border:'none',color:'var(--brass-fg)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Schedule a task</button>
               <button onClick={() => onQuickCreate('project', { goalId: goal.id })}
                 style={{background:'none',border:'none',color:'var(--ink2)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>+ Project for this goal</button>
+              {!goal.completed && onUpdate && progress >= 100 && isReadyDismissed('goal', goal.id) && (
+                <button onClick={() => onUpdate('goal', { ...goal, completed: true }, 'edit')}
+                  style={{background:'none',border:'none',color:'var(--success)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>Mark goal achieved</button>
+              )}
               {goal.completed && onUpdate && (
                 <button onClick={() => onUpdate('goal', { ...goal, completed: false }, 'edit')}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.8rem',fontWeight:600,fontFamily:'inherit',padding:0}}>Reopen goal</button>
