@@ -1152,7 +1152,8 @@ const plannerService = {
     const row = { user_id: userId, weekly_target: normalized.weeklyTarget }
     const { data, error } = await supabase.from('budgets').upsert(row, { onConflict: 'user_id' }).select().single()
     if (error) throw error
-    return { weeklyTarget: Number(data.weekly_target) }
+    const n = Number(data?.weekly_target)
+    return { weeklyTarget: Number.isFinite(n) ? n : normalized.weeklyTarget }
   },
 
   async saveProfile(profile, userId) {
@@ -4907,6 +4908,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useUrlTab('overview')
+  // Weekly target saves when you finish typing (was saving 2, 25, 250 — and 0 when the box was cleared)
+  const [targetDraft, setTargetDraft] = useState(String(budget.weeklyTarget ?? ''))
+  React.useEffect(() => { setTargetDraft(String(budget.weeklyTarget ?? '')) }, [budget.weeklyTarget])
   const [period, setPeriod] = useState('monthly')
 
   // ── Shared state (linked across tabs) ─────────────────────────────────
@@ -4939,6 +4943,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   const [debts, setDebts] = useState(() => lsGet('debts', []))
   const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
+  const [editingDebt, setEditingDebt] = useState(null)
   const saveDebts = (d) => { setDebts(d); syncPageData('debts', d) }
 
   const [savingsGoals, setSavingsGoals] = useState(() => lsGet('savingsGoals', [
@@ -4953,7 +4958,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
   // 52-week plan
   const WEEK_PLAN = [150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250]
-  const currentWeekNum = Math.ceil((new Date(TODAY) - new Date(new Date(TODAY).getFullYear(), 0, 1)) / (7 * 24 * 60 * 60 * 1000))
+  // Week 1 = Jan 1–7 (date math on the plain date; the old version mixed UTC and local and showed week 0 on Jan 1)
+  const currentWeekNum = Math.min(52, Math.floor((Date.parse(TODAY + 'T12:00:00Z') - Date.parse(TODAY.slice(0, 4) + '-01-01T12:00:00Z')) / 86400000 / 7) + 1)
   const [checkedWeeks, setCheckedWeeks] = useState(() => lsGet('weekPlan', []))
   const [challengeGoal, setChallengeGoal] = useState(() => lsGet('challengeGoal', 10000))
   const [netWorthHistory, setNetWorthHistory] = useState(() => lsGet('netWorthHistory', []))
@@ -5027,6 +5033,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const totalSavingsStored = savingsGoals.reduce((s, g) => s + Number(g.current || 0), 0)
 
   // 50/30/20
+  // Spending for the selected period: this week, this month, or this month's pace × 3 / × 12
+  const periodSpend = period === 'weekly' ? fpWeekSpend : period === 'monthly' ? fpMonthSpend : fpMonthSpend * ((PERIOD_MULT[period] || 4.33) / 4.33)
+  const periodDebt = totalDebtPayments * ((PERIOD_MULT[period] || 4.33) / 4.33)
   const needs50 = totalIncomeForPeriod * 0.5
   const wants30 = totalIncomeForPeriod * 0.3
   const savings20 = totalIncomeForPeriod * 0.2
@@ -5112,10 +5121,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                 )}
                 {netWorthHistory.length > 1 && (
                   <div style={{marginTop:12,display:'flex',alignItems:'flex-end',gap:2,height:40}}>
-                    {netWorthHistory.slice(-12).map((nw, i) => {
-                      const val = Number(nw.assets) - Number(nw.liabilities)
-                      const max = Math.max(...netWorthHistory.slice(-12).map(x => Number(x.assets) - Number(x.liabilities)))
-                      const h = Math.max(4, (val / max) * 100)
+                    {netWorthHistory.slice(-12).map((nw, i, arr) => {
+                      // Scaled between the lowest and highest snapshot so negative net worth still draws
+                      const vals = arr.map(x => Number(x.assets || 0) - Number(x.liabilities || 0))
+                      const val = vals[i], lo = Math.min(0, ...vals), hi = Math.max(...vals)
+                      const h = 6 + ((val - lo) / ((hi - lo) || 1)) * 94
                       return <div key={i} style={{flex:1,height:h+'%',background:'var(--brass)',borderRadius:'2px 2px 0 0',opacity:.6}} />
                     })}
                   </div>
@@ -5130,9 +5140,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           {[
             [incomeLabel, fmt(totalIncomeForPeriod), 'var(--success)'],
             ['Total Bills', fmt(totalBillsForPeriod), 'var(--danger)'],
-            ['Expenses (tracked)', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)'],
-            ['Debt Min Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)'],
-            ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33) - fpWeekSpend * (PERIOD_MULT[period]||4.33)), totalIncomeForPeriod > totalBillsForPeriod ? 'var(--success)' : 'var(--danger)'],
+            ['Expenses (tracked)', fmt(periodSpend), 'var(--warning,#f90)'],
+            ['Debt Min Payments', fmt(periodDebt), 'var(--danger)'],
+            ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend), totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend >= 0 ? 'var(--success)' : 'var(--danger)'],
             ['This Week Spend', fmt(fpWeekSpend), 'var(--brass-fg)'],
             ['This Month Spend', fmt(fpMonthSpend), 'var(--slate)'],
             ['Total Saved (goals)', fmt(totalSavingsStored), 'var(--teal)'],
@@ -5148,21 +5158,25 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <p className="eyebrow" style={{marginBottom:6}}>50 / 30 / 20 Rule</p>
             <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of {fmt(totalIncomeForPeriod)}</p>
             {[
-              ['50% Needs', needs50, '#256A2A', 'Rent, utilities, groceries, insurance, min debt payments'],
-              ['30% Wants', wants30, '#8F5300', 'Dining, shopping, subscriptions, gym, travel'],
-              ['20% Savings & Debt', savings20, '#9C27B0', 'Emergency fund, investments, extra debt payments'],
-            ].map(([label, amt, col, desc]) => (
+              // Actuals: bills + debt minimums count as needs; tracked spending as wants; what's left as savings
+              ['50% Needs', needs50, totalBillsForPeriod + periodDebt, '#256A2A', 'Rent, utilities, groceries, insurance, min debt payments', 'used'],
+              ['30% Wants', wants30, periodSpend, '#8F5300', 'Dining, shopping, subscriptions, gym, travel', 'used'],
+              ['20% Savings & Debt', savings20, Math.max(0, totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend), '#9C27B0', 'Emergency fund, investments, extra debt payments', 'left over'],
+            ].map(([label, amt, actual, col, desc, verb]) => {
+              const over = verb === 'used' && amt > 0 && actual > amt
+              return (
               <div key={label} style={{marginBottom:12}}>
                 <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
                   <strong style={{fontSize:'.85rem'}}>{label}</strong>
                   <strong style={{color:col,fontSize:'.85rem'}}>{fmt(amt)}</strong>
                 </div>
-                <div style={{height:8,borderRadius:999,background:'var(--border)',marginBottom:4}}>
-                  <div style={{height:'100%',borderRadius:999,background:col,width:'33.3%'}} />
+                <div style={{height:8,borderRadius:999,background:'var(--border)',marginBottom:4,overflow:'hidden'}}>
+                  <div style={{height:'100%',borderRadius:999,background: over ? 'var(--danger)' : col,width:`${amt > 0 ? Math.min(100, Math.round(actual / amt * 100)) : 0}%`}} />
                 </div>
-                <p className="muted" style={{fontSize:'.72rem',margin:0}}>{desc}</p>
+                <p className="muted" style={{fontSize:'.72rem',margin:0}}>{amt > 0 ? <><strong style={{color: over ? 'var(--danger)' : 'var(--ink2)'}}>{fmt(actual)} {verb}</strong> · </> : null}{desc}</p>
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* 4 Tips */}
@@ -5426,7 +5440,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                 </div>
                 <div style={{display:'flex',gap:10,alignItems:'center'}}>
                   <strong style={{color:'var(--danger)'}}>{fmt(b.amount)}</strong>
-                  <button onClick={() => saveBills(bills.filter((_,j)=>j!==i))}
+                  <button aria-label={`Delete ${b.label}`} onClick={() => { if (window.confirm(`Delete the bill "${b.label}"?`)) saveBills(bills.filter((_,j)=>j!==i)) }}
                     style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                 </div>
               </div>
@@ -5570,7 +5584,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:600,fontSize:'.88rem'}}>{exp.description || exp.category}</div>
                   <div className="muted" style={{fontSize:'.75rem'}}>
-                    {exp.category} · {exp.date}
+                    {exp.category}{exp.date ? ` · ${shortDate(exp.date)}` : ''}
                     {exp.period && exp.period !== 'one-time' && <span style={{color:'var(--teal)',marginLeft:6,fontWeight:600}}>· {exp.period}</span>}
                   </div>
                 </div>
@@ -5586,12 +5600,18 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               </div>
             ))}
             {(expenses||[]).length > 0 && (() => {
+              // This month: one-time spending dated this month + the monthly share of repeating expenses
               const cats = {}
-              expenses.forEach(e => { cats[e.category] = (cats[e.category]||0) + Number(e.amount||0) })
+              expenses.forEach(e => {
+                const p = e.period || 'one-time'
+                const amt = p === 'one-time' ? (e.date && e.date.slice(0, 7) === TODAY.slice(0, 7) ? Number(e.amount || 0) : 0) : (!e.date || e.date <= TODAY ? toWeekly(e) * 4.33 : 0)
+                if (amt) cats[e.category || 'Other'] = (cats[e.category || 'Other'] || 0) + amt
+              })
               const total = Object.values(cats).reduce((s,v)=>s+v,0)
+              if (!total) return null
               return (
                 <div style={{marginTop:16}}>
-                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>By Category</p>
+                  <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:10}}>By Category · {monthLabel(CUR_MONTH, { month: 'long' })}</p>
                   {Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,amt]) => (
                     <div key={cat} style={{marginBottom:8}}>
                       <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
@@ -5669,7 +5689,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               ].map(cfg => {
                 const isActive = challengeGoal === cfg.goal
                 return (
-                  <button key={cfg.goal} onClick={() => { saveChallengeGoal(cfg.goal); saveCheckedWeeks([]) }}
+                  <button key={cfg.goal} onClick={() => {
+                    if (isActive) return
+                    if (checkedWeeks.length && !window.confirm(`Switch to the ${cfg.label} challenge? Your ${checkedWeeks.length} checked ${checkedWeeks.length === 1 ? 'box' : 'boxes'} on the current one will be cleared.`)) return
+                    saveChallengeGoal(cfg.goal); saveCheckedWeeks([])
+                  }}
                     style={{
                       padding:'14px 10px', borderRadius:12, cursor:'pointer', textAlign:'center',
                       border: isActive ? `2px solid ${cfg.color}` : '1.5px solid var(--border)',
@@ -5843,20 +5867,40 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             </div>
           )}
           {debts.length === 0 && <p className="muted" style={{textAlign:'center',padding:'20px 0'}}><EmptyState icon="📉" title="No debts added" message="Track what you owe and build a payoff plan." /></p>}
-          {[...debts].sort((a, b) => Number(b.rate || 0) - Number(a.rate || 0)).map((debt, i) => (
-            <div key={i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <strong style={{ fontSize: '.9rem' }}>{debt.name}</strong>
-                <button onClick={() => saveDebts(debts.filter((_,j)=>j!==i))}
-                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+          {/* Sorted by rate for display; edits/deletes match the debt itself (deleting by sorted position removed the wrong one) */}
+          {[...debts].sort((a, b) => Number(b.rate || 0) - Number(a.rate || 0)).map((debt, i) => {
+            const editing = editingDebt && editingDebt.ref === debt
+            const patch = (fields) => saveDebts(debts.map((d) => d === debt ? { ...d, ...fields } : d))
+            return (
+            <div key={debt.id || i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+                <strong style={{ fontSize: '.9rem' }}>{i === 0 && debts.length > 1 ? '🎯 ' : ''}{debt.name}</strong>
+                <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                  <button className="ghost-btn" style={{ fontSize: '.72rem', padding: '4px 8px' }} onClick={() => setEditingDebt(editing ? null : { ref: debt, balance: debt.balance, rate: debt.rate, minPayment: debt.minPayment })}>{editing ? 'Cancel' : 'Update'}</button>
+                  <button aria-label={`Delete ${debt.name}`} onClick={() => { if (window.confirm(`Delete "${debt.name}"?`)) saveDebts(debts.filter((d) => d !== debt)) }}
+                    style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                </div>
               </div>
+              {editing ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {[['Balance $', 'balance'], ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
+                      <label key={key} style={{ fontSize: '.7rem' }}>{ph}<input type="number" inputMode="decimal" value={editingDebt[key] ?? ''} onChange={(e) => setEditingDebt((p) => ({ ...p, [key]: e.target.value }))} /></label>
+                    ))}
+                  </div>
+                  <button className="primary-btn" onClick={() => { patch({ balance: editingDebt.balance, rate: editingDebt.rate, minPayment: editingDebt.minPayment, updatedAt: TODAY }); setEditingDebt(null) }}>Save</button>
+                  {Number(editingDebt.balance) <= 0 && <p className="muted" style={{ fontSize: '.75rem', margin: 0 }}>Paid off? Save it at $0 to celebrate, or delete it.</p>}
+                </div>
+              ) : (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '.8rem' }}>
-                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>BALANCE</p><strong>${Number(debt.balance).toLocaleString()}</strong></div>
-                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>RATE</p><strong style={{color:'var(--danger)'}}>{debt.rate}%</strong></div>
-                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>MIN PMT</p><strong>${debt.minPayment}/mo</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>BALANCE</p><strong style={Number(debt.balance) <= 0 ? { color: 'var(--success)' } : undefined}>{Number(debt.balance) <= 0 ? 'Paid off ✓' : fmt(debt.balance)}</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>RATE</p><strong style={{color:'var(--danger)'}}>{debt.rate || 0}%</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>MIN PMT</p><strong>{fmt(debt.minPayment)}/mo</strong></div>
               </div>
+              )}
             </div>
-          ))}
+            )
+          })}
           <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
             <p style={{ fontWeight: 600, fontSize: '.85rem', margin: 0 }}>Add a Debt</p>
             <input placeholder="Debt name (e.g. Credit Card, Car Loan)" value={newDebt.name}
@@ -5889,8 +5933,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               Discretionary only — bills and rent don't count. Used to calculate the Finance dimension of your life score.
             </p>
             <div style={{display:'flex',gap:10,alignItems:'center'}}>
-              <input type="number" value={budget.weeklyTarget}
-                onChange={(e) => setBudget({ weeklyTarget: Number(e.target.value) })}
+              <input type="number" inputMode="decimal" value={targetDraft}
+                onChange={(e) => setTargetDraft(e.target.value)}
+                onBlur={() => { const n = Number(targetDraft); if (targetDraft !== '' && Number.isFinite(n) && n >= 0 && n !== Number(budget.weeklyTarget)) setBudget({ weeklyTarget: n }); else setTargetDraft(String(budget.weeklyTarget ?? '')) }}
+                onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
                 style={{flex:1,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem'}} />
               <span className="muted" style={{fontSize:'.85rem'}}>/week</span>
             </div>
@@ -5923,8 +5969,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             {[
               [incomeLabel, fmt(totalIncomeForPeriod), 'var(--success)', '+'],
               ['Fixed Bills', fmt(totalBillsForPeriod), 'var(--danger)', '-'],
-              ['Min Debt Payments', fmt(totalDebtPayments * ((PERIOD_MULT[period]||4.33)/4.33)), 'var(--danger)', '-'],
-              ['Variable Expenses', fmt(fpWeekSpend * (PERIOD_MULT[period]||4.33)), 'var(--warning,#f90)', '-'],
+              ['Min Debt Payments', fmt(periodDebt), 'var(--danger)', '-'],
+              ['Variable Expenses', fmt(periodSpend), 'var(--warning,#f90)', '-'],
             ].map(([label, val, col, sign]) => (
               <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                 <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -5936,8 +5982,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ))}
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 0',marginTop:4}}>
               <strong style={{fontSize:'1rem'}}>= Remaining</strong>
-              <strong style={{fontSize:'1.1rem',color: totalIncomeForPeriod - totalBillsForPeriod - totalDebtPayments*((PERIOD_MULT[period]||4.33)/4.33) - fpWeekSpend*(PERIOD_MULT[period]||4.33) >= 0 ? 'var(--success)' : 'var(--danger)'}}>
-                {fmt(totalIncomeForPeriod - totalBillsForPeriod - totalDebtPayments*((PERIOD_MULT[period]||4.33)/4.33) - fpWeekSpend*(PERIOD_MULT[period]||4.33))}
+              <strong style={{fontSize:'1.1rem',color: totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend >= 0 ? 'var(--success)' : 'var(--danger)'}}>
+                {fmt(totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend)}
               </strong>
             </div>
           </section>
@@ -5948,12 +5994,13 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <h3 style={{ margin: '4px 0 12px' }}>Where Should Your Money Go?</h3>
             <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of <strong>{fmt(totalIncomeForPeriod)}</strong></p>
             {[
-              ['50% — Needs', needs50, totalBillsForPeriod, '#256A2A', 'Fixed bills, utilities, groceries, insurance'],
-              ['30% — Wants', wants30, fpWeekSpend*(PERIOD_MULT[period]||4.33), '#8F5300', 'Dining, shopping, subscriptions, entertainment'],
-              ['20% — Savings & Debt', savings20, totalDebtPayments*((PERIOD_MULT[period]||4.33)/4.33), '#9C27B0', 'Emergency fund, investments, extra debt payments'],
-            ].map(([label, target, actual, col, desc]) => {
+              // Same split as the Overview: bills + debt minimums are needs, tracked spending is wants, the rest is savings
+              ['50% — Needs', needs50, totalBillsForPeriod + periodDebt, '#256A2A', 'Fixed bills, utilities, insurance, minimum debt payments'],
+              ['30% — Wants', wants30, periodSpend, '#8F5300', 'Dining, shopping, subscriptions, entertainment'],
+              ['20% — Savings & Debt', savings20, Math.max(0, totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend), '#9C27B0', 'What is left to save, invest or pay extra on debt'],
+            ].map(([label, target, actual, col, desc], k) => {
               const pct = target > 0 ? Math.min((actual / target) * 100, 200) : 0
-              const over = actual > target
+              const over = k < 2 && actual > target
               return (
                 <div key={label} style={{marginBottom:16,padding:'12px',background:'var(--stone)',borderRadius:10}}>
                   <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
@@ -5975,7 +6022,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             <p className="eyebrow">Your Savings Rate</p>
             <h3 style={{ margin: '4px 0 14px' }}>How Much Are You Keeping?</h3>
             {(() => {
-              const totalOut = totalBillsForPeriod + fpWeekSpend*(PERIOD_MULT[period]||4.33)
+              const totalOut = totalBillsForPeriod + periodDebt + periodSpend
               const remaining = totalIncomeForPeriod - totalOut
               const rate = totalIncomeForPeriod > 0 ? (remaining / totalIncomeForPeriod) * 100 : 0
               return (
@@ -6042,7 +6089,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             {[7, 14, 21, 30].map(d => (
               <button key={d} className={noSpend.days === d ? 'pill active-pill' : 'pill'}
                 style={{ fontSize: '.78rem' }}
-                onClick={() => saveNoSpend({ days: d, checked: [] })}>{d} days</button>
+                onClick={() => { if (noSpend.days === d) return; if (noSpend.checked.length && !window.confirm(`Start a new ${d}-day challenge? Your ${noSpend.checked.length} colored-in ${noSpend.checked.length === 1 ? 'day' : 'days'} will be cleared.`)) return; saveNoSpend({ days: d, checked: [] }) }}>{d} days</button>
             ))}
           </div>
         </section>
@@ -6765,7 +6812,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
   const [routineLog, setRoutineLog] = useState(() => lsGet('routineLog', {}))
   const [wellnessLog, setWellnessLog] = useState(() => lsGet('wellnessLog', {}))
   const [journalEntries, setJournalEntries] = useState(() => lsGet('journalEntries', lsGet('journal', [])))
-  const [journalText, setJournalText] = useState('')
+  // Unsaved journal text survives leaving the tab or closing the app (this device only)
+  const [journalText, setJournalTextRaw] = useState(() => { try { return localStorage.getItem('planner.hw.journalDraft') || '' } catch { return '' } })
+  const setJournalText = (v) => { setJournalTextRaw(v); try { v ? localStorage.setItem('planner.hw.journalDraft', v) : localStorage.removeItem('planner.hw.journalDraft') } catch {} }
+  const [journalShown, setJournalShown] = useState(10)
   const [journalPrompt, setJournalPrompt] = useState(0)
 
   const saveRoutine = (r) => { setRoutine(r); syncPageData('routine', r) }
@@ -7029,17 +7079,20 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                 setJournalText('')
               }}>Save Entry</button>
           </section>
-          {journalEntries.slice(0,10).map(entry => (
+          {journalEntries.slice(0, journalShown).map(entry => (
             <section key={entry.id} className="card">
               <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass-fg)',letterSpacing:'.08em'}}>{entry.date}</div>
-                <button onClick={()=>saveJournal(journalEntries.filter(e=>e.id!==entry.id))}
+                <div style={{fontSize:'.65rem',fontWeight:700,color:'var(--brass-fg)',letterSpacing:'.08em',textTransform:'uppercase'}}>{entry.date ? formatDateLabel(entry.date, { weekday: 'short', month: 'short', day: 'numeric', year: entry.date.slice(0, 4) !== TODAY.slice(0, 4) ? 'numeric' : undefined }) : ''}</div>
+                <button aria-label="Delete entry" onClick={()=>{ if (window.confirm('Delete this journal entry?')) saveJournal(journalEntries.filter(e=>e.id!==entry.id)) }}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.85rem'}}>✕</button>
               </div>
               {entry.prompt && <div style={{fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic',marginBottom:6}}>{entry.prompt}</div>}
               <p style={{fontSize:'.88rem',color:'var(--ink2)',lineHeight:1.7,fontFamily:'var(--serif)',whiteSpace:'pre-wrap'}}>{entry.text}</p>
             </section>
           ))}
+          {journalEntries.length > journalShown && (
+            <button className="secondary-btn" style={{width:'100%'}} onClick={() => setJournalShown((n) => n + 10)}>Show older entries ({journalEntries.length - journalShown} more)</button>
+          )}
         </div>
       </ProTabGate>)}
 
@@ -7050,7 +7103,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           <p className="eyebrow">Daily Routine Builder</p>
           <h3 style={{margin:'4px 0 14px'}}>Your Rhythm</h3>
           {routine.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}>Build your morning and evening rhythm below.</p>}
-          {routine.map(item => {
+          {[...routine].sort((a, b) => ({ morning: 0, anytime: 1, evening: 2 }[a.type] ?? 1) - ({ morning: 0, anytime: 1, evening: 2 }[b.type] ?? 1)).map(item => {
             const done = todayLog.includes(item.id)
             return (
               <div key={item.id} onClick={() => toggleRoutineItem(item.id)} style={{
@@ -7065,7 +7118,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                 </div>
                 <div style={{flex:1}}>
                   <div style={{fontSize:'.9rem',fontWeight:500,color:done?'var(--muted)':'var(--ink)',textDecoration:done?'line-through':'none'}}>{item.label}</div>
-                  <div style={{fontSize:'.72rem',color:'var(--muted)'}}>{item.time} · {item.type}</div>
+                  <div style={{fontSize:'.72rem',color:'var(--muted)',textTransform:'capitalize'}}>{[item.time, item.type].filter(Boolean).join(' · ')}</div>
                 </div>
                 <button onClick={e=>{e.stopPropagation();saveRoutine(routine.filter(r=>r.id!==item.id))}}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
@@ -7103,19 +7156,19 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
         <>
           <section className="card">
             <p className="eyebrow">Today's Medications</p>
-            <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {TODAY}</h3>
+            <h3 style={{ margin: '4px 0 14px' }}>Medication Log — {formatDateLabel(TODAY, { weekday: 'long', month: 'short', day: 'numeric' })}</h3>
             {meds.map((med, i) => {
-              // Use unique key per med instance (index-based) not just name
-              const medKey = `${med.name}_${i}`
+              // Taken-today key: the med's id (older meds without one keep their name_index key)
+              const medKey = med.id ? `id:${med.id}` : `${med.name}_${i}`
               const taken = todayMeds.includes(medKey)
-              // Check if scheduled for today based on frequency
-              const todayDay = new Date().toLocaleDateString('en-US',{weekday:'long'})
+              // Days are saved as Mon/Tue/…; this compared against "Friday" before, so day-scheduled meds never showed as due
+              const todayDay = formatDateLabel(TODAY, { weekday: 'short' })
               const isScheduled = !med.days || med.days.length === 0 || med.days.includes(todayDay)
               return (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--surface)' }}>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '.9rem', color: taken ? 'var(--muted)' : 'var(--text)', textDecoration: taken ? 'line-through' : 'none' }}>{med.name}</div>
-                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{med.dose} · {med.time} · {med.type}</div>
+                    <div style={{ fontSize: '.75rem', color: 'var(--muted)' }}>{[med.dose, med.time, med.type, med.days?.length ? med.days.join(' ') : ''].filter(Boolean).join(' · ')}</div>
                   </div>
                   {isScheduled ? (
                   <button onClick={() => saveMedLog({ ...medLog, [todayMedKey]: taken ? todayMeds.filter(n => n !== medKey) : [...todayMeds, medKey] })}
@@ -7163,8 +7216,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
               </div>
               <button className="primary-btn" onClick={() => {
                 if(!form.medName) return
-                saveMeds([...meds, {name:form.medName, dose:form.medDose||'', time:form.medTime||'', days:form.medDays||[], notes:form.medNotes||''}])
-                setForm(p => ({...p, medName:'', medDose:'', medTime:'', medNotes:''}))
+                const DAY_ORDER = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+                saveMeds([...meds, {id: Date.now(), name:form.medName.trim(), dose:form.medDose||'', time:form.medTime||'', days:(form.medDays||[]).slice().sort((a,b)=>DAY_ORDER.indexOf(a)-DAY_ORDER.indexOf(b)), notes:form.medNotes||''}])
+                setForm(p => ({...p, medName:'', medDose:'', medTime:'', medNotes:'', medDays:[]}))
               }}>Add Medication</button>
             </div>
             {meds.length > 0 && (
@@ -7176,8 +7230,8 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                       <span style={{ fontSize: '.75rem', color: 'var(--muted)', marginLeft: 8 }}>{med.dose} · {med.time}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: '.72rem', padding: '2px 8px', borderRadius: 999, background: 'var(--teal-dim)', color: 'var(--teal)' }}>{med.type}</span>
-                      <button onClick={() => saveMeds(meds.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
+                      {med.type && <span style={{ fontSize: '.72rem', padding: '2px 8px', borderRadius: 999, background: 'var(--teal-dim)', color: 'var(--teal)' }}>{med.type}</span>}
+                      <button aria-label={`Remove ${med.name}`} onClick={() => { if (window.confirm(`Remove ${med.name}?`)) saveMeds(meds.filter((_, j) => j !== i)) }} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
                     </div>
                   </div>
                 ))}
@@ -7203,21 +7257,24 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                 {icon:'😐', label:'OK', val:3},
                 {icon:'😕', label:'Poor', val:2},
                 {icon:'😩', label:'Awful', val:1},
-              ].map(({icon, label, val}) => (
-                <button key={label} onClick={() => {
+              ].map(({icon, label, val}) => {
+                // Sets the 1–10 quality below (Great = 10 … Awful = 2) and today's mood check-in sleep rating
+                const on = form.sleepQ ? Math.round(form.sleepQ / 2) === val : todayWellness.sleep === val
+                return (
+                <button key={label} aria-pressed={on} onClick={() => {
                   logWellness('sleep', val)
+                  setForm(p => ({ ...p, sleepQ: val * 2 }))
                 }} style={{
                   display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-                  padding:'10px 4px', borderRadius:10, background:'var(--stone)',
-                  border:'1.5px solid var(--border2)', cursor:'pointer',
+                  padding:'10px 4px', borderRadius:10, background: on ? 'var(--teal-dim)' : 'var(--stone)',
+                  border: on ? '1.5px solid var(--teal)' : '1.5px solid var(--border2)', cursor:'pointer',
                 }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--teal)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
                 >
                   <div style={{fontSize:'1.5rem'}}>{icon}</div>
                   <div style={{fontSize:'.65rem',color:'var(--ink2)',fontWeight:600}}>{label}</div>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
           <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
@@ -7485,7 +7542,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
                   style={{padding:'8px',border:'1.5px solid var(--border2)',borderRadius:6,fontSize:'.82rem'}} />
               </div>
               <button onClick={() => {
-                if(!newMeasurement.weight && !newMeasurement.waist) return
+                if(!newMeasurement.weight && !newMeasurement.waist && !newMeasurement.hip && !newMeasurement.bodyFat) return
                 saveMeasurements([...measurements, {...newMeasurement, id: Date.now()}])
                 setNewMeasurement({weight:'', waist:'', hip:'', bodyFat:'', date:TODAY})
               }} style={{padding:'9px',background:'var(--teal)',color:'white',border:'none',borderRadius:8,fontWeight:600,cursor:'pointer',fontSize:'.85rem'}}>
@@ -7565,8 +7622,10 @@ function NoteComposer({ onSave }) {
   const [open, setOpen] = React.useState(false)
 
   const save = () => {
-    if (!title.trim()) return
-    onSave({ id: Date.now(), title: title.trim(), content: body.trim(), category, date: TODAY })
+    // A note with only a body is titled from its first line
+    const t = title.trim() || body.trim().split('\n')[0].slice(0, 60)
+    if (!t) return
+    onSave({ id: Date.now(), title: t, content: body.trim(), category, date: TODAY })
     setTitle(''); setBody(''); setOpen(false)
   }
 
@@ -7643,43 +7702,71 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   // notes now come from Supabase via props - use saveItem
   const [checklists, setChecklists] = useState(() => lsGet('checklists', [{ id: 1, title: 'Work Checklist', items: [] }]))
   const [brainDump, setBrainDump] = useState(() => { try { const v = localStorage.getItem('planner.p.brainDump'); return v != null ? JSON.parse(v) : (localStorage.getItem('planner.p.braindump') || '') } catch { return '' } })
-  const saveBrainDump = (v) => { setBrainDump(v); syncPageData('brainDump', v) }
-  const WORK_MINS = 25
-  const BREAK_MINS = 5
-  const [focusCustomMins, setFocusCustomMins] = useState(25)
-  const [focusTimeLeft, setFocusTimeLeft] = useState(25 * 60)
-  const [focusRunning, setFocusRunning] = useState(false)
+  // Typing updates the screen at once and saves after a short pause (was one save per keystroke,
+  // which could land out of order); anything pending is saved when the app is hidden.
+  const brainTimer = React.useRef(null), brainPending = React.useRef(null)
+  const flushBrainDump = React.useCallback(() => { clearTimeout(brainTimer.current); if (brainPending.current != null) { syncPageData('brainDump', brainPending.current); brainPending.current = null } }, [syncPageData])
+  const saveBrainDump = (v, now = false) => {
+    setBrainDump(v); brainPending.current = v; ownPage.mark('brainDump')
+    try { localStorage.setItem('planner.p.brainDump', JSON.stringify(v)) } catch {}
+    clearTimeout(brainTimer.current)
+    if (now) flushBrainDump(); else brainTimer.current = setTimeout(flushBrainDump, 700)
+  }
+  React.useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushBrainDump() }
+    document.addEventListener('visibilitychange', onHide); window.addEventListener('pagehide', flushBrainDump)
+    return () => { document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', flushBrainDump); flushBrainDump() }
+  }, [flushBrainDump])
+  // Focus timer runs off an end time, so it stays right when the phone locks or the app is in the background
+  // (a 1-second counter pauses there). Break presets no longer change the focus length.
+  const [focusWorkMins, setFocusWorkMins] = useState(25)
+  const [focusBreakMins, setFocusBreakMins] = useState(5)
   const [focusMode, setFocusMode] = useState('work')
   const [focusSessions, setFocusSessions] = useState(0)
-  const focusRef = React.useRef(null)
+  const [focusEndsAt, setFocusEndsAt] = useState(null)        // ms timestamp while running
+  const [focusLeft, setFocusLeft] = useState(25 * 60)          // seconds left while paused
+  const [, focusTick] = useState(0)
+  const focusRunning = focusEndsAt != null
+  const focusTimeLeft = focusRunning ? Math.max(0, Math.ceil((focusEndsAt - Date.now()) / 1000)) : focusLeft
+  const focusChime = () => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      ;[0, 0.25, 0.5].forEach((t) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = 880; g.gain.setValueAtTime(0.18, ctx.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t + 0.22); o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.24) })
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+    } catch {}
+  }
   React.useEffect(() => {
-    if (focusRunning) {
-      focusRef.current = setInterval(() => {
-        setFocusTimeLeft(prev => {
-          if (prev > 1) return prev - 1
-          clearInterval(focusRef.current)
-          setFocusRunning(false)
-          if (focusMode === 'work') {
-            setFocusSessions(s => s + 1)
-            setFocusMode('break')
-            return BREAK_MINS * 60
-          } else {
-            setFocusMode('work')
-            return focusCustomMins * 60
-          }
-        })
-      }, 1000)
-    } else {
-      clearInterval(focusRef.current)
-    }
-    return () => clearInterval(focusRef.current)
-  }, [focusRunning, focusMode, focusCustomMins])
+    if (!focusRunning) return undefined
+    const id = setInterval(() => {
+      if (Date.now() < focusEndsAt) { focusTick((n) => n + 1); return }
+      setFocusEndsAt(null)
+      focusChime()
+      if (focusMode === 'work') {
+        const done = focusSessions + 1
+        setFocusSessions(done)
+        setFocusMode('break')
+        setFocusLeft((done % 4 === 0 ? Math.max(15, focusBreakMins) : focusBreakMins) * 60)   // every 4th session: a longer break
+      } else {
+        setFocusMode('work')
+        setFocusLeft(focusWorkMins * 60)
+      }
+    }, 500)
+    return () => clearInterval(id)
+  }, [focusRunning, focusEndsAt, focusMode, focusSessions, focusWorkMins, focusBreakMins])
+  const toggleFocus = () => {
+    if (focusRunning) { setFocusLeft(focusTimeLeft); setFocusEndsAt(null) }
+    else setFocusEndsAt(Date.now() + focusTimeLeft * 1000)
+  }
+  const focusPreset = (mins, mode) => {
+    setFocusEndsAt(null); setFocusMode(mode); setFocusLeft(mins * 60)
+    if (mode === 'work') setFocusWorkMins(mins); else setFocusBreakMins(mins)
+  }
   const focusMinutes = Math.floor(focusTimeLeft / 60)
   const focusSeconds = focusTimeLeft % 60
-  const focusTotal = focusMode === 'work' ? focusCustomMins * 60 : BREAK_MINS * 60
+  const focusTotal = Math.max(1, focusMode === 'work' ? focusWorkMins * 60 : Math.max(focusLeft, focusBreakMins * 60))
   const focusDisplay = `${String(focusMinutes).padStart(2,'0')}:${String(focusSeconds).padStart(2,'0')}`
-  const focusProgress = Math.round(((focusTotal - focusTimeLeft) / focusTotal) * 100)
-  const focusReset = () => { clearInterval(focusRef.current); setFocusRunning(false); setFocusTimeLeft(focusCustomMins * 60); setFocusMode('work') }
+  const focusProgress = Math.max(0, Math.min(100, Math.round(((focusTotal - focusTimeLeft) / focusTotal) * 100)))
+  const focusReset = () => { setFocusEndsAt(null); setFocusMode('work'); setFocusLeft(focusWorkMins * 60) }
 
   const [newChecklist, setNewChecklist] = useState('')
   const [newItem, setNewItem] = useState({})
@@ -7703,7 +7790,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             style={{ width: '100%', minHeight: 300, padding: 14, border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.9rem', fontFamily: 'var(--serif)', lineHeight: 1.7, resize: 'vertical', background: 'var(--warm-white)', color: 'var(--ink)', boxSizing: 'border-box' }} />
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
             <p style={{ fontSize: '.75rem', color: 'var(--muted)', margin:0 }}>Saved automatically as you type.</p>
-            <button onClick={()=>saveBrainDump('')} style={{background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',color:'var(--muted)',cursor:'pointer'}}>Clear</button>
+            <button onClick={()=>{ if (String(brainDump || '').trim() && window.confirm('Clear your whole brain dump? This can\'t be undone.')) saveBrainDump('', true) }} style={{background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',color:'var(--muted)',cursor:'pointer'}}>Clear</button>
           </div>
         </section>
       )}
@@ -7737,7 +7824,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
 
             {/* Controls */}
             <div style={{display:'flex',gap:12,justifyContent:'center',marginBottom:16}}>
-              <button onClick={()=>setFocusRunning(r=>!r)} style={{
+              <button onClick={toggleFocus} style={{
                 padding:'12px 28px',borderRadius:999,fontSize:'1rem',fontWeight:700,cursor:'pointer',
                 background: focusRunning ? 'var(--danger)' : 'var(--ink)',
                 color:'white',border:'none'
@@ -7749,7 +7836,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             {/* Mode presets */}
             <div style={{display:'flex',gap:8,justifyContent:'center',flexWrap:'wrap'}}>
               {[['Pomodoro',25,'work'],['Short Break',5,'break'],['Long Break',15,'break'],['Deep Work',50,'work'],['Quick',15,'work']].map(([label,mins,mode])=>(
-                <button key={label} onClick={()=>{setFocusRunning(false);setFocusMode(mode);setFocusCustomMins(mins);setFocusTimeLeft(mins*60);}}
+                <button key={label} onClick={()=>focusPreset(mins, mode)}
                     style={{padding:'6px 12px',borderRadius:999,fontSize:'.78rem',cursor:'pointer',
                     border:'1.5px solid var(--border2)',background:'var(--stone)',color:'var(--ink)',fontWeight:500}}>
                     {label} · {mins}m</button>
@@ -7780,9 +7867,15 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
           {checklists.map((cl, ci) => (
             <section key={cl.id} className="card">
               <div className="section-title-row">
-                <h3 style={{ fontSize: '1rem' }}>{cl.title}</h3>
-                <button onClick={() => saveChecklists(checklists.filter((_, i) => i !== ci))}
-                  style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem' }}>Remove</button>
+                <h3 style={{ fontSize: '1rem' }}>{cl.title}{cl.items.length ? <span className="muted" style={{ fontSize: '.75rem', fontWeight: 500, marginLeft: 8 }}>{cl.items.filter((it) => it.done).length}/{cl.items.length}</span> : null}</h3>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                  {cl.items.some((it) => it.done) && (
+                    <button onClick={() => saveChecklists(checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: c.items.map((it) => ({ ...it, done: false })) }))}
+                      style={{ background: 'none', border: 'none', color: 'var(--teal)', cursor: 'pointer', fontSize: '.8rem', fontWeight: 600 }}>Uncheck all</button>
+                  )}
+                  <button onClick={() => { if (window.confirm(`Remove the "${cl.title}" checklist and its ${cl.items.length} item${cl.items.length === 1 ? '' : 's'}?`)) saveChecklists(checklists.filter((_, i) => i !== ci)) }}
+                    style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '.85rem' }}>Remove</button>
+                </div>
               </div>
               {cl.items.map((item, ii) => (
                 <div key={ii} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--surface)' }}>
@@ -7800,6 +7893,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                 <input placeholder="Add item..." value={newItem[cl.id] || ''}
                   onChange={e => setNewItem(p => ({ ...p, [cl.id]: e.target.value }))}
+                  onKeyDown={e => { if (e.key === 'Enter' && String(newItem[cl.id] || '').trim()) { saveChecklists(checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: [...c.items, { label: newItem[cl.id].trim(), done: false }] })); setNewItem(p => ({ ...p, [cl.id]: '' })) } }}
                   style={{ flex: 1, padding: '8px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
                 <button className="primary-btn" style={{ padding: '8px 14px', fontSize: '.82rem' }}
                   onClick={() => { if (!newItem[cl.id]) return; saveChecklists(checklists.map((c, cIdx) => cIdx !== ci ? c : { ...c, items: [...c.items, { label: newItem[cl.id], done: false }] })); setNewItem(p => ({ ...p, [cl.id]: '' })) }}>Add</button>
@@ -7834,13 +7928,15 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
           {notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase())).length === 0
             ? <EmptyState icon="📝" title="Thoughts deserve a home" message="Capture what comes to mind. Reflect later. Watch patterns emerge." />
             : notes.filter(n => !noteQuery || n.title?.toLowerCase().includes(noteQuery.toLowerCase()) || (n.content||'').toLowerCase().includes(noteQuery.toLowerCase()))
+              // Pinned first, then newest (they arrived in random id order)
+              .slice().sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || String(b.date || b.created_at || '').localeCompare(String(a.date || a.created_at || '')) || String(b.created_at || '').localeCompare(String(a.created_at || '')))
               .map(note => (
                 <div key={note.id} style={{padding:'12px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:600,fontSize:'.9rem',marginBottom:4}}>{note.title}</div>
                       {note.content && <div style={{fontSize:'.85rem',color:'var(--ink2)',lineHeight:1.6,whiteSpace:'pre-wrap'}}>{note.content}</div>}
-                      <div className="muted" style={{fontSize:'.72rem',marginTop:4}}>{note.category||'General'} · {note.date}</div>
+                      <div className="muted" style={{fontSize:'.72rem',marginTop:4}}>{[note.category||'General', note.date ? shortDate(String(note.date).slice(0, 10)) : ''].filter(Boolean).join(' · ')}</div>
                     </div>
                     <div style={{display:'flex',gap:6,flexShrink:0}}>
                       <button onClick={() => onEdit('note', note)}
@@ -8442,8 +8538,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
           <section className="card">
             <p className="eyebrow">My List</p>
             <h3 style={{ margin: '4px 0 12px' }}>Shopping List</h3>
-            {groceries.map((item, i) => (
-              <div key={i} onClick={() => save('groceries', setGroceries, groceries.map((g, j) => j === i ? { ...g, done: !g.done } : g))}
+            {/* Still-to-buy first, checked-off items sink to the bottom */}
+            {groceries.map((item, i) => ({ item, i })).sort((a, b) => Number(!!a.item.done) - Number(!!b.item.done)).map(({ item, i }) => (
+              <div key={i + ':' + item.label} onClick={() => save('groceries', setGroceries, groceries.map((g, j) => j === i ? { ...g, done: !g.done } : g))}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer' }}>
                 <div style={{ width: 22, height: 22, borderRadius: 6, border: '2px solid', borderColor: item.done ? 'var(--navy)' : 'var(--border2)', background: item.done ? 'var(--navy)' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {item.done && <span style={{ color: 'white', fontWeight: 700, fontSize: '.8rem' }}>✓</span>}
@@ -8463,7 +8560,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
               <input placeholder="Qty" value={form.grocQty || ''} onChange={e => setForm(p => ({ ...p, grocQty: e.target.value }))}
                 style={{ flex: 1, padding: '9px 10px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
               <button className="primary-btn" style={{ padding: '9px 14px', fontSize: '.82rem' }}
-                onClick={() => { if (!form.grocLabel) return; save('groceries', setGroceries, [...groceries, { label: form.grocLabel, qty: form.grocQty, done: false }]); setForm(p => ({ ...p, grocLabel: '', grocQty: '' })) }}>+</button>
+                onClick={() => { const label = String(form.grocLabel || '').trim(); if (!label) return; addToGroceries([{ label, qty: form.grocQty || '' }]) || onToast?.('Already on your list', label); setForm(p => ({ ...p, grocLabel: '', grocQty: '' })) }}>+</button>
             </div>
             {groceries.some(g => g.done) && (
               <button className="ghost-btn" style={{ marginTop: 10, fontSize: '.82rem' }}
@@ -8506,11 +8603,12 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                   {items.map(item => {
-                    const alreadyAdded = groceries.some(g => groceryKey(g.label) === groceryKey(item))
+                    // Checked-off items can be added again (they used to stay locked until "Clear Checked")
+                    const alreadyAdded = groceries.some(g => groceryKey(g.label) === groceryKey(item) && !g.done)
                     return (
                       <button key={item} onClick={() => {
                         if (alreadyAdded) return
-                        save('groceries', setGroceries, [...groceries, { label: item, qty: '', done: false }])
+                        addToGroceries([{ label: item, qty: '' }])
                       }} style={{
                         padding:'5px 10px', borderRadius:999, fontSize:'.78rem', cursor: alreadyAdded ? 'default' : 'pointer',
                         border: alreadyAdded ? '1.5px solid var(--success)' : '1.5px solid var(--border2)',
@@ -8644,14 +8742,23 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             <p className="eyebrow">Trip Planner</p>
             <h3 style={{margin:'4px 0 12px'}}>Upcoming & Past Trips</h3>
             {trips.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="✈️" title="The world is waiting" message="Add a trip you're looking forward to." /></p>}
-            {trips.map((trip, i) => (
-              <div key={i} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)'}}>
+            {/* Upcoming trips first (soonest on top), then past ones (most recent first) */}
+            {[...trips].sort((a, b) => {
+              const pa = (a.endDate || a.startDate || '9999') < TODAY, pb = (b.endDate || b.startDate || '9999') < TODAY
+              if (pa !== pb) return pa ? 1 : -1
+              return pa ? String(b.startDate || '').localeCompare(String(a.startDate || '')) : String(a.startDate || '9999').localeCompare(String(b.startDate || '9999'))
+            }).map((trip, i) => {
+              const past = (trip.endDate || trip.startDate || '9999') < TODAY
+              const away = trip.startDate && trip.startDate > TODAY ? Math.round((Date.parse(trip.startDate + 'T12:00:00Z') - Date.parse(TODAY + 'T12:00:00Z')) / 86400000) : null
+              const fmtD = (d) => d ? formatDateLabel(d, { month: 'short', day: 'numeric', year: d.slice(0, 4) !== TODAY.slice(0, 4) ? 'numeric' : undefined }) : ''
+              return (
+              <div key={trip.id || i} style={{padding:'12px 0',borderBottom:'1px solid var(--stone2)',opacity: past ? .7 : 1}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>{trip.destination}</div>
-                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{trip.startDate}{trip.endDate ? ' → '+trip.endDate : ''}</div>
+                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{fmtD(trip.startDate)}{trip.endDate ? ' → ' + fmtD(trip.endDate) : ''}{past ? ' · Past' : away != null ? ` · in ${away} day${away === 1 ? '' : 's'}` : trip.startDate ? ' · Now' : ''}</div>
                   </div>
-                  <button onClick={()=>saveTrips(trips.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
+                  <button aria-label="Delete trip" onClick={()=>{ if (window.confirm(`Delete the trip to ${trip.destination || 'this place'}?`)) saveTrips(trips.filter((x)=>x!==trip)) }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                 </div>
                 {trip.notes && <div style={{fontSize:'.82rem',color:'var(--ink2)',marginBottom:6,lineHeight:1.5}}>{trip.notes}</div>}
                 {trip.packing && (
@@ -8665,7 +8772,8 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
                   </div>
                 )}
               </div>
-            ))}
+              )
+            })}
             <div style={{display:'grid',gap:8,marginTop:12}}>
               <input placeholder="Destination" value={newTrip.destination} onChange={e=>setNewTrip(p=>({...p,destination:e.target.value}))}
                 style={{padding:'9px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.88rem',background:'var(--stone)',color:'var(--text)'}} />
@@ -8692,25 +8800,19 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             <p className="eyebrow">Birthday Reminders</p>
             <h3 style={{margin:'4px 0 12px'}}>Never miss one</h3>
             {birthdays.length === 0 && <p className="muted" style={{fontSize:'.85rem',marginBottom:12}}><EmptyState icon="🎂" title="No birthdays yet" message="Add the people you want to celebrate." /></p>}
-            {[...birthdays].sort((a,b)=>{
-              const today = new Date()
-              const toNext = (dateStr) => {
-                if (!dateStr) return 999
-                const [,m,d] = dateStr.split('-').map(Number)
-                const next = new Date(today.getFullYear(), m-1, d)
-                if (next < today) next.setFullYear(today.getFullYear()+1)
-                return (next - today) / (1000*60*60*24)
+            {(() => {
+              // Days until the next birthday, counted on plain dates (a birthday today used to show as 365d)
+              const untilNext = (dateStr) => {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return null
+                const [, m, d] = dateStr.split('-').map(Number)
+                const y = Number(TODAY.slice(0, 4))
+                const on = (yy) => { const last = new Date(Date.UTC(yy, m, 0)).getUTCDate(); return `${yy}-${String(m).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}` }
+                const next = on(y) >= TODAY ? on(y) : on(y + 1)
+                return { days: Math.round((Date.parse(next + 'T12:00:00Z') - Date.parse(TODAY + 'T12:00:00Z')) / 86400000), turns: Number(next.slice(0, 4)) - Number(dateStr.slice(0, 4)) }
               }
-              return toNext(a.date) - toNext(b.date)
-            }).map((bd,i) => {
-              const daysUntil = (() => {
-                if (!bd.date) return null
-                const [,m,d] = bd.date.split('-').map(Number)
-                const next = new Date(new Date().getFullYear(), m-1, d)
-                if (next < new Date()) next.setFullYear(new Date().getFullYear()+1)
-                const diff = Math.round((next - new Date()) / (1000*60*60*24))
-                return diff
-              })()
+              return [...birthdays].map((bd) => ({ bd, next: untilNext(bd.date) })).sort((a, b) => (a.next?.days ?? 999) - (b.next?.days ?? 999))
+            })().map(({ bd, next }, i) => {
+              const daysUntil = next ? next.days : null
               return (
                 <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 0',borderBottom:'1px solid var(--stone2)'}}>
                   <div style={{width:44,height:44,borderRadius:'50%',background:'var(--brass-dim)',display:'grid',placeItems:'center',flexShrink:0}}>
@@ -8718,7 +8820,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
                   </div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{fontWeight:700,fontSize:'.9rem',color:'var(--ink)'}}>{bd.name}</div>
-                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{bd.relationship} · {bd.date}</div>
+                    <div style={{fontSize:'.75rem',color:'var(--muted)'}}>{[bd.relationship, bd.date ? formatDateLabel(bd.date, { month: 'long', day: 'numeric' }) : '', next && next.turns > 0 && next.turns < 130 ? `turns ${next.turns}` : ''].filter(Boolean).join(' · ')}</div>
                     {bd.notes && <div style={{fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic'}}>{bd.notes}</div>}
                   </div>
                   <div style={{textAlign:'center',flexShrink:0}}>
@@ -8727,7 +8829,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
                         {daysUntil === 0 ? '🎉 Today!' : `${daysUntil}d`}
                       </div>
                     )}
-                    <button onClick={()=>saveBirthdays(birthdays.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.8rem'}}>✕</button>
+                    <button aria-label={`Remove ${bd.name}`} onClick={()=>{ if (window.confirm(`Remove ${bd.name}'s birthday?`)) saveBirthdays(birthdays.filter((x)=>x!==bd)) }} style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'.8rem'}}>✕</button>
                   </div>
                 </div>
               )
@@ -10566,14 +10668,18 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                 <p style={{fontSize:'.78rem',color:'var(--ink2)',marginBottom:10,fontStyle:'italic'}}>
                   "Give thanks to the Lord, for he is good; his love endures forever." — Psalm 107:1
                 </p>
-                <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:120,overflow:'auto'}}>
-                  {answered.slice(0,5).map(p => (
-                    <div key={p.id} style={{
-                      fontSize:'.82rem',color:'var(--ink)',padding:'6px 10px',
-                      background:'rgba(255,255,255,.6)',borderRadius:8,
-                      borderLeft:'3px solid var(--success)',
-                    }}>
-                      <strong>✓ {p.title || p.request}</strong>
+                {/* One list of answered prayers (the box showed blanks — it read p.title, prayers store p.text — and a second list repeated them) */}
+                <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:260,overflow:'auto'}}>
+                  {answered.slice().sort((x, y) => String(y.answeredDate || '').localeCompare(String(x.answeredDate || ''))).map(p => (
+                    <div key={p.id} style={{fontSize:'.82rem',color:'var(--ink)',padding:'8px 10px',background:'rgba(255,255,255,.6)',borderRadius:8,borderLeft:'3px solid var(--success)',display:'flex',gap:8,alignItems:'flex-start'}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <strong style={{fontWeight:600}}>✓ {p.text || p.title || p.request}</strong>
+                        {p.answeredDate && <div style={{fontSize:'.7rem',color:'var(--success)',fontWeight:600,marginTop:2}}>Answered {shortDate(p.answeredDate)}</div>}
+                      </div>
+                      <button aria-label="Move back to active" title="Not answered yet" onClick={() => savePrayers(prayers.map(x => x.id === p.id ? { ...x, answered: false, answeredDate: null } : x))}
+                        style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0,fontSize:'.85rem'}}>↺</button>
+                      <button aria-label="Delete prayer" onClick={() => { if (window.confirm('Delete this answered prayer?')) savePrayers(prayers.filter(x => x.id !== p.id)) }}
+                        style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -10591,35 +10697,18 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <div key={prayer.id} style={{padding:'12px',background:'var(--stone)',borderRadius:10,marginBottom:8}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
                 <div style={{flex:1}}>
-                  <div style={{fontSize:'.78rem',color:'var(--brass-fg)',fontWeight:600,marginBottom:4}}>{prayer.type} · {prayer.date}</div>
+                  <div style={{fontSize:'.78rem',color:'var(--brass-fg)',fontWeight:600,marginBottom:4}}>{[prayer.type, prayer.date ? shortDate(prayer.date) : ''].filter(Boolean).join(' · ')}</div>
                   <div style={{fontSize:'.9rem',color:'var(--ink)',lineHeight:1.5}}>{prayer.text}</div>
                 </div>
                 <div style={{display:'flex',gap:6,flexShrink:0}}>
                   <button onClick={() => savePrayers(prayers.map(p => p.id===prayer.id ? {...p, answered:true, answeredDate:TODAY} : p))}
                     style={{background:'var(--success)',color:'white',border:'none',borderRadius:6,padding:'4px 8px',fontSize:'.72rem',cursor:'pointer',fontWeight:600}}>✓ Answered</button>
-                  <button onClick={() => savePrayers(prayers.filter(p => p.id !== prayer.id))}
+                  <button aria-label="Delete prayer" onClick={() => { if (window.confirm('Delete this prayer request?')) savePrayers(prayers.filter(p => p.id !== prayer.id)) }}
                     style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                 </div>
               </div>
             </div>
           ))}
-
-          {/* Answered prayers */}
-          {prayers.filter(p => p.answered).length > 0 && (
-            <div style={{marginBottom:16}}>
-              <p style={{fontWeight:600,fontSize:'.85rem',marginBottom:8,color:'var(--success)'}}>✓ Answered Prayers ({answeredPrayers})</p>
-              {prayers.filter(p => p.answered).slice(0,5).map(prayer => (
-                <div key={prayer.id} style={{padding:'10px 12px',background:'var(--success)18',borderRadius:8,marginBottom:6,display:'flex',justifyContent:'space-between',gap:8}}>
-                  <div>
-                    <div style={{fontSize:'.72rem',color:'var(--success)',fontWeight:600,marginBottom:2}}>Answered {prayer.answeredDate || ''}</div>
-                    <div style={{fontSize:'.85rem',color:'var(--ink2)'}}>{prayer.text}</div>
-                  </div>
-                  <button onClick={() => savePrayers(prayers.filter(p => p.id !== prayer.id))}
-                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',flexShrink:0}}>✕</button>
-                </div>
-              ))}
-            </div>
-          )}
 
           {/* Add prayer */}
           <div style={{marginTop:8,padding:'14px',background:'var(--stone)',borderRadius:10,display:'grid',gap:8}}>
@@ -10708,7 +10797,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                       padding: '3px 10px', fontSize: '.7rem', fontWeight: 600,
                       cursor: 'pointer',
                     }}>{s.memorized ? '✓ Memorized' : s.memorizing ? '📚 Memorizing' : '+ Memorize'}</button>
-                  <button onClick={() => saveScriptures(scriptures.filter((_,j)=>j!==i))}
+                  <button aria-label="Remove verse" onClick={() => { if (window.confirm(`Remove ${s.ref || s.reference || 'this verse'} from your list?`)) saveScriptures(scriptures.filter((_,j)=>j!==i)) }}
                     style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                 </div>
               </div>
@@ -10866,7 +10955,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                 {icon:'🤝', label:'Friends'},
               ].map(({icon, label}) => (
                 <button key={label} onClick={() => {
-                  saveGratitude([...gratitude, {id: Date.now(), text: label, date: TODAY}])
+                  // Newest first like typed entries; tapping the same one twice in a day doesn't duplicate it
+                  if (gratitude.some(g => g.date === TODAY && String(g.text).toLowerCase() === label.toLowerCase())) return
+                  saveGratitude([{id: Date.now(), text: label, date: TODAY}, ...gratitude])
                 }} style={{
                   display:'flex', flexDirection:'column', alignItems:'center', gap:4,
                   padding:'10px 6px', borderRadius:12, background:'var(--stone)',
@@ -10897,7 +10988,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               setNewGratitude('')
             }}>+ Add</button>
           </div>
-          {gratitude.slice(0, 30).reduce((groups, item) => {
+          {[...gratitude].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (Number(b.id) || 0) - (Number(a.id) || 0)).slice(0, 30).reduce((groups, item) => {
             const g = groups.find(g => g.date === item.date)
             if (g) g.items.push(item)
             else groups.push({ date: item.date, items: [item] })
@@ -10907,7 +10998,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 .map(group => (
             <div key={group.date} style={{marginBottom:14}}>
               <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6}}>
-                {group.date === TODAY ? 'Today' : group.date}
+                {group.date === TODAY ? 'Today' : group.date === addDays(TODAY, -1) ? 'Yesterday' : formatDateLabel(group.date, { weekday: 'short', month: 'short', day: 'numeric' })}
               </p>
               {group.items.map(item => (
                 <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
@@ -10932,7 +11023,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <div style={{background:'var(--ink)',borderRadius:12,padding:'16px',marginBottom:16}}>
               <p style={{color:'var(--brass-fg)',fontWeight:700,fontSize:'.85rem',marginBottom:4}}>Active Fast</p>
               <p style={{color:'white',fontSize:'1rem',fontWeight:600,marginBottom:4}}>{fasting.intention || 'No intention set'}</p>
-              <p style={{color:'rgba(255,255,255,.6)',fontSize:'.8rem'}}>{fasting.startDate} → {fasting.endDate || 'Open'}</p>
+              <p style={{color:'rgba(255,255,255,.6)',fontSize:'.8rem'}}>
+                {fasting.startDate ? shortDate(fasting.startDate) : ''} → {fasting.endDate ? shortDate(fasting.endDate) : 'Open'}
+                {fasting.startDate && fasting.startDate <= TODAY ? ` · Day ${Math.round((Date.parse(TODAY + 'T12:00:00Z') - Date.parse(fasting.startDate + 'T12:00:00Z')) / 86400000) + 1}${fasting.endDate && fasting.endDate >= fasting.startDate ? ` of ${Math.round((Date.parse(fasting.endDate + 'T12:00:00Z') - Date.parse(fasting.startDate + 'T12:00:00Z')) / 86400000) + 1}` : ''}` : ''}
+              </p>
               <button onClick={() => saveFasting({...fasting, active:false, log:[...fasting.log, {start:fasting.startDate,end:TODAY,intention:fasting.intention}]})}
                 style={{marginTop:12,background:'var(--danger)',color:'white',border:'none',borderRadius:8,padding:'8px 16px',cursor:'pointer',fontWeight:600,fontSize:'.85rem'}}>
                 End Fast
@@ -10963,7 +11057,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               {(fasting.log || []).map((entry, i) => (
                 <div key={i} style={{padding:'10px 0',borderBottom:'1px solid var(--border)'}}>
                   <div style={{fontWeight:600,fontSize:'.88rem'}}>{entry.intention || 'Fast'}</div>
-                  <div className="muted" style={{fontSize:'.75rem'}}>{entry.start} → {entry.end}</div>
+                  <div className="muted" style={{fontSize:'.75rem'}}>{entry.start ? shortDate(entry.start) : ''} → {entry.end ? shortDate(entry.end) : ''}</div>
                 </div>
               ))}
             </div>
@@ -10977,14 +11071,14 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
         <section className="card">
           <p className="eyebrow">Sermon Notes</p>
           <h3 style={{ margin: '4px 0 14px' }}>Capture What God Says</h3>
-          {sermons.map((s, i) => (
-            <div key={s.id} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
+          {[...sermons].sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).map((s, i) => (
+            <div key={s.id || i} style={{padding:'14px',background:'var(--stone)',borderRadius:10,marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
                 <div>
                   <strong style={{fontSize:'.9rem'}}>{s.title || 'Untitled'}</strong>
-                  <div className="muted" style={{fontSize:'.75rem'}}>{s.speaker} · {s.date}</div>
+                  <div className="muted" style={{fontSize:'.75rem'}}>{[s.speaker, s.date ? formatDateLabel(s.date, { month: 'short', day: 'numeric', year: 'numeric' }) : ''].filter(Boolean).join(' · ')}</div>
                 </div>
-                <button onClick={() => { if(window.confirm('Delete this sermon note?')) saveSermons(sermons.filter((_,j)=>j!==i)) }}
+                <button aria-label="Delete sermon note" onClick={() => { if(window.confirm('Delete this sermon note?')) saveSermons(sermons.filter((x)=>x!==s)) }}
                   style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',padding:'4px 8px',fontSize:'.85rem'}}>✕</button>
               </div>
               {s.notes && <p style={{fontSize:'.85rem',lineHeight:1.6,margin:'8px 0 6px',color:'var(--ink2)'}}>{s.notes}</p>}
