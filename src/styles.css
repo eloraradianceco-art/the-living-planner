@@ -1849,3 +1849,42 @@ button.profile-pill:active { transform: scale(.97); }
   .recipe-book-head { flex-direction: column; }
   .recipe-new { align-self: stretch; justify-content: center; }
 }
+
+/* ── Savings goals + sinking funds (2026-11-12) ───────────────────── */
+.sav-item { background: var(--stone); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.sav-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.sav-head strong { font-size: .92rem; color: var(--ink); overflow-wrap: anywhere; }
+.sav-x { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; flex-shrink: 0; }
+.sav-amounts { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.sav-saved { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sav-amounts .muted { font-size: .8rem; }
+.sav-bar { height: 10px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.sav-bar > div { height: 100%; border-radius: 999px; transition: width .3s; }
+.sav-hint { font-size: .78rem; color: var(--ink2); margin: 8px 0 10px; line-height: 1.45; }
+.sav-done { color: var(--success); font-weight: 700; }
+.sav-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sav-btn { padding: 7px 12px; border-radius: 999px; font-size: .8rem; font-weight: 600; cursor: pointer; background: var(--warm-white); color: var(--ink2); border: 1.5px solid var(--border2); }
+.sav-btn.primary { background: var(--teal); color: #fff; border-color: var(--teal); }
+.sav-btn.on { box-shadow: 0 0 0 3px var(--teal-dim); }
+.money-move { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--warm-white); border: 1px solid var(--border2); display: grid; gap: 10px; }
+.money-move label, .sav-new label, .sav-edit-grid label { display: grid; gap: 4px; font-size: .76rem; font-weight: 600; color: var(--ink); margin: 0; }
+.money-move label .muted, .sav-new label .muted, .sav-edit-grid label .muted { font-weight: 400; }
+.money-move-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
+.money-move-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.money-move-actions .primary-btn, .money-move-actions .ghost-btn { padding: 9px 14px; font-size: .84rem; }
+.money-move-actions button:disabled { opacity: .45; transform: none; }
+.money-move-cancel { background: none; border: none; color: var(--muted); cursor: pointer; font-size: .82rem; margin-left: auto; }
+.sav-edit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sav-edit-grid .full { grid-column: 1 / -1; }
+.sav-history { list-style: none; margin: 12px 0 0; padding: 0; }
+.sav-history li { display: flex; align-items: baseline; gap: 10px; padding: 7px 2px; border-bottom: 1px solid var(--border); font-size: .8rem; }
+.sav-history-note { flex: 1; min-width: 0; color: var(--ink2); overflow-wrap: anywhere; }
+.sav-history .in { color: var(--success); font-variant-numeric: tabular-nums; }
+.sav-history .out { color: var(--danger); font-variant-numeric: tabular-nums; }
+.sav-new { display: grid; gap: 10px; margin: 8px 0 12px; padding: 14px; border-radius: 12px; border: 1.5px dashed var(--border2); }
+.sav-new-title { font-weight: 600; font-size: .88rem; margin: 0; color: var(--ink); }
+.sav-new-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sav-new-tip { font-size: .74rem; margin: 0; }
+@media (max-width: 420px) {
+  .money-move-fields, .sav-new-row, .sav-edit-grid { grid-template-columns: 1fr; }
+}
