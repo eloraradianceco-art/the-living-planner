@@ -2269,6 +2269,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
   const SECTIONS = [
     ...NAV_ITEMS.filter((n) => n.to !== '/').map((n) => ({
+      emoji: SECTION_EMOJI[n.to],
       ...n,
       count: n.to === '/tasks' ? (openTasks.length || null)
         : n.to === '/calendar' ? (todaySchedule.length || null)
@@ -2468,7 +2469,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{display:'grid', opacity:.6}}><Repeat size={16} strokeWidth={1.8} color="var(--brass)" /></div>
+                  <div style={{fontSize:'1rem', opacity:.7}}>🔁</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>TOP HABIT</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Build your first habit</div>
@@ -2484,7 +2485,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   border:'1px solid rgba(255,255,255,.1)',
                   textDecoration:'none', color:'white',
                 }}>
-                  <div style={{display:'grid'}}><Target size={16} strokeWidth={1.8} color="var(--brass)" /></div>
+                  <div style={{fontSize:'1rem'}}>🎯</div>
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontSize:'.58rem', color:'#FFB84D', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
                     <div style={{fontWeight:600, fontSize:'.8rem', marginTop:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
@@ -2503,7 +2504,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   borderRadius:9, display:'flex', alignItems:'center', gap:9,
                   border:'1px dashed rgba(255,255,255,.2)', textDecoration:'none', color:'white',
                 }}>
-                  <div style={{display:'grid', opacity:.6}}><Target size={16} strokeWidth={1.8} color="var(--brass)" /></div>
+                  <div style={{fontSize:'1rem', opacity:.7}}>🎯</div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:'.58rem', color:'rgba(255,255,255,.5)', fontWeight:700, letterSpacing:'.05em'}}>CURRENT GOAL</div>
                     <div style={{fontSize:'.78rem', marginTop:1, color:'rgba(255,255,255,.7)'}}>Set a goal to aim toward</div>
@@ -2540,7 +2541,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           {SECTIONS.map(s => (
             <Link key={s.to} to={s.to} className="home-quick-tile">
               {s.count > 0 && <span className="home-quick-count">{s.count}</span>}
-              <s.icon size={20} strokeWidth={1.6} color="var(--brass2)" />
+              {s.emoji ? <span className="home-quick-emoji" aria-hidden="true">{s.emoji}</span> : <s.icon size={20} strokeWidth={1.6} color="var(--brass2)" />}
               <span className="home-quick-label">{s.label}</span>
             </Link>
           ))}
@@ -2977,7 +2978,7 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
 
       {Object.values(groups).every(g => g.length === 0) && (
         <section className="card">
-          <EmptyState icon={ListTodo}
+          <EmptyState icon="✅"
             title={(tasks || []).length ? 'Nothing matches those filters' : 'A clear list — for now'}
             message={(tasks || []).length ? 'Try another category or status, or clear your search.' : 'Add the first thing on your mind. One task is how momentum starts.'} />
           {!(tasks || []).length && (
@@ -3312,7 +3313,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
 
       {filtered.length === 0 && (
         <section className="card">
-          <EmptyState icon={Folder}
+          <EmptyState icon="📁"
             title={projects.length ? `No ${filter.toLowerCase()} projects` : 'Build something meaningful'}
             message={projects.length ? 'Try another filter.' : 'Name the project, then list the steps. Check them off as you go.'}
             action={projects.length ? null : '+ Add your first project'} onAction={() => onQuickCreate('project')} />
@@ -3466,7 +3467,7 @@ function PageNav() {
             padding: '9px 16px', borderRadius: 999,
             border: '1.5px solid var(--border2)', background: 'var(--stone)',
             color: 'var(--ink2)', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
-          }}>← {stripEmoji(prev.label)}</button>
+          }}>← {withEmoji(prev.label)}</button>
         : <div />}
       {next
         ? <button onClick={() => nav(next.path)} style={{
@@ -3474,7 +3475,7 @@ function PageNav() {
             padding: '9px 16px', borderRadius: 999,
             border: '1px solid var(--ink)', background: 'var(--ink)',
             color: 'var(--warm-white)', fontSize: '.82rem', fontWeight: 600, cursor: 'pointer',
-          }}>{stripEmoji(next.label)} →</button>
+          }}>{withEmoji(next.label)} →</button>
         : <div />}
     </div>
   )
@@ -3879,13 +3880,8 @@ function StepsChecklist({ steps, onChange, onSchedule, completeSlot, label = 'St
   )
 }
 
-const EMPTY_ICON_MAP = {
-  '✈': Plane, '✝': Cross, '🍳': ChefHat, '🎁': Gift, '🎂': Cake, '🎯': Target, '💊': Pill, '💪': Dumbbell,
-  '💳': CreditCard, '💵': Banknote, '📁': Folder, '📈': TrendingUp, '📉': TrendingDown, '📖': BookOpen,
-  '📚': BookMarked, '📝': PenLine, '🔁': Repeat, '🧾': Receipt,
-}
 function EmptyState({ icon, title, message, action, onAction }) {
-  const Ic = typeof icon === 'string' ? EMPTY_ICON_MAP[icon.replace(/\uFE0F/g, '')] : icon
+  const Ic = typeof icon === 'string' ? null : icon
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -3897,7 +3893,7 @@ function EmptyState({ icon, title, message, action, onAction }) {
         background: 'radial-gradient(circle at 30% 25%, #FBF6EC 0%, var(--brass-dim) 100%)',
         border: '1px solid var(--brass-glow)',
         boxShadow: '0 8px 22px rgba(184,150,90,.14)',
-      }}>{Ic ? <Ic size={28} strokeWidth={1.5} color="var(--brass2)" /> : <span style={{ fontSize: '1.8rem' }}>{icon}</span>}</div>
+      }}>{Ic ? <Ic size={28} strokeWidth={1.5} color="var(--brass2)" /> : <span aria-hidden="true" style={{ fontSize: '2rem', lineHeight: 1 }}>{icon}</span>}</div>
       <div style={{
         fontWeight: 700, fontSize: '1rem', color: 'var(--ink)',
         marginBottom: 8,
@@ -4112,6 +4108,18 @@ const SECTION_ICONS = {
 const FAITH_ICON_OVERRIDES = { reading: BookMarked }
 // Labels in the TABS arrays still start with an emoji — strip it for display
 const stripEmoji = (label = '') => String(label).replace(/^[^\p{L}\p{N}]+\s*/u, '')
+// Leading emoji of a label, forced to color presentation ("✈" → "✈️") — 2026-11-12: emoji back on tiles
+const emojiOf = (label = '') => {
+  const m = String(label).match(/^([^\p{L}\p{N}\s]+)\s/u)
+  if (!m) return ''
+  return [...m[1]].length === 1 ? m[1] + '\uFE0F' : m[1] // single symbol: ask for the color version
+}
+// Home Quick Access tiles (same emoji as the website's section list)
+const SECTION_EMOJI = {
+  '/tasks': '✅', '/calendar': '📅', '/projects': '📁', '/habits': '🔁', '/goals': '🎯', '/growth': '📈',
+  '/finance': '💰', '/calculator': '🧮', '/wellness': '❤️', '/productivity': '⚡', '/lifestyle': '🏡', '/faith': '🙏',
+}
+const withEmoji = (label = '') => { const e = emojiOf(label); return e ? `${e} ${stripEmoji(label)}` : label }
 
 // Brand mark — brass circle, diamond and cross (matches the printable planner)
 function BrandMark({ size = 56, color = 'var(--brass)', ink = 'var(--ink)' }) {
@@ -4335,8 +4343,8 @@ function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = fals
         const active = activeTab === t.id
         const isLocked = !isPro && proTabs.includes(t.id)
         const name = stripEmoji(t.label)
+        const emoji = emojiOf(t.label)
         const Icon = iconOverrides[t.id] || SECTION_ICONS[t.id]
-        const fallback = (t.label.match(/^(\S+)\s/) || [])[1] || t.label[0]
         return (
           <button key={t.id} onClick={() => onSelect(t.id)} aria-pressed={active} style={{
             position: 'relative',
@@ -4352,9 +4360,10 @@ function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = fals
             minHeight: 70,
             opacity: isLocked ? .62 : 1,
           }}>
-            {Icon
-              ? <Icon size={21} strokeWidth={1.6} color={active ? 'var(--brass)' : 'var(--ink2)'} />
-              : <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{fallback}</span>}
+            {emoji
+              ? <span aria-hidden="true" style={{ fontSize: '1.45rem', lineHeight: 1, filter: active ? 'drop-shadow(0 2px 6px rgba(0,0,0,.35))' : 'none' }}>{emoji}</span>
+              : Icon ? <Icon size={21} strokeWidth={1.6} color={active ? 'var(--brass)' : 'var(--ink2)'} />
+              : <span style={{ fontSize: '1.2rem', lineHeight: 1 }}>{t.label[0]}</span>}
             <span style={{
               fontSize: '.66rem', fontWeight: 600,
               color: active ? 'var(--warm-white)' : 'var(--ink2)',
@@ -4397,7 +4406,7 @@ function TabNav({ tabs, activeTab, onSelect }) {
           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brass)'; e.currentTarget.style.color = 'var(--brass2)' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--ink2)' }}
         >
-          ← {stripEmoji(prev.label)}
+          ← {withEmoji(prev.label)}
         </button>
       ) : <div />}
       {next ? (
@@ -4411,7 +4420,7 @@ function TabNav({ tabs, activeTab, onSelect }) {
           onMouseEnter={e => { e.currentTarget.style.opacity = '.85' }}
           onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
         >
-          {stripEmoji(next.label)} →
+          {withEmoji(next.label)} →
         </button>
       ) : <div />}
     </div>
@@ -5993,7 +6002,7 @@ function TrainingTab({ workouts, onSave }) {
       <section className="card">
         <p className="eyebrow">History</p>
         {workouts.length === 0 ? (
-          <EmptyState icon={Dumbbell} title="No sessions yet" message="Log your first session. Exercises you enter here show your last numbers next time." />
+          <EmptyState icon="💪" title="No sessions yet" message="Log your first session. Exercises you enter here show your last numbers next time." />
         ) : workouts.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 20).map((w) => (
           <div key={w.id} className="wl-session">
             <div className="wl-session-head">
@@ -6560,10 +6569,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
 
 
   const TABS = [
-    {id:'mood',label:'😊 Mood'},{id:'training',label:'Training'},{id:'recovery',label:'Recovery'},{id:'nutrition',label:'Nutrition'},{id:'sleep',label:'😴 Sleep'},
+    {id:'mood',label:'😊 Mood'},{id:'training',label:'🏋️ Training'},{id:'recovery',label:'🔋 Recovery'},{id:'nutrition',label:'🥗 Nutrition'},{id:'sleep',label:'😴 Sleep'},
     {id:'journal',label:'✍ Journal'},{id:'routine',label:'🌅 Routine'},
     {id:'meds',label:'💊 Medications'},
-    {id:'metrics',label:'📈 Body Metrics'},{id:'care',label:'Vitals & Care'},{id:'anxiety',label:'🧘 Anxiety'},
+    {id:'metrics',label:'📈 Body Metrics'},{id:'care',label:'🩺 Vitals & Care'},{id:'anxiety',label:'🧘 Anxiety'},
     {id:'migraines',label:'🤕 Migraines'},{id:'coping',label:'🛡 Coping Skills'},
   ]
 
@@ -8148,7 +8157,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             ].map(({ cat, color, items }) => (
               <div key={cat} style={{marginBottom:16}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 10px'}}>
-                  <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass-fg)'}}>{stripEmoji(cat)}</span>
+                  <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass-fg)'}}><span aria-hidden="true" style={{fontSize:'.95rem',letterSpacing:0,marginRight:6}}>{emojiOf(cat)}</span>{stripEmoji(cat)}</span>
                   <span style={{flex:1,height:1,background:'var(--border2)'}} />
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
@@ -8675,7 +8684,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
 
       {filtered.length === 0 && (
         <section className="card">
-          <EmptyState icon={Target}
+          <EmptyState icon="🎯"
             title={goals.length ? 'No goals in this timeframe' : 'Aim at something'}
             message={goals.length ? 'Pick another timeframe above.' : 'Set one goal using the SMART framework above, then break it into steps.'}
             action={goals.length ? null : '+ Set your first goal'} onAction={() => onQuickCreate('goal')} />
@@ -9966,12 +9975,12 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
       {/* Stats strip */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:4}}>
         {[
-          [HandHeart, prayers.filter(p=>!p.answered).length, 'Active Prayers', 'var(--brass2)'],
-          [CircleCheck, answeredPrayers, 'Answered', 'var(--success)'],
-          [Flower2, todayGratitude.length, 'Gratitude Today', 'var(--brass2)'],
-        ].map(([Ic,val,label,color]) => (
+          ['🙏', prayers.filter(p=>!p.answered).length, 'Active Prayers', 'var(--brass2)'],
+          ['✅', answeredPrayers, 'Answered', 'var(--success)'],
+          ['🌸', todayGratitude.length, 'Gratitude Today', 'var(--brass2)'],
+        ].map(([emo,val,label,color]) => (
           <div key={label} style={{background:'var(--warm-white)',borderRadius:14,padding:'14px 8px 12px',textAlign:'center',border:'1px solid var(--border)',boxShadow:'0 1px 2px rgba(28,28,30,.04)'}}>
-            <div style={{display:'grid',placeItems:'center',marginBottom:6}}><Ic size={20} strokeWidth={1.6} color={color} /></div>
+            <div aria-hidden="true" style={{fontSize:'1.35rem',lineHeight:1,marginBottom:6}}>{emo}</div>
             <div style={{fontWeight:800,fontSize:'1.2rem',color,lineHeight:1,marginBottom:2}}>{val}</div>
             <div style={{fontSize:'.65rem',color:'var(--muted)',fontWeight:600,letterSpacing:'.04em',textTransform:'uppercase'}}>{label}</div>
           </div>
@@ -10532,7 +10541,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <Link className="ghost-btn" to="/goals" style={{ fontSize: '.8rem' }}>All goals →</Link>
           </div>
           <p className="muted" style={{ fontSize: '.8rem', margin: '0 0 12px' }}>These live in Goals too, so they get steps, progress and a place on Home.</p>
-          {myFaithGoals.length === 0 && <EmptyState icon={Cross} title="What is God calling you to?" message="Spiritual growth is intentional. What is being asked of you in this season?" />}
+          {myFaithGoals.length === 0 && <EmptyState icon="✝️" title="What is God calling you to?" message="Spiritual growth is intentional. What is being asked of you in this season?" />}
           {myFaithGoals.map((g) => {
             const pct = getGoalProgress(g, tasks, projects)
             const next = nextStepFor(g, projects)

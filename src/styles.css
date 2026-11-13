@@ -1888,3 +1888,4 @@ button.profile-pill:active { transform: scale(.97); }
 @media (max-width: 420px) {
   .money-move-fields, .sav-new-row, .sav-edit-grid { grid-template-columns: 1fr; }
 }
+.home-quick-emoji { font-size: 1.4rem; line-height: 1; }
