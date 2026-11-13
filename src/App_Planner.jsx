@@ -28,7 +28,9 @@ const supabase = hasSupabaseEnv
   : null
 
 // ── Date utils ────────────────────────────────────────────────────────────
-const APP_TIME_ZONE = 'America/Chicago'
+// Days roll over at midnight where this device is (was fixed to Chicago, so the date was wrong outside Central time)
+const DEVICE_TIME_ZONE = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || '' } catch { return '' } })()
+const APP_TIME_ZONE = DEVICE_TIME_ZONE || 'America/Chicago'
 // Calendar date (YYYY-MM-DD, app time zone) of a stored timestamp. "2026-11-14T02:00Z" is still Nov 13 in Chicago;
 // slicing the ISO string would push evening check-offs into tomorrow. Plain dates pass through.
 function dateOfStamp(stamp) {
@@ -1215,6 +1217,29 @@ function useResponsive() {
 const AuthContext = createContext(null)
 const MOCK_EMAIL = ''
 
+// Each page keeps a device copy of the account's data in localStorage so it opens instantly.
+// Those copies belong to whoever is signed in: on sign-out, or when a different account signs in
+// on this device, they're cleared so one person's planner never shows up (or gets saved) under another's.
+const DEVICE_ONLY_KEYS = new Set(['planner_a2hs_seen', 'planner_onboarded', 'planner.vapidPub', 'planner.lastUser'])
+function clearAccountCache() {
+  try {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i))
+    keys.forEach((k) => {
+      if (!k || DEVICE_ONLY_KEYS.has(k) || k.startsWith('sb-') || k.startsWith('supabase') || k.startsWith('CapacitorStorage.')) return
+      localStorage.removeItem(k)
+    })
+  } catch {}
+}
+function noteSignedInUser(u) {
+  if (!u?.id) return
+  try {
+    const last = localStorage.getItem('planner.lastUser')
+    if (last && last !== u.id) clearAccountCache()
+    localStorage.setItem('planner.lastUser', u.id)
+  } catch {}
+}
+
 function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
@@ -1235,11 +1260,13 @@ function AuthProvider({ children }) {
     let mounted = true
     supabase.auth.getSession().then(( { data }) => {
       if (!mounted) return
+      noteSignedInUser(data.session?.user)
       setSession(data.session ?? null)
       setUser(data.session?.user ?? null)
       setLoading(false)
     })
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      noteSignedInUser(nextSession?.user)
       setSession(nextSession ?? null)
       setUser(nextSession?.user ?? null)
       setLoading(false)
@@ -1274,7 +1301,10 @@ function AuthProvider({ children }) {
       return { error: null }
     }
     if (!hasSupabaseEnv) return { error: null }
-    return supabase.auth.signOut()
+    const res = await supabase.auth.signOut()
+    clearAccountCache()
+    try { localStorage.removeItem('planner.lastUser') } catch {}
+    return res
   }
 
   const value = useMemo(() => ({
@@ -3803,11 +3833,10 @@ const STRIPE_CONFIG = {
 }
 
 // Free tier limits
+// Free tier: everything for daily planning, up to 5 habits (the site lists "Unlimited habits" as Pro).
+// Tasks, goals and projects stay unlimited on Free. Existing habits are never removed; only new ones are capped.
 const FREE_LIMITS = {
-  tasks: 20,
   habits: 5,
-  goals: 2,
-  projects: 2,
 }
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
@@ -4003,7 +4032,7 @@ function UpgradeCard({ title, message, onClose }) {
           {title || 'Upgrade to Pro'}
         </h2>
         <p style={{ fontSize: '.88rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 24 }}>
-          {message || 'Unlock unlimited tasks, habits, goals, faith section, finance tools, and all future features.'}
+          {message || 'Unlock unlimited habits, the full finance workflow, wellness, faith and growth tools, and all future features.'}
         </p>
 
         <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
@@ -9822,7 +9851,9 @@ async function downloadBackup(user) {
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
   const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/json' }) : null
   // iPhone/iPad Home Screen apps can't download directly — hand the file to the share sheet (Save to Files)
-  if (file && navigator.canShare?.({ files: [file] }) && /iPad|iPhone|iPod/.test(navigator.userAgent || '')) {
+  // (iPads report themselves as a Mac, so check for touch too)
+  const iOSish = /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1)
+  if (file && navigator.canShare?.({ files: [file] }) && iOSish) {
     try { await navigator.share({ files: [file], title: 'Living Planner backup' }); return 'shared' } catch (e) { if (e?.name === 'AbortError') return 'cancelled' }
   }
   const url = URL.createObjectURL(blob)
@@ -9854,8 +9885,18 @@ const PLANNER_SETTINGS_THEME = {
   body: 'var(--sans)', heading: 'var(--sans)',
 }
 
+const TIME_ZONES = [
+  ['America/New_York', 'Eastern (New York)'], ['America/Chicago', 'Central (Chicago)'], ['America/Denver', 'Mountain (Denver)'],
+  ['America/Phoenix', 'Arizona (Phoenix)'], ['America/Los_Angeles', 'Pacific (Los Angeles)'], ['America/Anchorage', 'Alaska (Anchorage)'],
+  ['Pacific/Honolulu', 'Hawaii (Honolulu)'], ['America/Puerto_Rico', 'Atlantic (Puerto Rico)'], ['America/Toronto', 'Eastern (Toronto)'],
+  ['America/Mexico_City', 'Mexico City'], ['Europe/London', 'London'], ['Europe/Paris', 'Central Europe (Paris)'], ['Africa/Lagos', 'West Africa (Lagos)'],
+  ['Africa/Johannesburg', 'South Africa (Johannesburg)'], ['Asia/Dubai', 'Dubai'], ['Asia/Kolkata', 'India (Kolkata)'], ['Asia/Manila', 'Philippines (Manila)'],
+  ['Asia/Tokyo', 'Japan (Tokyo)'], ['Australia/Sydney', 'Sydney'],
+]
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut, user } = useAuth()
+  const [nameDraft, setNameDraft] = React.useState(profile.displayName || '')
+  React.useEffect(() => { setNameDraft(profile.displayName || '') }, [profile.displayName])
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
   const [showReviews, setShowReviews] = React.useState(false)
 
@@ -9882,7 +9923,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                        fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap',
                      }}>Manage</a>
                 ) : (
-                  <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited everything plus exclusive features.')} style={{
+                  <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited habits and every Pro tool across finance, wellness, faith and growth.')} style={{
                     padding:'8px 18px', borderRadius:999, background:'var(--teal)',
                     color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
                   }}>Upgrade</button>
@@ -9908,15 +9949,29 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           <div><p className="eyebrow">Account</p><h3>Profile</h3></div>
         </div>
         <div style={{display:'grid', gap:12}}>
+          {/* Name saves when you finish typing (was one save per letter) */}
           <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
             Display Name
-            <input value={profile.displayName || ''} onChange={(e) => updateProfile({ ...profile, displayName: e.target.value })}
+            <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={() => { const v = nameDraft.trim(); if (v !== (profile.displayName || '')) updateProfile({ ...profile, displayName: v }) }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
               style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}} />
           </label>
+          {/* Reminders are sent on this time zone's clock, so it's a list of real zones (free text could break them) */}
           <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
-            Timezone
-            <input value={profile.timezone || ''} onChange={(e) => updateProfile({ ...profile, timezone: e.target.value })}
-              style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}} />
+            Time zone
+            <select value={profile.timezone || DEVICE_TIME_ZONE || 'America/Chicago'} onChange={(e) => updateProfile({ ...profile, timezone: e.target.value })}
+              style={{padding:'10px 12px', border:'1.5px solid var(--border2)', borderRadius:'var(--radius-sm)', fontSize:'.9rem', color:'var(--text)', background:'var(--surface)'}}>
+              {[...new Set([profile.timezone, DEVICE_TIME_ZONE, ...TIME_ZONES.map(([z]) => z)].filter(Boolean))].map((z) => (
+                <option key={z} value={z}>{(TIME_ZONES.find(([x]) => x === z) || [z, z.replace(/_/g, ' ')])[1]}{z === DEVICE_TIME_ZONE ? ' · this device' : ''}</option>
+              ))}
+            </select>
+            {DEVICE_TIME_ZONE && profile.timezone && profile.timezone !== DEVICE_TIME_ZONE && (
+              <span style={{fontSize:'.76rem', fontWeight:400, color:'var(--muted)', lineHeight:1.45}}>
+                This device is on {DEVICE_TIME_ZONE.replace(/_/g, ' ')}. Reminders follow the zone above.{' '}
+                <button type="button" onClick={() => updateProfile({ ...profile, timezone: DEVICE_TIME_ZONE })} style={{background:'none', border:'none', padding:0, color:'var(--teal)', fontWeight:600, cursor:'pointer', font:'inherit'}}>Use this device's</button>
+              </span>
+            )}
           </label>
           <label style={{display:'grid', gap:5, fontSize:'.85rem', fontWeight:600, color:'var(--text2)'}}>
             Planner Mode
@@ -10146,7 +10201,22 @@ function PlannerApp() {
     return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('pageshow', check); window.removeEventListener('focus', check) }
   }, [])
 
-  const openCreate = (type = 'task', prefill = null) => setModalState({ open: true, type, mode: 'create', item: prefill })
+  // New accounts start on the database default (Chicago). Before onboarding is done, match the device's zone
+  // so reminders arrive on the person's own clock. Existing accounts are never changed automatically.
+  const tzSynced = React.useRef(false)
+  useEffect(() => {
+    if (tzSynced.current || loading || !user || !hasSupabaseEnv || settings?.onboardingComplete) return
+    if (!DEVICE_TIME_ZONE || profile?.timezone === DEVICE_TIME_ZONE) return
+    tzSynced.current = true
+    updateProfile({ ...profile, timezone: DEVICE_TIME_ZONE }).catch(() => {})
+  }, [loading, user?.id, settings?.onboardingComplete, profile?.timezone])
+
+  const atHabitLimit = () => !subscription.isPro && habits.length >= FREE_LIMITS.habits
+  const habitLimitUpgrade = () => triggerUpgrade('Unlock unlimited habits', `Free includes ${FREE_LIMITS.habits} habits. Pro removes the limit, plus the full finance, wellness, faith and growth tools.`)
+  const openCreate = (type = 'task', prefill = null) => {
+    if (type === 'habit' && atHabitLimit()) { habitLimitUpgrade(); return }
+    setModalState({ open: true, type, mode: 'create', item: prefill })
+  }
   const openEdit = (type, item) => setModalState({ open: true, type, mode: 'edit', item })
   const closeModal = () => setModalState(modalEmpty)
 
@@ -10212,6 +10282,7 @@ function PlannerApp() {
           goals={goals}
           projects={projects}
           onSave={async (type, payload, modeArg) => {
+            if (type === 'habit' && modeArg !== 'edit' && atHabitLimit()) { habitLimitUpgrade(); return }
             await saveItem(type, payload, modeArg)
             pushToast(`${labels[type] || type} ${modeArg === 'edit' ? 'updated' : 'added'}`, 'Synced across your devices.', 'success')
           }}
