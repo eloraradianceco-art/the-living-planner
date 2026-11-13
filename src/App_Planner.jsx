@@ -349,6 +349,17 @@ function fmtRange(start, end) {
   const a = fmt12(start), b = fmt12(end)
   return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)} – ${b}` : `${a} – ${b}`
 }
+// "09:30" ⇄ minutes since midnight
+const toMin = (t) => { const m = String(t || '').match(/^(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : null }
+const fromMin = (n) => { const c = Math.max(0, Math.min(23 * 60 + 59, n)); return `${String(Math.floor(c / 60)).padStart(2, '0')}:${String(c % 60).padStart(2, '0')}` }
+// When a start time moves, move the end with it so the item keeps its length ('' stays '').
+function shiftEnd(oldStart, newStart, end) {
+  const a = toMin(oldStart), b = toMin(newStart), e = toMin(end)
+  if (e == null) return end || ''
+  if (a == null || b == null) return end
+  return fromMin(e + (b - a))
+}
+const endBeforeStart = (start, end) => toMin(start) != null && toMin(end) != null && toMin(end) <= toMin(start)
 const hourLabel = (hh) => { const h = Number(String(hh).slice(0, 2)); return `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}` }
 
 const upsertById = (list, item) => list.some((x) => x.id === item.id)
@@ -599,6 +610,8 @@ function normalizePayload(type, payload, userId) {
   if (type === 'task') {
     if ('linkedGoalId' in raw) { raw.goal_id = raw.linkedGoalId ? String(raw.linkedGoalId) : null; delete raw.linkedGoalId }
     if ('linkedProjectId' in raw) { raw.project_id = raw.linkedProjectId ? String(raw.linkedProjectId) : null; delete raw.linkedProjectId }
+    if ('endTime' in raw) { raw.end_time = raw.endTime || null; delete raw.endTime }
+    if ('time' in raw && !raw.time) raw.end_time = null // an end time needs a start time
     if (!raw.recurrence) raw.recurrence = 'none'
     // clean up extra fields not in schema
     delete raw.linkedType; delete raw.linkedId; delete raw.goalId; delete raw.startTime
@@ -684,7 +697,8 @@ function mapDbRow(type, row) {
           : type === 'habit_log' ? 'habit_logs'
           : type
   if (t === 'habits')     { r.title = r.name; delete r.name }
-  if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id }
+  if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id
+                            r.endTime = r.end_time || ''; delete r.end_time }
   if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date; r.steps = normalizeSteps(r.steps) }
   if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date; r.steps = normalizeSteps(r.steps) }
   if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time
@@ -858,6 +872,7 @@ const plannerService = {
         // Normalize camelCase -> snake_case before inserting
         if ('linkedGoalId' in clonePayload) { clonePayload.goal_id = clonePayload.linkedGoalId || null; delete clonePayload.linkedGoalId }
         if ('linkedProjectId' in clonePayload) { clonePayload.project_id = clonePayload.linkedProjectId || null; delete clonePayload.linkedProjectId }
+        if ('endTime' in clonePayload) { clonePayload.end_time = clonePayload.endTime || null; delete clonePayload.endTime }
         if ('linkedType' in clonePayload) delete clonePayload.linkedType
         if ('linkedId' in clonePayload) delete clonePayload.linkedId
         const { data: inserted, error: insertError } = await supabase.from('tasks').insert(clonePayload).select().single()
@@ -1738,8 +1753,8 @@ function SearchSheet({ open, onClose, data, onOpenItem }) {
       const inTitle = title.toLowerCase().includes(query)
       out.push({ group, title, sub: inTitle ? (sub || '') : [sub, snippet(hay, query)].filter(Boolean).join(' · '), go, rank: inTitle ? 0 : 1 })
     }
-    for (const t of data.tasks || []) add('Tasks', t.title || '', t.notes || '', () => onOpenItem('task', t), [t.date ? shortDate(t.date) : '', t.time ? fmt12(t.time) : '', t.completed ? 'Done' : ''].filter(Boolean).join(' · '))
-    for (const e of data.events || []) add('Events', e.title || '', `${e.location || ''} ${e.notes || ''}`, () => onOpenItem('event', e), [e.date ? shortDate(e.date) : '', e.startTime ? fmt12(e.startTime) : '', e.recurrence && e.recurrence !== 'none' ? `↻ ${repeatLabel(e.recurrence)}` : ''].filter(Boolean).join(' · '))
+    for (const t of data.tasks || []) add('Tasks', t.title || '', t.notes || '', () => onOpenItem('task', t), [t.date ? shortDate(t.date) : '', t.time ? fmtRange(t.time, t.endTime) : '', t.completed ? 'Done' : ''].filter(Boolean).join(' · '))
+    for (const e of data.events || []) add('Events', e.title || '', `${e.location || ''} ${e.notes || ''}`, () => onOpenItem('event', e), [e.date ? shortDate(e.date) : '', e.startTime ? fmtRange(e.startTime, e.endTime) : '', e.recurrence && e.recurrence !== 'none' ? `↻ ${repeatLabel(e.recurrence)}` : ''].filter(Boolean).join(' · '))
     for (const g of data.goals || []) add('Goals', g.title || '', `${g.why || ''} ${g.description || ''} ${(g.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('goal', g), g.category)
     for (const pr of data.projects || []) add('Projects', pr.title || '', `${pr.description || ''} ${(pr.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('project', pr), pr.status)
     for (const n of data.notes || []) add('Notes', n.title || titleOf(n.content || ''), n.content || '', () => onOpenItem('note', n))
@@ -2007,13 +2022,30 @@ function ToastStack({ toasts, onDismiss }) {
 
 
 const baseForms = {
-  task: { title: '', date: TODAY, time: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
+  task: { title: '', date: TODAY, time: '', endTime: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
   event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '', recurrence: 'none', recurrenceUntil: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
   goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr', steps: [] },
   project: { title: '', goalId: '', dueDate: addDays(TODAY, 45), status: 'Active', description: '', steps: [] },
   habit: { title: '', category: 'Health' },
+}
+
+// Start + optional End for tasks and events. Moving the start keeps the length; ✕ removes the end.
+function TimeRangeFields({ start, end, onChange }) {
+  const bad = endBeforeStart(start, end)
+  return (<>
+    <label>Start<input type="time" value={start || ''} onChange={(e) => { const v = e.target.value; onChange(v, v ? shiftEnd(start, v, end) : '') }} /></label>
+    <label>End (optional)
+      <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input type="time" value={end || ''} disabled={!start} aria-invalid={bad || undefined} style={{ flex: 1, minWidth: 0 }}
+          onChange={(e) => onChange(start, e.target.value)} />
+        {end && <button type="button" onClick={() => onChange(start, '')} aria-label="Remove end time"
+          style={{ flexShrink: 0, width: 36, height: 36, borderRadius: '50%', border: '1.5px solid var(--border2)', background: 'var(--stone2)', color: 'var(--ink)', cursor: 'pointer', fontWeight: 700 }}>✕</button>}
+      </span>
+    </label>
+    {bad && <p className="full-span" role="alert" style={{ color: 'var(--danger)', fontSize: '.8rem', margin: 0 }}>End time needs to be after the start time.</p>}
+  </>)
 }
 
 const labels = { task: 'Task', event: 'Event', expense: 'Expense', note: 'Note', goal: 'Goal', project: 'Project', habit: 'Habit' }
@@ -2033,6 +2065,8 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
 
   const submit = (e) => {
     e.preventDefault()
+    if (selectedType === 'task' && endBeforeStart(form.time, form.endTime)) return
+    if (selectedType === 'event' && endBeforeStart(form.startTime, form.endTime)) return
     onSave(selectedType, { ...form, id: item?.id }, mode)
     onClose()
   }
@@ -2066,7 +2100,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
 
           {selectedType === 'task' && (<>
             <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
-            <label>Time<input type="time" value={form.time || ''} onChange={(e) => setForm({ ...form, time: e.target.value })} /></label>
+            <TimeRangeFields start={form.time} end={form.endTime} onChange={(time, endTime) => setForm({ ...form, time, endTime })} />
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>High</option><option>Medium</option><option>Low</option></select></label>
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
@@ -2076,8 +2110,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
 
           {selectedType === 'event' && (<>
             <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
-            <label>Start<input type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} /></label>
-            <label>End<input type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} /></label>
+            <TimeRangeFields start={form.startTime} end={form.endTime} onChange={(startTime, endTime) => setForm({ ...form, startTime, endTime })} />
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label className="full-span">Location<input value={form.location || ''} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Optional" /></label>
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>{EVENT_REPEATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
@@ -2504,7 +2537,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           : todaySchedule.slice(0, 6).map((item) => (
             <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
-              <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600}}>{fmt12(item.startTime)}</strong>
+              <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600, whiteSpace:'nowrap'}}>{fmtRange(item.startTime, item.endTime)}</strong>
               <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{item.title}</span>
               <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
@@ -2836,7 +2869,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
           </span>
           <span style={{color:'var(--muted)',fontSize:'.7rem'}}>{task.category}</span>
           {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{shortDate(task.date)}</span>}
-          {task.time && <span style={{color:'var(--brass-fg)',fontWeight:600}}>{fmt12(task.time)}</span>}
+          {task.time && <span style={{color:'var(--brass-fg)',fontWeight:600}}>{fmtRange(task.time, task.endTime)}</span>}
         </div>
       </div>
 
@@ -3115,7 +3148,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
                     <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => openItem(item)}
                       draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
-                      <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{fmt12(item.startTime)}</span>
+                      <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{fmtRange(item.startTime, item.endTime)}</span>
                       <strong style={{fontSize:'.8rem', color:'var(--ink)'}}>{item.title}</strong>
                     </button>
                   ))}
@@ -3304,7 +3337,7 @@ function ProjectsPage({ projects, tasks, goals, onEdit, onDelete, onQuickCreate,
                     </button>
                     <div style={{flex:1, minWidth:0}}>
                       <div style={{fontSize:'.88rem', color: task.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: task.completed ? 'line-through' : 'none'}}>{task.title}</div>
-                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{shortDate(task.date)}{task.time ? ` · ${fmt12(task.time)}` : ''}</div>}
+                      {task.date && <div style={{fontSize:'.72rem', color: isOverdue(task.date) && !task.completed ? 'var(--danger)' : 'var(--muted)'}}>{shortDate(task.date)}{task.time ? ` · ${fmtRange(task.time, task.endTime)}` : ''}</div>}
                     </div>
                   </div>
                 ))}
@@ -9105,7 +9138,7 @@ function PlannerApp() {
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
-          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onSkipOccurrence={async (id, date) => { const ev = events.find((e) => e.id === id); if (!ev) return; await saveItem('event', { ...ev, skipDates: [...(ev.skipDates || []), date] }, 'edit'); pushToast('Removed that day', 'The rest of the series is unchanged.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; await saveItem(type, { ...current, ...patch }, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
+          <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onSkipOccurrence={async (id, date) => { const ev = events.find((e) => e.id === id); if (!ev) return; await saveItem('event', { ...ev, skipDates: [...(ev.skipDates || []), date] }, 'edit'); pushToast('Removed that day', 'The rest of the series is unchanged.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; const next = { ...current, ...patch }; if (patch.time && current.endTime) next.endTime = shiftEnd(type === 'event' ? current.startTime : current.time, patch.time, current.endTime); await saveItem(type, next, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
