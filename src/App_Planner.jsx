@@ -2243,6 +2243,10 @@ function MiniLineChart({ data }) {
 
 function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
+  // Saved to the account so every device shows the same (were device-only before 2026-11-12)
+  const [woty, saveWoty] = usePageKey('home', 'wordOfYear', '', 'planner_word_of_year')
+  const [top3, saveTop3] = usePageKey('home', 'top3', { date: '', items: ['', '', ''], done: [] }, 'planner_tomorrow_top3')
+  const TOMORROW = addDays(TODAY, 1)
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
   const openTasks = tasks.filter(t => !t.completed)
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.date))
@@ -2323,13 +2327,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       {/* ── Word of the Year ──────────────────────────────── */}
       {/* ── Word of the Year ──────────────────────────────── */}
       {(() => {
-        const [woty, setWoty] = React.useState(() => { try { return localStorage.getItem('planner_word_of_year') || '' } catch { return '' } })
         const [editing, setEditing] = React.useState(false)
         const [draft, setDraft] = React.useState(woty)
-        const save = () => {
-          try { localStorage.setItem('planner_word_of_year', draft) } catch {}
-          setWoty(draft); setEditing(false)
-        }
+        const save = () => { saveWoty(String(draft || '').trim()); setEditing(false) }
         return (
           <section className="card" style={{padding:'14px 16px',marginBottom:12}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12}}>
@@ -2370,6 +2370,18 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       <section className="card" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
         <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Today's Focus</p>
         <h3 style={{margin:'2px 0 8px', color:'white', fontSize:'.85rem'}}>Three things that matter today</h3>
+        {top3?.date === TODAY && (top3.items || []).some((x) => String(x || '').trim()) && (
+          <div className="top3-today">
+            <div className="top3-today-label">Your Top 3 · set last night</div>
+            {(top3.items || []).map((item, i) => String(item || '').trim() ? (
+              <button key={i} type="button" className={'top3-today-item' + ((top3.done || [])[i] ? ' done' : '')} aria-pressed={!!(top3.done || [])[i]}
+                onClick={() => { const done = [...(top3.done || [])]; done[i] = !done[i]; saveTop3({ ...top3, done }) }}>
+                <span className="top3-today-num">{(top3.done || [])[i] ? '✓' : i + 1}</span>
+                <span className="top3-today-text">{item}</span>
+              </button>
+            ) : null)}
+          </div>
+        )}
 
         {(() => {
           // Pick top task: priority high, due today/overdue, not completed
@@ -2679,11 +2691,9 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
       {(() => {
         const hour = new Date().getHours()
         if (hour < 18) return null  // Only show evening (6pm+)
-        const stored = (typeof window !== 'undefined' && localStorage.getItem('planner_tomorrow_top3'))
-        const top3 = stored ? JSON.parse(stored) : { date: '', items: ['','',''] }
-        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0,10)
+        const tomorrow = TOMORROW   // local date (was UTC, which jumped two days ahead after 6 PM in the US)
         // Reset if it's for a different tomorrow
-        const items = top3.date === tomorrow ? top3.items : ['','','']
+        const items = top3?.date === tomorrow ? (top3.items || ['','','']) : ['','','']
         return (
           <section className="card" style={{
             background:'linear-gradient(135deg, rgba(184,150,90,.08) 0%, rgba(42,140,140,.05) 100%)',
@@ -2703,12 +2713,16 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
                   fontSize:'.75rem',fontWeight:700,flexShrink:0,
                 }}>{i+1}</span>
                 <input
+                  key={tomorrow + ':' + i + ':' + items[i]}
                   placeholder={`Priority ${i+1}...`}
+                  aria-label={`Tomorrow's priority ${i+1}`}
                   defaultValue={items[i]}
                   onBlur={e => {
+                    const v = e.target.value.trim()
+                    if (v === (items[i] || '')) return
                     const updated = [...items]
-                    updated[i] = e.target.value
-                    try { localStorage.setItem('planner_tomorrow_top3', JSON.stringify({date: tomorrow, items: updated})) } catch {}
+                    updated[i] = v
+                    saveTop3({ date: tomorrow, items: updated, done: [] })
                   }}
                   style={{flex:1,padding:'8px 12px',border:'1px solid var(--border2)',borderRadius:8,fontSize:'.88rem',background:'white'}}
                 />
@@ -5828,15 +5842,27 @@ function useWellnessKey(key, fallback) {
 function usePageKey(page, key, fallback, localKeys) {
   const { user } = useAuth()
   const keys = Array.isArray(localKeys) ? localKeys : [localKeys]
-  const [value, setValue] = useState(() => {
-    for (const k of keys) { try { const v = localStorage.getItem(k); if (v != null) return JSON.parse(v) } catch {} }
-    return fallback
-  })
+  const readLocalValue = () => {
+    for (const k of keys) {
+      try { const v = localStorage.getItem(k); if (v != null) { try { return { found: true, v: JSON.parse(v) } } catch { return { found: true, v } } } } catch {}
+    }
+    return { found: false, v: fallback }
+  }
+  const [value, setValue] = useState(() => readLocalValue().v)
   useEffect(() => {
     if (!user || !hasSupabaseEnv) return
     let alive = true
     supabase.from('page_data').select('data_value').eq('user_id', user.id).eq('page', page).eq('data_key', key).maybeSingle()
-      .then(({ data }) => { if (alive && data) { setValue(data.data_value ?? fallback); try { localStorage.setItem(keys[0], JSON.stringify(data.data_value)) } catch {} } })
+      .then(({ data, error }) => {
+        if (!alive || error) return
+        if (data) { setValue(data.data_value ?? fallback); try { localStorage.setItem(keys[0], JSON.stringify(data.data_value)) } catch {} return }
+        // Nothing in the account yet: move this device's copy up so other devices get it (2026-11-12)
+        const local = readLocalValue()
+        if (local.found && JSON.stringify(local.v) !== JSON.stringify(fallback)) {
+          supabase.from('page_data').upsert({ user_id: user.id, page, data_key: key, data_value: local.v, updated_at: new Date().toISOString() }, { onConflict: 'user_id,page,data_key' })
+            .then(({ error: e }) => { if (e) console.error('Sync error:', e) })
+        }
+      })
     return () => { alive = false }
   }, [user?.id, page, key])
   const save = React.useCallback((v) => {

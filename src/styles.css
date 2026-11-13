@@ -1897,3 +1897,13 @@ button.profile-pill:active { transform: scale(.97); }
 .menu-foot-link span[aria-hidden] { font-size: 1rem; line-height: 1; }
 .nav-item .nav-emoji { font-size: 1.3rem; opacity: .72; filter: saturate(.85); transition: opacity .15s, transform .15s, filter .15s; }
 .nav-item.active .nav-emoji { opacity: 1; filter: none; transform: translateY(-1px) scale(1.08); }
+
+/* ── Last night's Top 3 inside Today's Focus (2026-11-12) ─────────── */
+.top3-today { display: grid; gap: 6px; margin: 2px 0 10px; }
+.top3-today-label { font-size: .58rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--brass); }
+.top3-today-item { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px; cursor: pointer;
+  background: rgba(184,150,90,.12); border: 1px solid rgba(184,150,90,.35); color: #FAF8F4; font: inherit; font-size: .84rem; }
+.top3-today-num { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--brass); color: #1A2332; font-size: .72rem; font-weight: 800; }
+.top3-today-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.top3-today-item.done .top3-today-text { text-decoration: line-through; opacity: .6; }
+.top3-today-item.done .top3-today-num { background: #4CC46A; color: #fff; }
