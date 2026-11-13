@@ -1742,3 +1742,8 @@ button.profile-pill:active { transform: scale(.97); }
 .time-block.repeat-delete { height: auto; align-items: center; background: #EEEEEF; }
 .timeline-now-line { position: absolute; left: -6px; right: 0; height: 0; border-top: 2px solid var(--brass); z-index: 4; pointer-events: none; }
 .timeline-now-line::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--brass); }
+
+/* ── "Everything's done" prompt on goals and projects (2026-11-12) ──── */
+.ready-complete { margin-top: 12px; flex-wrap: wrap; }
+.ready-not-yet { background: none; border: none; color: var(--ink2); font: inherit; font-size: .8rem; font-weight: 600; cursor: pointer; padding: 6px 4px; }
+.ready-not-yet:hover { color: var(--ink); text-decoration: underline; }
