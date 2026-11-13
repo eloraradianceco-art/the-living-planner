@@ -29,6 +29,17 @@ const supabase = hasSupabaseEnv
 
 // ── Date utils ────────────────────────────────────────────────────────────
 const APP_TIME_ZONE = 'America/Chicago'
+// Calendar date (YYYY-MM-DD, app time zone) of a stored timestamp. "2026-11-14T02:00Z" is still Nov 13 in Chicago;
+// slicing the ISO string would push evening check-offs into tomorrow. Plain dates pass through.
+function dateOfStamp(stamp) {
+  const v = String(stamp || '')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+  const d = new Date(v)
+  if (isNaN(d)) return v.slice(0, 10)
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(d)
+  const get = (t) => p.find((x) => x.type === t)?.value
+  return `${get('year')}-${get('month')}-${get('day')}`
+}
 
 function getTodayString() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -294,8 +305,24 @@ function daysPart(label, dates, days, perWeek, noun = 'day') {
   return { label, detail: `${plural(Math.min(n, expected), noun)} of ${expected}`, value: clamp01(n / expected) }
 }
 // "Do cardio 3x per week" expects 3 check-ins a week; everything else is daily
+// Spending against the weekly target: one-time expenses dated in the week + the weekly share of
+// repeating ones (weekly, every 2 weeks, monthly, yearly) that have started. Used by Home, Finance and the Life Score.
+const expenseWeeklyShare = (e) => { const a = Number(e.amount) || 0; const p = e.period || 'one-time'; return p === 'weekly' ? a : p === 'biweekly' ? a / 2 : p === 'monthly' ? a / 4.33 : p === 'yearly' ? a / 52 : a }
+function weekSpendOf(expenses, from = startOfWeek(TODAY), to = endOfWeek(TODAY)) {
+  return (expenses || []).reduce((sum, e) => {
+    const p = e.period || 'one-time'
+    if (p === 'one-time') return e.date && e.date >= from && e.date <= to ? sum + (Number(e.amount) || 0) : sum
+    return !e.date || e.date <= to ? sum + expenseWeeklyShare(e) : sum
+  }, 0)
+}
+// Habits done this week vs their weekly target ("3x per week" → 3, otherwise daily)
+const habitDoneThisWeek = (h, habitLogs) => { const ws = startOfWeek(TODAY), we = endOfWeek(TODAY); return new Set((habitLogs || []).filter((l) => l.habitId === h.id && l.completed && l.date >= ws && l.date <= we).map((l) => l.date)).size }
+const habitWeekTarget = (h) => habitTimesPerWeek(h)
+// Weekly target for a habit: the "How often" setting (1x–6x a week), else "3x per week" in its name, else daily.
 const habitTimesPerWeek = (h) => {
-  const m = String(h.name || '').match(/(\d+)\s*(?:x|times?)\s*(?:per|a|each|\/)\s*week/i) || String(h.frequency || '').match(/(\d+)\s*(?:x|times?)?\s*(?:per|a|\/)?\s*week/i)
+  const f = String(h?.frequency || '').match(/^([1-6])x$/)
+  if (f) return Number(f[1])
+  const m = String(h?.title || h?.name || '').match(/(\d+)\s*(?:x|times?)\s*(?:per|a|each|\/)\s*week/i)
   return m ? Math.min(7, Math.max(1, Number(m[1]))) : 7
 }
 function habitsPart(category, habits, habitLogs, days) {
@@ -397,7 +424,7 @@ function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs
   // Productivity: work tasks due this week, overdue load, goal/project steps, Productivity habits
   const workTask = (t) => !otherAreas.has(t.category)
   const overdue = tasks.filter((t) => workTask(t) && !t.completed && t.date && t.date < TODAY).length
-  const stepDates = [...goals, ...projects].flatMap((x) => normalizeSteps(x.steps)).filter((st) => st.done && st.doneAt).map((st) => String(st.doneAt).slice(0, 10))
+  const stepDates = [...goals, ...projects].flatMap((x) => normalizeSteps(x.steps)).filter((st) => st.done && st.doneAt).map((st) => dateOfStamp(st.doneAt))
   const anyWork = tasks.some(workTask)
   parts.Productivity = [
     tasksPart('Tasks done', tasks, days, workTask),
@@ -407,8 +434,8 @@ function computeScoreDetails({ tasks = [], expenses = [], habits = [], habitLogs
   ]
 
   // Finances: spending vs weekly target (when you log spending), saving, Finance habits/tasks
-  const spentWin = expenses.filter((e) => e.date && days.includes(e.date))
-  const discretionary = spentWin.filter((e) => !['Bills', 'Utilities', 'Rent', 'Insurance'].includes(e.category)).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const spentWin = expenses.filter((e) => e.date && (days.includes(e.date) || ((e.period || 'one-time') !== 'one-time' && e.date <= days[days.length - 1])))
+  const discretionary = weekSpendOf(expenses, days[0], days[days.length - 1])
   const target = Number(budget.weeklyTarget) || 0
   const savingHistory = [...(Array.isArray(M.savingsGoals) ? M.savingsGoals : []), ...(Array.isArray(M.sinkingFunds) ? M.sinkingFunds : [])].flatMap((g) => g.history || [])
   const depositDates = savingHistory.filter((h) => Number(h.amount) > 0).map((h) => h.date)
@@ -630,7 +657,7 @@ function getHomeInsights({ tasks, expenses, budget, projects, goals, events, hab
   const weekTasks = tasks.filter((task) => task.date >= weekStart && task.date <= weekEnd)
   const weekCompleted = weekTasks.filter((task) => task.completed).length
   const completionRate = weekTasks.length ? Math.round((weekCompleted / weekTasks.length) * 100) : 0
-  const spend = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const spend = weekSpendOf(expenses)
   const budgetRemaining = Number((budget.weeklyTarget - spend).toFixed(2))
   const activeProjects = projects.filter((project) => project.status === 'Active').length
   const goalCount = goals.length
@@ -643,14 +670,12 @@ function getHomeInsights({ tasks, expenses, budget, projects, goals, events, hab
     return dayHabits.filter((log) => log.completed).length
   })
 
+  // Days in a row with at least one habit checked. Today counts once logged; until then the streak runs through yesterday.
   const currentHabitStreak = (() => {
+    const doneDays = new Set(habitLogs.filter((log) => log.completed).map((log) => log.date))
+    let day = doneDays.has(TODAY) ? TODAY : addDays(TODAY, -1)
     let streak = 0
-    for (let i = recentDays.length - 1; i >= 0; i -= 1) {
-      const date = recentDays[i]
-      const dayHabits = habitLogs.filter((log) => log.date === date)
-      if (!dayHabits.length || !dayHabits.some((log) => log.completed)) break
-      streak += 1
-    }
+    while (doneDays.has(day) && streak < 3650) { streak += 1; day = addDays(day, -1) }
     return streak
   })()
 
@@ -673,9 +698,9 @@ function getHomeInsights({ tasks, expenses, budget, projects, goals, events, hab
 function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitLogs }) {
   const suggestions = []
   const overdue = tasks.filter((task) => !task.completed && isOverdue(task.date))
-  const unscheduled = tasks.filter((task) => !task.completed && !task.time)
-  const healthGap = !habitLogs.some((log) => log.date === TODAY && log.completed && habits.find((habit) => habit.id === log.habitId && habit.category === 'Health'))
-  const weeklySpend = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const unscheduled = tasks.filter((task) => !task.completed && !task.time && task.date && task.date <= TODAY)
+  const healthGap = habits.some((habit) => habit.category === 'Health') && !habitLogs.some((log) => log.date === TODAY && log.completed && habits.find((habit) => habit.id === log.habitId && habit.category === 'Health'))
+  const weeklySpend = weekSpendOf(expenses)
   const activeProjects = projects.filter((project) => project.status === 'Active')
 
   if (overdue.length) {
@@ -688,7 +713,7 @@ function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitL
     })
   }
 
-  if (weeklySpend > budget.weeklyTarget) {
+  if (budget.weeklyTarget > 0 && weeklySpend > budget.weeklyTarget) {
     suggestions.push({
       title: 'Re-center your spending',
       body: `You are $${(weeklySpend - budget.weeklyTarget).toFixed(2)} over the weekly target. Review subscriptions or flexible spending today.`,
@@ -701,17 +726,17 @@ function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitL
   if (healthGap) {
     suggestions.push({
       title: 'Health score wants a win',
-      body: 'No health habit has been logged today yet. Even a short workout or walk will move the scorecard.',
+      body: 'No health habit has been checked off today yet. Even a short workout or walk moves the score.',
       tone: 'success',
-      actionLabel: 'Open Growth',
-      route: '/growth',
+      actionLabel: 'Open Habits',
+      route: '/habits',
     })
   }
 
   if (unscheduled.length) {
     suggestions.push({
-      title: 'Give loose tasks a time',
-      body: `${unscheduled.length} open task${unscheduled.length > 1 ? 's have' : ' has'} no time block. Drag one into the calendar so it becomes real.`,
+      title: 'Give today\'s tasks a time',
+      body: `${unscheduled.length} task${unscheduled.length > 1 ? 's' : ''} due today or earlier ${unscheduled.length > 1 ? 'have' : 'has'} no time block. Give one a time slot so it becomes real.`,
       tone: 'info',
       actionLabel: 'Open Calendar',
       route: '/calendar',
@@ -820,8 +845,8 @@ function normalizePayload(type, payload, userId) {
     // habits table uses 'name' not 'title'
     if ('title' in raw) { raw.name = raw.title; delete raw.title }
     // only keep valid columns
-    const { id, name, category, color, icon, user_id } = raw
-    return { id, name, category: category||'Health', color: color||null, icon: icon||null, user_id }
+    const { id, name, category, color, icon, user_id, frequency } = raw
+    return { id, name, category: category||'Health', frequency: /^([1-6]x|daily)$/.test(frequency || '') ? frequency : 'daily', color: color||null, icon: icon||null, user_id }
   }
 
   if (type === 'task') {
@@ -968,11 +993,28 @@ async function loadSupabaseAll(userId) {
 
 const sameTaskTitle = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
 
-function nextRecurringDate(date, recurrence) {
+// Next occurrence of a repeating task, always after today (finishing an overdue daily task
+// schedules tomorrow, not another past date). Monthly keeps the day of month, clamped to
+// the month's last day (Jan 31 → Feb 28 → Mar 31). Undated tasks repeat from today.
+function stepRecurring(date, recurrence, anchorDay) {
   if (recurrence === 'daily') return addDays(date, 1)
+  if (recurrence === 'weekdays') { let d = addDays(date, 1); while ([0, 6].includes(new Date(d + 'T12:00:00').getDay())) d = addDays(d, 1); return d }
   if (recurrence === 'weekly') return addDays(date, 7)
-  if (recurrence === 'monthly') return addDays(date, 30)
+  if (recurrence === 'biweekly') return addDays(date, 14)
+  if (recurrence === 'monthly') {
+    const [y, m] = date.split('-').map(Number)
+    const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1
+    const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate()
+    return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(anchorDay, last)).padStart(2, '0')}`
+  }
   return null
+}
+function nextRecurringDate(date, recurrence) {
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(date || '') ? date : TODAY
+  const anchorDay = Number(start.slice(8, 10))
+  let d = stepRecurring(start, recurrence, anchorDay)
+  for (let i = 0; d && d <= TODAY && i < 1000; i++) d = stepRecurring(d, recurrence, anchorDay)
+  return d
 }
 
 const plannerService = {
@@ -2329,7 +2371,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <TimeRangeFields start={form.time} end={form.endTime} onChange={(time, endTime) => setForm({ ...form, time, endTime })} />
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>High</option><option>Medium</option><option>Low</option></select></label>
-            <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+            <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week</option><option value="biweekly">Every 2 weeks</option><option value="monthly">Every month</option></select></label>
             {(() => {
               const projectGoal = projects.find((pr) => String(pr.id) === String(form.linkedProjectId || ''))?.goalId || ''
               return (<>
@@ -2383,10 +2425,16 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <div className="full-span"><StepsChecklist steps={form.steps} onChange={(steps) => setForm((f) => ({ ...f, steps }))} hint="Type a step and press Return. Paste a list to add several." /></div>
           </>)}
 
-          {selectedType === 'habit' && <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>}
+          {selectedType === 'habit' && (<>
+            <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+            <label>How often<select value={(() => { const n = habitTimesPerWeek(form); return n < 7 ? `${n}x` : 'daily' })()} onChange={(e) => setForm({ ...form, frequency: e.target.value })}>
+              <option value="daily">Every day</option>
+              {[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={`${n}x`}>{n}× a week</option>)}
+            </select></label>
+          </>)}
 
           <div className="full-span modal-actions">
-            {mode === 'edit' && item?.id ? <button className="danger-btn" type="button" onClick={() => { onDelete(selectedType, item.id); onClose() }}>Delete</button> : <span />}
+            {mode === 'edit' && item?.id ? <button className="danger-btn" type="button" onClick={async () => { if (await onDelete(selectedType, item.id) !== false) onClose() }}>Delete</button> : <span />}
             <button className="primary-btn" type="submit">{mode === 'edit' ? 'Save Changes' : `Save ${labels[selectedType]}`}</button>
           </div>
         </form>
@@ -2461,8 +2509,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
   const openTasks = tasks.filter(t => !t.completed)
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.date))
-  const weekSpend = expenses.filter(e => !['Bills','Utilities','Rent','Insurance'].includes(e.category))
-    .reduce((sum, item) => sum + Number(item.amount), 0)
+  const weekSpend = weekSpendOf(expenses)
   const todaySchedule = [
     ...todayTasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' })),
     ...expandEvents(events, TODAY, TODAY).map((event) => ({ ...event, itemType: 'event' })),
@@ -2610,7 +2657,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           // Pick top habit: not completed today
           const todayHabitLogs = habitLogs.filter(l => l.date === getTodayString() && l.completed)
           const completedHabitIds = todayHabitLogs.map(l => l.habitId)
-          const topHabit = habits.find(h => !completedHabitIds.includes(h.id))
+          const topHabit = habits.find(h => !completedHabitIds.includes(h.id) && habitDoneThisWeek(h, habitLogs) < habitWeekTarget(h))
 
           // Get today's intention from settings or first goal
           const topGoal = goals.find(g => !g.completed)
@@ -2826,7 +2873,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
             <button key={task.id} onClick={() => onEdit('task', task)}
               style={{width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--surface)', background:'none', cursor:'pointer', textAlign:'left'}}>
               <span style={{fontSize:'.9rem', color:'var(--text)', fontWeight:500}}>{task.title}</span>
-              <span style={{fontSize:'.75rem', color:'var(--danger)', fontWeight:600, flexShrink:0}}>{task.date}</span>
+              <span style={{fontSize:'.75rem', color:'var(--danger)', fontWeight:600, flexShrink:0}}>{shortDate(task.date)}</span>
             </button>
           ))}
         </section>
@@ -3050,7 +3097,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
 
   const weekStart = startOfWeek(TODAY)
   const doneThisWeek = tasks.filter((t) => t.completed && t.date >= weekStart && t.date <= TODAY).length
-  const stepsThisWeek = [...goals, ...projects].reduce((n, x) => n + normalizeSteps(x.steps).filter((st) => st.done && st.doneAt && st.doneAt.slice(0, 10) >= weekStart).length, 0)
+  const stepsThisWeek = [...goals, ...projects].reduce((n, x) => n + normalizeSteps(x.steps).filter((st) => st.done && st.doneAt && dateOfStamp(st.doneAt) >= weekStart).length, 0)
   const B_review = (
     <section className="card home-review-card">
       <p className="eyebrow" style={{margin:'0 0 4px'}}>Weekly Review</p>
@@ -3152,12 +3199,17 @@ function TasksPage({ tasks, settings, onToggle, onEdit, onDelete, onQuickCreate 
     } catch(e) { return [] }
   }, [tasks, settings, category, status, query])
 
+  // Soonest first, then by time, then High → Low priority
+  const PRI = { High: 0, Medium: 1, Low: 2 }
+  const byWhen = (a, b) => (a.date || '9999').localeCompare(b.date || '9999') || (a.time || '99:99').localeCompare(b.time || '99:99') || (PRI[a.priority] ?? 3) - (PRI[b.priority] ?? 3)
+  const sorted = [...filtered].sort(byWhen)
   const groups = {
-    Overdue: filtered.filter((task) => !task.completed && isOverdue(task.date)),
-    Today: filtered.filter((task) => isToday(task.date)),
-    'This Week': filtered.filter((task) => !task.completed && isThisWeek(task.date) && !isToday(task.date) && !isOverdue(task.date)),
-    Upcoming: filtered.filter((task) => !task.completed && !isThisWeek(task.date) && task.date > TODAY),
-    Completed: filtered.filter((task) => task.completed && !isToday(task.date)),
+    Overdue: sorted.filter((task) => !task.completed && isOverdue(task.date)),
+    Today: sorted.filter((task) => isToday(task.date)).sort((a, b) => Number(!!a.completed) - Number(!!b.completed)),
+    'This Week': sorted.filter((task) => !task.completed && isThisWeek(task.date) && !isToday(task.date) && !isOverdue(task.date)),
+    Upcoming: sorted.filter((task) => !task.completed && !isThisWeek(task.date) && task.date > TODAY),
+    'No Date': sorted.filter((task) => !task.completed && !task.date),
+    Completed: sorted.filter((task) => task.completed && !isToday(task.date)).reverse(),
   }
 
   const openCount = filtered.filter(t => !t.completed).length
@@ -3237,9 +3289,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   const scheduled = useMemo(() => {
     const md = getMonthDays(selectedDate), wd = getWeekDays(selectedDate)
     const from = [md[0], wd[0], selectedDate].sort()[0], to = [md[md.length - 1], wd[6], selectedDate].sort()[2]
-    const taskItems = tasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' }))
+    // Every dated task shows: timed ones on the grid, untimed ones in the All-day row
+    const taskItems = tasks.filter((task) => task.date).map((task) => ({ ...task, startTime: task.time || '', itemType: 'task' }))
     const eventItems = expandEvents(events, from, to).map((event) => ({ ...event, itemType: 'event' }))
-    return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`))
+    return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime || ''}`.localeCompare(`${b.date}-${b.startTime || ''}`))
   }, [tasks, events, selectedDate])
   // Editing a repeat opens the series (with its real start date), never the single occurrence
   const openItem = (item) => item.itemType === 'event' && item.isRepeat
@@ -3250,6 +3303,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   const weekDays = getWeekDays(selectedDate)
   const monthDays = getMonthDays(selectedDate)
   const dayScheduled = scheduled.filter((item) => item.date === selectedDate)
+  const dayAllDay = dayScheduled.filter((item) => toMin(item.startTime) == null)
   // Each item as a block: start → end (no end, or an end before the start = one half-hour)
   const dayBlocks = useMemo(() => {
     const list = dayScheduled.map((item) => {
@@ -3302,7 +3356,15 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
     : view === 'week' ? `Week of ${formatDateLabel(weekDays[0], { month: 'short', day: 'numeric' })}`
     : formatDateLabel(selectedDate, { weekday: 'short', month: 'short', day: 'numeric' })
 
-  const step = view === 'month' ? 30 : view === 'week' ? 7 : 1
+  const step = view === 'week' ? 7 : 1
+  // Month arrows move a calendar month (was 30 days, which skipped February from Jan 31)
+  const shiftMonth = (d, n) => {
+    const [y, m, day] = d.split('-').map(Number)
+    const t = new Date(Date.UTC(y, m - 1 + n, 1))
+    const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate()
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(day, last)).padStart(2, '0')}`
+  }
+  const go = (dir) => setSelectedDate(view === 'month' ? shiftMonth(selectedDate, dir) : addDays(selectedDate, dir * step))
 
   // Build 6-week grid for month view
   const buildMonthGrid = () => {
@@ -3331,9 +3393,9 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
           <button className="primary-btn" style={{fontSize:'.78rem', padding:'6px 12px'}} onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Event</button>
         </div>
         <div style={{display:'flex', gap:6, marginBottom:8}}>
-          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, -step))}>‹</button>
+          <button className="cal-nav-btn" onClick={() => go(-1)} aria-label="Previous">‹</button>
           <button className="cal-nav-btn" onClick={() => setSelectedDate(TODAY)}>Today</button>
-          <button className="cal-nav-btn" onClick={() => setSelectedDate(addDays(selectedDate, step))}>›</button>
+          <button className="cal-nav-btn" onClick={() => go(1)} aria-label="Next">›</button>
         </div>
         <div style={{display:'flex', gap:6}}>
           {['day','week','month'].map((v) => (
@@ -3358,6 +3420,27 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               {dayScheduled.length ? `${dayScheduled.length} scheduled` : 'Open day'}
             </span>
           </div>
+          {dayAllDay.length > 0 && (
+            <div className="cal-allday">
+              <div className="cal-allday-label">All day</div>
+              {dayAllDay.map((item) => {
+                const done = item.itemType === 'task' && item.completed
+                return (
+                  <div key={`${item.itemType}-${item.id}`} className={'cal-allday-item ' + item.itemType + (done ? ' done' : '')}
+                    draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
+                    {item.itemType === 'task' && onToggle && (
+                      <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
+                        aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
+                        {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+                      </button>
+                    )}
+                    <button type="button" className="cal-allday-title" onClick={() => openItem(item)}>{item.title}</button>
+                    <span className="cal-allday-kind">{item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
           <div className={'timeline timeline-grid' + (settings.compactCalendar ? ' compact-calendar' : '')} style={{ '--row-h': ROW_H + 'px' }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
@@ -3441,8 +3524,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
                     <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => openItem(item)}
                       draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
-                      <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{fmtRange(item.startTime, item.endTime)}</span>
-                      <strong style={{fontSize:'.8rem', color:'var(--ink)'}}>{item.title}</strong>
+                      <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{item.startTime ? fmtRange(item.startTime, item.endTime) : 'All day'}</span>
+                      <strong style={{fontSize:'.8rem', color:'var(--ink)', textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none', opacity: item.itemType === 'task' && item.completed ? .6 : 1}}>{item.title}</strong>
                     </button>
                   ))}
                 </div>
@@ -4789,6 +4872,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
+          if (ownFin.wrote(row.data_key)) return
           if (row.data_key === 'incomes') setIncomes(row.data_value || [])
           if (row.data_key === 'bills') setBills(row.data_value || [])
           if (row.data_key === 'debts') setDebts(row.data_value || [])
@@ -4866,8 +4950,6 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const [noSpend, setNoSpend] = useState(() => lsGet('noSpend', { days: 30, checked: [] }))
   const saveNoSpend = (n) => { setNoSpend(n); syncPageData('noSpend', n) }
 
-  const [monthlyIncome, setMonthlyIncome] = useState(() => lsGet('monthlyIncome', 0))
-  const saveMonthlyIncome = (v) => { setMonthlyIncome(v); lsSet('monthlyIncome', v) }
 
   // 52-week plan
   const WEEK_PLAN = [150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,250,200,150,200,250,150,200,150,200,250,150,200,150,200,250]
@@ -4920,7 +5002,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const fpRecurringWeek = (expenses || [])
     .filter(e => (e.period || 'one-time') !== 'one-time')
     .reduce((s, e) => s + toWeekly(e), 0)
-  const fpWeekSpend = fpOneTimeWeek + fpRecurringWeek
+  const fpWeekSpend = weekSpendOf(expenses, fpWeekStart, fpWeekEnd)
 
   const fpOneTimeMonth = (expenses || [])
     .filter(e => (e.period || 'one-time') === 'one-time' && e.date && e.date.slice(0,7) === TODAY.slice(0,7))
@@ -4953,45 +5035,6 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const daysArray = Array.from({ length: noSpend.days }, (_, i) => i + 1)
 
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-  // ── Bank connection state ─────────────────────────────────────────────
-  const [connectedBanks, setConnectedBanks] = useState(() => lsGet('connectedBanks', []))
-  const [bankTransactions, setBankTransactions] = useState(() => lsGet('bankTransactions', []))
-  const [plaidLinkToken, setPlaidLinkToken] = useState(null)
-  const [bankLoading, setBankLoading] = useState(false)
-  const [bankError, setBankError] = useState('')
-  const [autoImport, setAutoImport] = useState(() => lsGet('autoImport', { income: true, expenses: true }))
-  const saveBanks = (v) => { setConnectedBanks(v); lsSet('connectedBanks', v) }
-  const saveBankTx = (v) => { setBankTransactions(v); lsSet('bankTransactions', v) }
-  const saveAutoImport = (v) => { setAutoImport(v); lsSet('autoImport', v) }
-
-  // Simulate bank fetch (real version calls /api/plaid/transactions)
-  const fetchBankTransactions = async (bankId) => {
-    setBankLoading(true)
-    setBankError('')
-    try {
-      const res = await fetch('/api/plaid/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankId, days: 30 })
-      })
-      if (!res.ok) throw new Error('Could not fetch transactions')
-      const data = await res.json()
-      const existing = bankTransactions.filter(t => t.bankId !== bankId)
-      saveBankTx([...existing, ...data.transactions])
-    } catch(e) {
-      setBankError(e.message)
-    } finally {
-      setBankLoading(false)
-    }
-  }
-
-  // Categorize transaction as income or expense
-  const categorizeTransaction = (tx) => {
-    const amount = Number(tx.amount)
-    if (amount < 0) return 'income'   // Plaid uses negative for credits
-    return 'expense'
-  }
 
   const TABS = [
     { id: 'overview', label: '📊 Overview' },
@@ -6064,6 +6107,8 @@ function useOwnWrites() {
   return React.useMemo(() => ({
     mark: (key) => { const at = new Date().toISOString(); last.current[key] = at; return at },
     isStale: (key, updatedAt) => { const mine = last.current[key]; return !!mine && stampOf(updatedAt) <= stampOf(mine) },
+    // Saved on this device since the page opened: the server copy fetched on open is older, so don't apply it
+    wrote: (key) => Object.prototype.hasOwnProperty.call(last.current, key),
   }), [])
 }
 
@@ -6647,18 +6692,20 @@ const WELLNESS_GROUPS = [
 
 function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent }) {
   const { user } = useAuth()
+  const ownW = useOwnWrites()
 
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem(HW_PREFIX + key, JSON.stringify(value)); localStorage.setItem(HW_PREFIX + key + '.at', String(Date.now())) } catch {}
     emitPlannerData('wellness', key, value)
+    const at = ownW.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'wellness', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Wellness sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownW])
 
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
@@ -6668,6 +6715,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
+          if (ownW.wrote(row.data_key)) return
           if (row.data_key === 'routine') setRoutine(row.data_value || [])
           if (row.data_key === 'meds') setMeds(row.data_value || [])
           if (row.data_key === 'anxiety') setAnxiety(row.data_value || [])
@@ -6692,7 +6740,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
         // One-time move of workouts logged under Lifestyle (device-only) into synced Wellness
         const remote = (data.find((r) => r.data_key === 'workouts')?.data_value) || []
         const merged = mergeLegacyWorkouts(remote)
-        if (merged !== remote) { setWorkouts(merged); syncPageData('workouts', merged) }
+        if (merged !== remote && !ownW.wrote('workouts')) { setWorkouts(merged); syncPageData('workouts', merged) }
         markLegacyWorkoutsMoved()
       })
   }, [user?.id])
@@ -7551,17 +7599,19 @@ function NoteComposer({ onSave }) {
 function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, onEdit, onDelete, saveItem, settings, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
+  const ownPage = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.p.' + key, JSON.stringify(value)) } catch {}
     emitPlannerData('productivity', key, value)
+    const at = ownPage.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'productivity', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Productivity sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownPage])
 
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
@@ -7570,6 +7620,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
+          if (ownPage.wrote(row.data_key)) return
           if (row.data_key === 'checklists') setChecklists(row.data_value || [])
           if (row.data_key === 'brainDump') setBrainDump(row.data_value || [])
         })
@@ -8293,16 +8344,18 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   const fmt = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   // Device copy uses the same 'planner.l.' keys the page reads on open (was writing bare keys).
+  const ownPage = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.l.' + key, JSON.stringify(value)) } catch {}
+    const at = ownPage.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'lifestyle', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Lifestyle sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownPage])
 
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
@@ -8313,6 +8366,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
         if (error || !data) return
         const setters = { trips: setTrips, birthdays: setBirthdays, groceries: setGroceries, recipes: setRecipes, gifts: setGifts }
         data.forEach(row => {
+          if (ownPage.wrote(row.data_key)) return
           const set = setters[row.data_key]
           if (!set) return
           set(row.data_value || [])
@@ -8338,7 +8392,6 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   const [gifts, setGifts] = useState(() => lsGet('gifts', []))
   const saveGifts = (g) => { setGifts(g); syncPageData('gifts', g) }
   const [newGift, setNewGift] = useState({recipient:'',occasion:'Birthday',idea:'',amount:'',purchased:false,year:new Date().getFullYear()+''})
-  const [keyDates, setKeyDates] = useState(() => lsGet('keyDates', []))
   const [groceries, setGroceries] = useState(() => lsGet('groceries', []))
   const [form, setForm] = useState({})
   const save = (key, setter, val) => { setter(val); syncPageData(key, val) }
@@ -8735,8 +8788,8 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
     ['Review subscriptions monthly','Finances'],['Build your emergency fund','Finances'],
     ['Invest consistently','Finances'],['Read one financial book monthly','Finances'],
     // ── Faith & Character ─────────────────────────────────────────────────
-    ['Pray or reflect daily','Wellness'],['Practice patience intentionally','Wellness'],
-    ['Serve someone selflessly','Lifestyle'],['Write a daily affirmation','Wellness'],
+    ['Pray or reflect daily','Faith'],['Practice patience intentionally','Wellness'],
+    ['Serve someone selflessly','Faith'],['Write a daily affirmation','Wellness'],
     ['Express gratitude to someone','Lifestyle'],['Rest without guilt','Wellness'],
   ]
 
@@ -8760,7 +8813,17 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
         {habits.map(habit => {
           const logs = habitLogs.filter(l => l.habitId === habit.id)
           const todayLog = logs.find(l => isToday(l.date))
-          const weekComplete = weekLogs.filter(l => l.habitId === habit.id && l.completed).length
+          const weekComplete = new Set(weekLogs.filter(l => l.habitId === habit.id && l.completed).map(l => l.date)).size
+          const perWeek = habitTimesPerWeek(habit)
+          // "3x a week" habits: streak = weeks in a row the target was met (this week counts once it's met)
+          const weekStreak = perWeek < 7 ? (() => {
+            const done = new Set(logs.filter(l => l.completed).map(l => l.date))
+            const metWeek = (ws) => getWeekDays(ws).filter(d => done.has(d)).length >= perWeek
+            let ws = startOfWeek(TODAY), n = 0
+            if (!metWeek(ws)) ws = addDays(ws, -7)
+            while (n < 520 && metWeek(ws)) { n++; ws = addDays(ws, -7) }
+            return n
+          })() : 0
           const { current: streak, longest: longestStreak } = (() => {
             // Build a sorted list of completed dates
             const completedDates = logs.filter(l => l.completed).map(l => l.date).sort()
@@ -8809,9 +8872,11 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
                 <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>{habit.title}</div>
                 <div style={{display:'flex',gap:10,marginTop:2,fontSize:'.72rem',color:'var(--muted)'}}>
                   <span style={{color:CAT_COLOR[habit.category]||'var(--brass-fg)',fontWeight:600}}>{habit.category}</span>
-                  <span>{weekComplete + '/7 this week'}</span>
-                  {streak > 0 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
-                  {longestStreak > streak && longestStreak > 2 && <span style={{color:'var(--muted)',fontSize:'.7rem'}}>· best {longestStreak}d</span>}
+                  <span style={weekComplete >= perWeek ? {color:'var(--success)',fontWeight:600} : undefined}>{`${Math.min(weekComplete, perWeek)}/${perWeek} this week`}{perWeek < 7 && weekComplete >= perWeek ? ' ✓' : ''}</span>
+                  {perWeek < 7
+                    ? weekStreak > 0 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {weekStreak}wk streak</span>
+                    : streak > 0 && <span style={{color:'var(--warning)',fontWeight:700}}>🔥 {streak}d streak</span>}
+                  {perWeek >= 7 && longestStreak > streak && longestStreak > 2 && <span style={{color:'var(--muted)',fontSize:'.7rem'}}>· best {longestStreak}d</span>}
                 </div>
               </div>
               <div style={{display:'flex',gap:6,flexShrink:0}}>
@@ -8837,9 +8902,10 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
                   {days.map(date => {
                     const logged = habitLogs.find(l => l.habitId === habit.id && l.date === date && l.completed)
                     const isT = date === TODAY
+                    const future = date > TODAY
                     return (
-                      <div key={date} onClick={() => onToggleHabit(habit.id, date)} style={{
-                        flex:1,height:28,borderRadius:5,cursor:'pointer',
+                      <div key={date} role="button" aria-disabled={future} onClick={() => { if (!future) onToggleHabit(habit.id, date) }} style={{
+                        flex:1,height:28,borderRadius:5,cursor: future ? 'default' : 'pointer', opacity: future ? .45 : 1,
                         background: logged ? 'var(--success)' : isT ? 'var(--brass-dim)' : 'var(--stone2)',
                         border: isT ? '1.5px solid var(--brass)' : '1px solid var(--border)',
                         display:'grid',placeItems:'center',fontSize:'.6rem',color: logged ? 'white' : 'var(--muted)',fontWeight:700
@@ -8879,16 +8945,18 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
   const [, bumpReady] = useState(0) // re-render after "Not yet" on a finished goal
   const { user } = useAuth()
 
+  const ownPage = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.g.' + key, JSON.stringify(value)) } catch {}
+    const at = ownPage.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'goals', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Goals sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownPage])
 
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
@@ -8897,6 +8965,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
+          if (ownPage.wrote(row.data_key)) return
           if (row.data_key === 'visionItems') { setVisionItems(row.data_value || []); try { localStorage.setItem('planner.g.visionItems', JSON.stringify(row.data_value || [])) } catch {} }
         })
       })
@@ -8932,10 +9001,13 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
       <PageHeader icon={Target} title="Goals" subtitle="Aim with intention" />
 
       {/* SMART goals guide */}
-      <section className="card" style={{background:'var(--ink)',border:'none'}}>
-        <p className="eyebrow" style={{color:'var(--brass-fg)'}}>How to Set Goals That Work</p>
-        <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px',fontSize:'1.1rem'}}>The SMART Framework</h3>
-        <div style={{display:'grid',gap:10}}>
+      {/* Open by default until you have goals; then it folds away so your goals lead the page */}
+      <details className="card smart-guide" style={{background:'var(--ink)',border:'none'}} open={goals.length === 0 || undefined}>
+        <summary>
+          <p className="eyebrow" style={{color:'var(--brass-fg)'}}>How to Set Goals That Work</p>
+          <h3 style={{color:'var(--warm-white)',margin:'4px 0 0',fontSize:'1.1rem'}}>The SMART Framework</h3>
+        </summary>
+        <div style={{display:'grid',gap:10,marginTop:14}}>
           {SMART_GUIDE.map(s => (
             <div key={s.letter} style={{display:'flex',gap:12,alignItems:'flex-start'}}>
               <div style={{
@@ -8951,7 +9023,7 @@ function GoalsPage({ goals, tasks, projects, onEdit, onDelete, onQuickCreate, on
             </div>
           ))}
         </div>
-      </section>
+      </details>
 
       {/* Timeframe filter */}
       <section className="card" style={{padding:'12px 14px'}}>
@@ -9149,16 +9221,18 @@ function ReadingList() {
 function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habitLogs, goals, tasks, projects, onToggleHabit, onEdit, onDelete, onQuickCreate, budget, setBudget, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
+  const ownPage = useOwnWrites()
   const syncPageData = React.useCallback(async (key, value) => {
     try { localStorage.setItem('planner.gr.' + key, JSON.stringify(value)) } catch {}
+    const at = ownPage.mark(key)
     if (!user || !hasSupabaseEnv) return
     try {
       await supabase.from('page_data').upsert({
         user_id: user.id, page: 'growth', data_key: key, data_value: value,
-        updated_at: new Date().toISOString()
+        updated_at: at
       }, { onConflict: 'user_id,page,data_key' })
     } catch (e) { console.error('Growth sync error:', e) }
-  }, [user?.id])
+  }, [user?.id, ownPage])
 
   React.useEffect(() => {
     if (!user || !hasSupabaseEnv) return
@@ -9167,6 +9241,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], habits, habi
       .then(({ data, error }) => {
         if (error || !data) return
         data.forEach(row => {
+          if (ownPage.wrote(row.data_key)) return
           const fallback = { reviewAnswers: {}, reviewHistory: [], intentionText: '' }[row.data_key]
           if (fallback === undefined) return
           const v = row.data_value ?? fallback
@@ -10011,12 +10086,12 @@ function PlannerApp() {
         onModeChange={async (id) => { await updateProfile({ ...profile, plannerMode: id }); pushToast(`${id} mode`, 'Home is arranged for this season.', 'success') }}>
         <Routes>
           <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
-          <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
+          <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { const t = tasks.find((x) => x.id === id); if (!window.confirm(`Delete "${t?.title || 'this task'}"?`)) return; await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onSkipOccurrence={async (id, date) => { const ev = events.find((e) => e.id === id); if (!ev) return; await saveItem('event', { ...ev, skipDates: [...(ev.skipDates || []), date] }, 'edit'); pushToast('Removed that day', 'The rest of the series is unchanged.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; const next = { ...current, ...patch }; if (patch.time && current.endTime) next.endTime = shiftEnd(type === 'event' ? current.startTime : current.time, patch.time, current.endTime); await saveItem(type, next, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
-          <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
+          <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { const pr = projects.find((x) => x.id === id); if (!window.confirm(`Delete the project "${pr?.title || ''}" and its steps?`)) return; await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (!window.confirm(`Delete this ${type}? Its check-in history goes with it.`)) return; await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
           <Route path="/calculator" element={<CalculatorPage onQuickCreate={openCreate} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
@@ -10039,8 +10114,10 @@ function PlannerApp() {
             pushToast(`${labels[type] || type} ${modeArg === 'edit' ? 'updated' : 'added'}`, 'Synced across your devices.', 'success')
           }}
           onDelete={async (type, id) => {
+            if (!window.confirm(`Delete this ${(labels[type] || type).toLowerCase()}? This can't be undone.`)) return false
             await deleteItem(type, id)
             pushToast(`${labels[type] || type} deleted`, '', 'success')
+            return true
           }}
         />
       </Layout>
