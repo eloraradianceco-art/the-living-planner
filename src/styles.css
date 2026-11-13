@@ -1954,3 +1954,27 @@ button.profile-pill:active { transform: scale(.97); }
 .score-explain-meter { height: 5px; border-radius: 999px; background: var(--border2); overflow: hidden; }
 .score-explain-meter > span { display: block; height: 100%; background: var(--teal); border-radius: 999px; }
 .score-explain-empty { font-size: .75rem; color: var(--muted); font-style: italic; }
+
+/* Sleep log: live duration readout */
+.sleep-preview { display: flex; flex-direction: column; gap: 2px; padding: 9px 12px; border-radius: var(--radius-sm); background: var(--stone); border: 1px solid var(--border2); font-size: .82rem; }
+.sleep-preview strong { color: var(--teal); font-size: .92rem; }
+.sleep-preview span { color: var(--muted); }
+.sleep-preview.fixed { border-color: var(--warning); }
+.field-error { color: var(--danger); font-weight: 600; font-size: .75rem; }
+
+/* Sliders (sleep quality, migraine pain): the global input rule boxed them and hid the track on iOS */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 30px; padding: 0; margin: 0;
+  border: none; border-radius: 0; background: transparent; cursor: pointer;
+}
+input[type="range"]:focus { background: transparent; border: none; box-shadow: none !important; }
+input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--border2); }
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 24px; height: 24px; margin-top: -9px; border-radius: 50%;
+  background: var(--teal); border: 3px solid var(--warm-white); box-shadow: 0 1px 4px rgba(0,0,0,.25);
+}
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 999px; background: var(--border2); }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--teal); border: 3px solid var(--warm-white); }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--brass-dim); }
