@@ -1868,6 +1868,8 @@ const PLANNER_MODES = [
   { id: 'Growth',    icon: TrendingUp, emoji: '📈', line: 'Leads with your goals, their next steps, and your weekly review.' },
 ]
 const modeOf = (profile) => PLANNER_MODES.find((m) => m.id === profile?.plannerMode) || PLANNER_MODES[0]
+// Free accounts use Balanced; the other modes are Pro (a saved Pro mode comes back when Pro does).
+const effectiveMode = (profile, isPro) => { const m = modeOf(profile); return isPro || FREE_MODES.includes(m.id) ? m : PLANNER_MODES[0] }
 
 const HOME_ORDER = {
   Balanced:  ['hero', 'focus', 'faith', 'woty', 'metrics', 'quick', 'schedule', 'suggestions', 'overdue', 'goals', 'score', 'execution', 'tomorrow'],
@@ -1876,7 +1878,7 @@ const HOME_ORDER = {
   Growth:    ['hero', 'woty', 'goals', 'nextSteps', 'review', 'faith', 'focus', 'score', 'metrics', 'schedule', 'overdue', 'quick', 'suggestions', 'execution', 'tomorrow'],
 }
 
-function ModeSheet({ open, current, onPick, onClose }) {
+function ModeSheet({ open, current, onPick, onClose, isPro = true }) {
   useEffect(() => {
     if (!open) return
     const onKey = (e) => { if (e.key === 'Escape') onClose() }
@@ -1896,11 +1898,14 @@ function ModeSheet({ open, current, onPick, onClose }) {
         <div className="mode-options">
           {PLANNER_MODES.map((m) => {
             const active = m.id === current
+            const locked = !isPro && !FREE_MODES.includes(m.id)
             return (
-              <button key={m.id} className={'mode-option' + (active ? ' active' : '')} onClick={() => onPick(m.id)} aria-pressed={active}>
+              <button key={m.id} className={'mode-option' + (active ? ' active' : '') + (locked ? ' locked' : '')} onClick={() => onPick(m.id, locked)} aria-pressed={active}
+                aria-label={locked ? `${m.id} mode (Pro)` : undefined}>
                 <span className="mode-option-icon mode-option-emoji" aria-hidden="true">{m.emoji}</span>
                 <span className="mode-option-text"><strong>{m.id}</strong><small>{m.line}</small></span>
                 {active && <Check size={18} strokeWidth={2.4} className="mode-option-check" />}
+                {locked && <span className="pro-tag">PRO</span>}
               </button>
             )
           })}
@@ -1914,7 +1919,7 @@ const isNavActive = (item, path) => item.to === '/'
   : path === item.to || path.startsWith(item.to + '/') || (item.also || []).includes(path)
 
 // Phone: every section, one tap from the bottom bar. Swipe down, tap outside or ✕ to close.
-function MenuSheet({ open, onClose, onQuickAdd }) {
+function MenuSheet({ open, onClose, onQuickAdd, isPro = true }) {
   const { pathname } = useLocation()
   const sheetRef = React.useRef(null)
   const drag = React.useRef({ y: 0, dy: 0, active: false })
@@ -1969,6 +1974,7 @@ function MenuSheet({ open, onClose, onQuickAdd }) {
                   <Link key={item.to} to={item.to} onClick={onClose} className={'menu-tile' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
                     <span className="menu-emoji" aria-hidden="true">{item.emoji}</span>
                     <span>{item.label}</span>
+                    {!isPro && PRO_ROUTES.includes(item.to) && <span className="pro-tag menu-pro">PRO</span>}
                   </Link>
                 )
               })}
@@ -2135,7 +2141,7 @@ function SearchSheet({ open, onClose, data, onOpenItem }) {
   )
 }
 
-function SideNav({ onQuickAdd }) {
+function SideNav({ onQuickAdd, isPro = true }) {
   const { pathname } = useLocation()
   return (
     <aside className="side-nav" aria-label="Planner sections">
@@ -2151,6 +2157,7 @@ function SideNav({ onQuickAdd }) {
               <Link key={item.to} to={item.to} className={'side-link' + (active ? ' active' : '')} aria-current={active ? 'page' : undefined}>
                 <span className="side-emoji" aria-hidden="true">{item.emoji}</span>
                 <span>{item.label}</span>
+                {!isPro && PRO_ROUTES.includes(item.to) && <span className="pro-tag side-pro">PRO</span>}
               </Link>
             )
           })}
@@ -2166,7 +2173,7 @@ function SideNav({ onQuickAdd }) {
   )
 }
 
-function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchData, onOpenItem }) {
+function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchData, onOpenItem, isPro = true, onUpgrade = () => {} }) {
   const location = useLocation()
   const displayName = profile?.displayName || 'Planner'
   const { isDesktop, isMobile, isTablet } = useResponsive()
@@ -2255,11 +2262,11 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
 
         <div className="topbar-actions">
           <button type="button" className="topbar-search" onClick={() => setSearchOpen(true)} aria-label="Search everything"><Search size={19} /></button>
-          <button type="button" className="profile-pill" onClick={() => setModeOpen(true)} aria-label={`Planner mode: ${modeOf(profile).id}. Change mode`}>
+          <button type="button" className="profile-pill" onClick={() => setModeOpen(true)} aria-label={`Planner mode: ${effectiveMode(profile, isPro).id}. Change mode`}>
             <span className="profile-avatar">{displayName.slice(0, 1).toUpperCase()}</span>
             <div style={{display:'flex',flexDirection:'column',gap:1,textAlign:'left'}}>
               <strong style={{lineHeight:1.1}}>{displayName}</strong>
-              <span style={{fontSize:'.58rem',opacity:.92}}>{modeOf(profile).id} mode ▾</span>
+              <span style={{fontSize:'.58rem',opacity:.92}}>{effectiveMode(profile, isPro).id} mode ▾</span>
             </div>
           </button>
         </div>
@@ -2268,7 +2275,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
       {banner}
 
       <div className={(showSideNav ? 'app-frame with-side-nav ' : 'app-frame ') + (isDesktop ? 'desktop-frame' : isMobile ? 'mobile-frame' : 'tablet-frame')}>
-        {showSideNav ? <SideNav onQuickAdd={onQuickAdd} /> : null}
+        {showSideNav ? <SideNav onQuickAdd={onQuickAdd} isPro={isPro} /> : null}
         <main className="content">{children}</main>
       </div>
 
@@ -2280,6 +2287,7 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
               <Link key={tab.to} to={tab.to} className={active ? 'nav-item active' : 'nav-item'} aria-current={active ? 'page' : undefined}>
                 <span className="nav-icon nav-emoji" aria-hidden="true">{tab.emoji}</span>
                 <span className="nav-label">{tab.label}</span>
+                {!isPro && PRO_ROUTES.includes(tab.to) && <span className="pro-tag nav-pro">PRO</span>}
               </Link>
             )
           })}
@@ -2294,10 +2302,14 @@ function Layout({ children, onQuickAdd, banner, profile, onModeChange, searchDat
       <SearchSheet open={searchOpen} onClose={() => setSearchOpen(false)} data={searchData || {}}
         onOpenItem={(type, item) => { setSearchOpen(false); onOpenItem && onOpenItem(type, item) }} />
 
-      <ModeSheet open={modeOpen} current={modeOf(profile).id} onClose={() => setModeOpen(false)}
-        onPick={(id) => { setModeOpen(false); if (onModeChange && id !== modeOf(profile).id) onModeChange(id) }} />
+      <ModeSheet open={modeOpen} current={effectiveMode(profile, isPro).id} isPro={isPro} onClose={() => setModeOpen(false)}
+        onPick={(id, locked) => {
+          setModeOpen(false)
+          if (locked) { onUpgrade(`${id} mode is Pro`, 'Every Home mode, plus the full finance, wellness and faith tools, Life Score insights, and no limits.'); return }
+          if (onModeChange && id !== effectiveMode(profile, isPro).id) onModeChange(id)
+        }} />
 
-      {!showSideNav ? <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onQuickAdd={onQuickAdd} /> : null}
+      {!showSideNav ? <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} onQuickAdd={onQuickAdd} isPro={isPro} /> : null}
 
       {!showSideNav ? (
         <button onClick={onQuickAdd} style={{
@@ -2382,7 +2394,7 @@ function TimeRangeFields({ start, end, onChange }) {
 const labels = { task: 'Task', event: 'Event', expense: 'Expense', note: 'Note', goal: 'Goal', project: 'Project', habit: 'Habit' }
 const getInitialForm = (type, item) => ({ ...baseForms[type], ...(item || {}) })
 
-function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, goals, projects, onSave, onDelete }) {
+function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, goals, projects, onSave, onDelete, isLocked = () => false, onLocked = () => {} }) {
   const [selectedType, setSelectedType] = useState(type)
   const [form, setForm] = useState(getInitialForm(type, item))
 
@@ -2417,9 +2429,16 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
           }}>✕</button>
         </div>
         <div className="pill-row modal-tabs">
-          {Object.keys(labels).map((option) => (
-            <button key={option} className={selectedType === option ? 'pill active-pill' : 'pill'} onClick={() => mode === 'create' && (setSelectedType(option), setForm(getInitialForm(option, null)))} type="button" disabled={mode !== 'create'}>{labels[option]}</button>
-          ))}
+          {Object.keys(labels).map((option) => {
+            const locked = mode === 'create' && option !== selectedType && isLocked(option)
+            return (
+              <button key={option} className={selectedType === option ? 'pill active-pill' : 'pill'} type="button" disabled={mode !== 'create'}
+                aria-label={locked ? `${labels[option]} (free limit reached, Pro)` : undefined}
+                onClick={() => { if (mode !== 'create') return; if (locked) { onLocked(option); return } setSelectedType(option); setForm(getInitialForm(option, null)) }}>
+                {labels[option]}{locked ? ' 🔒' : ''}
+              </button>
+            )
+          })}
         </div>
         <form className="form-grid" onSubmit={submit}>
           {selectedType !== 'expense' && (
@@ -2567,7 +2586,7 @@ function MiniLineChart({ data }) {
 }
 
 
-function HomePage({ tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
+function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
   // Saved to the account so every device shows the same (were device-only before 2026-11-12)
   const [woty, saveWoty] = usePageKey('home', 'wordOfYear', '', 'planner_word_of_year')
@@ -2876,6 +2895,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
           {SECTIONS.map(s => (
             <Link key={s.to} to={s.to} className="home-quick-tile">
               {s.count > 0 && <span className="home-quick-count">{s.count}</span>}
+              {!isPro && PRO_ROUTES.includes(s.to) && <span className="pro-tag home-quick-pro">PRO</span>}
               {s.emoji ? <span className="home-quick-emoji" aria-hidden="true">{s.emoji}</span> : <s.icon size={20} strokeWidth={1.6} color="var(--brass2)" />}
               <span className="home-quick-label">{s.label}</span>
             </Link>
@@ -2977,7 +2997,18 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
     </>
   )
 
-  const B_score = (
+  const B_score = !isPro ? (
+    <section className="card pro-teaser">
+      <div className="section-title-row" style={{marginBottom:8}}>
+        <div><p className="eyebrow">Life Balance</p><h3>What's behind your score?</h3></div>
+        <span className="pro-tag">PRO</span>
+      </div>
+      <p className="muted" style={{fontSize:'.86rem',lineHeight:1.55,margin:'0 0 12px'}}>
+        Pro breaks your Life Score into its 7 areas, tracks it over 30 days, and walks you through a weekly review.
+      </p>
+      <button type="button" className="primary-btn" onClick={() => onUpgrade('See your full Life Score', 'Your score in 7 areas, 30-day trends and a weekly review, plus everything else in Pro.')}>Unlock Pro →</button>
+    </section>
+  ) : (
     <>
       {/* ── Life score strip ──────────────────────────────────────── */}
       <section className="card">
@@ -3064,7 +3095,7 @@ function HomePage({ tasks, goals, projects, expenses, scores, budget, events, ha
   )
 
   // ── Mode cards ─────────────────────────────────────────────────────────
-  const mode = modeOf(profile)
+  const mode = effectiveMode(profile, isPro)
   const vod = getVerseOfDay()
   const B_faith = (
     <Link to="/faith" className="card home-faith-card">
@@ -3861,20 +3892,40 @@ const STRIPE_CONFIG = {
   publishableKey: 'pk_live_51Sxe7pBr8nMXOo8tUrruWNZ7BkQ0OsKlfqtgKuksLAIcBfCHGtnPv19QP2sIrZz7nQJzDr4SH0OT6ZJ7yxubDUF3007nOd9RJE',
   monthlyLink: 'https://buy.stripe.com/00w7sKcrG8dEe110Rl57W05',
   annualLink: 'https://buy.stripe.com/dRm14majydxYaOP8jN57W06',
-  monthlyTrial: 7,
-  annualTrial: 14,
+  // No free trial (removed 2026-11-14): both links charge at checkout.
   prices: {
     monthly: 7.99,
     annual: 59.99,
   },
 }
+const PRO_PRICE_LINE = '$7.99/mo or $59.99/yr · Cancel anytime'
 
-// Free tier limits
-// Free tier: everything for daily planning, up to 5 habits (the site lists "Unlimited habits" as Pro).
-// Tasks, goals and projects stay unlimited on Free. Existing habits are never removed; only new ones are capped.
+// ── Free vs Pro (2026-11-14) ──────────────────────────────────────────────
+// Free: Home (Balanced mode), Tasks, Calendar, reminders, Calculator, and a starter tab in each life area
+// (Finance → Budget Plan, Wellness → Mood, Faith → Devotional + Prayer, Lifestyle → Groceries,
+// Productivity → Brain Dump, Notes, Tips), plus the limits below.
+// Pro: everything else, unlimited habits/goals/projects, every Home mode, and the Growth page.
+// Limits count active items (completed goals/projects don't count). Nothing a person already has is removed;
+// only new ones past the limit are held back.
 const FREE_LIMITS = {
-  habits: 5,
+  habits: 3,
+  goals: 2,
+  projects: 2,
 }
+const FREE_MODES = ['Balanced']
+const PRO_ROUTES = ['/growth']
+const activeCount = (type, items = []) =>
+  type === 'goal' ? items.filter((g) => !g.completed).length
+    : type === 'project' ? items.filter((p) => p.status !== 'Completed').length
+    : items.length
+const PRO_FEATURES = [
+  ['💰', 'Full Finance', 'income, bills, savings, debt payoff, giving, net worth'],
+  ['❤️', 'Full Health & Wellness', 'training, nutrition, sleep, recovery, meds, body metrics'],
+  ['🙏', 'All of Faith', 'scripture, Bible reading plan, gratitude, fasting, sermons, faith goals'],
+  ['📈', 'Growth & Life Score', 'the 7 areas behind your score, 30-day trends, weekly review'],
+  ['♾️', 'No limits', 'unlimited habits, goals and projects, and every Home mode'],
+  ['🏡', 'Lifestyle & Focus', 'recipes, trips, birthdays, gifts, cleaning, checklists, focus timer'],
+]
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
 // Complimentary Pro (owner/staff) is the profiles.pro_comp flag, set in the database only.
@@ -3893,9 +3944,6 @@ function useSubscription(user) {
   const [tier, setTierState] = React.useState(() => {
     try { return localStorage.getItem('planner_tier') || 'free' } catch { return 'free' }
   })
-  const [trialEndsAt, setTrialEndsAtState] = React.useState(() => {
-    try { return localStorage.getItem('planner_trial_ends') } catch { return null }
-  })
   // After checkout Stripe sends people back with ?welcome=pro&session_id=…
   // Pro turns on when Stripe's notice reaches the webhook, usually within seconds.
   const [arrival] = React.useState(() => {
@@ -3910,11 +3958,9 @@ function useSubscription(user) {
     if (!row) return null
     const finalTier = row.pro_comp ? 'pro' : (row.tier || 'free')
     setTierState(finalTier)
-    setTrialEndsAtState(row.trial_ends_at || null)
     try {
       localStorage.setItem('planner_tier', finalTier)
-      if (row.trial_ends_at) localStorage.setItem('planner_trial_ends', row.trial_ends_at)
-      else localStorage.removeItem('planner_trial_ends')
+      localStorage.removeItem('planner_trial_ends')
     } catch {}
     return finalTier
   }, [])
@@ -3928,7 +3974,7 @@ function useSubscription(user) {
     const readProfile = async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('tier, trial_ends_at, pro_comp')
+        .select('tier, pro_comp')
         .eq('user_id', user.id)
         .maybeSingle()
       return error ? null : data
@@ -3953,7 +3999,7 @@ function useSubscription(user) {
     if (arrival) { try { window.history.replaceState({}, '', window.location.pathname) } catch {} }
     load()
 
-    // Realtime: Stripe changes (trial ending, renewal, cancellation) show up without a reload.
+    // Realtime: Stripe changes (renewal, cancellation) show up without a reload.
     const channel = supabase
       .channel('subscription_' + user.id)
       .on('postgres_changes', {
@@ -3968,21 +4014,20 @@ function useSubscription(user) {
     return () => { cancelled = true; clearTimeout(timer); supabase.removeChannel(channel) }
   }, [user?.id])
 
+  // 'trial' is kept as Pro for any subscription that started before trials were removed.
   const isPro = tier === 'pro' || tier === 'trial'
-  const isTrialing = tier === 'trial' && trialEndsAt && new Date(trialEndsAt) > new Date()
-  const daysLeftInTrial = trialEndsAt ? Math.max(0, Math.ceil((new Date(trialEndsAt) - new Date()) / 86400000)) : 0
   const dismissWelcome = React.useCallback(() => setWelcome(null), [])
 
-  return { tier, isPro, isTrialing, daysLeftInTrial, trialEndsAt, welcome, dismissWelcome }
+  return { tier, isPro, welcome, dismissWelcome }
 }
 
 // ── Welcome Pro Banner ────────────────────────────────────────────────────
-function WelcomeProBanner({ state = 'done', trial = false, onDismiss }) {
+function WelcomeProBanner({ state = 'done', onDismiss }) {
   const copy = state === 'confirming'
     ? { icon: '⏳', title: 'Confirming your subscription…', text: 'This usually takes a few seconds.' }
     : state === 'waiting'
       ? { icon: '⏳', title: 'Still confirming your payment', text: "Pro turns on as soon as Stripe confirms it. Make sure you're signed in with the email you paid with, or email support@eloraradiance.com." }
-      : { icon: '🎉', title: 'Welcome to Pro!', text: trial ? 'Your free trial has started. Plan with faith, live with purpose.' : 'Every Pro feature is unlocked. Plan with faith, live with purpose.' }
+      : { icon: '🎉', title: 'Welcome to Pro!', text: 'Every Pro feature is unlocked. Plan with faith, live with purpose.' }
   return (
     <div style={{
       position: 'fixed', top: 'calc(env(safe-area-inset-top, 0px) + 12px)', left: 16, right: 16, zIndex: 9999,
@@ -4007,19 +4052,20 @@ function WelcomeProBanner({ state = 'done', trial = false, onDismiss }) {
 }
 
 // ── Pro-only Tab Configuration ────────────────────────────────────────────
+// Each life area keeps one starter tab free (the first id not listed here).
 const PRO_TABS = {
-  faith: ['fasting', 'sermons', 'goals', 'reading'],
-  finance: ['income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
+  faith: ['scripture', 'reading', 'gratitude', 'fasting', 'sermons', 'goals'],
+  finance: ['overview', 'income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
   lifestyle: ['recipes', 'trips', 'birthdays', 'gifts', 'cleaning'],
   productivity: ['checklists', 'focus'],
-  wellness: ['training', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
+  wellness: ['training', 'recovery', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
-function ProTabGate({ isPro, onUpgrade, children }) {
+function ProTabGate({ isPro, onUpgrade, children, title = 'Pro Feature', text, points }) {
   if (isPro) return children
   return (
     <div style={{
-      padding: '48px 24px', textAlign: 'center',
+      padding: '40px 24px', textAlign: 'center',
       background: 'linear-gradient(135deg, var(--ink) 0%, #0B1829 100%)',
       borderRadius: 16, margin: '0 0 16px',
       border: '1px solid rgba(184,150,90,.2)',
@@ -4031,19 +4077,40 @@ function ProTabGate({ isPro, onUpgrade, children }) {
         margin: '0 auto 16px', fontSize: '1.6rem'
       }}>🔒</div>
       <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white', marginBottom: 8 }}>
-        Pro Feature
+        {title}
       </div>
-      <p style={{ fontSize: '.85rem', color: 'rgba(255,255,255,.78)', lineHeight: 1.6, maxWidth: 260, margin: '0 auto 24px' }}>
-        Unlock this and every Pro feature with a 7-day free trial. No commitment required.
+      <p style={{ fontSize: '.88rem', color: 'rgba(255,255,255,.8)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 18px' }}>
+        {text || 'Part of Living Planner Pro, with the full finance, wellness, faith and lifestyle tools, Life Score insights, and no limits.'}
       </p>
+      {points && points.length > 0 && (
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 auto 20px', maxWidth: 300, textAlign: 'left', display: 'grid', gap: 8 }}>
+          {points.map((p) => (
+            <li key={p} style={{ display: 'flex', gap: 8, fontSize: '.86rem', color: 'rgba(255,255,255,.9)', lineHeight: 1.45 }}>
+              <span style={{ color: 'var(--brass-fg, #D4B87A)', fontWeight: 800 }} aria-hidden="true">✓</span><span>{p}</span>
+            </li>
+          ))}
+        </ul>
+      )}
       <button onClick={onUpgrade} style={{
         padding: '13px 32px', borderRadius: 999,
         background: 'linear-gradient(135deg, var(--brass) 0%, var(--brass2) 100%)',
         color: 'white', border: 'none',
-        fontSize: '.92rem', fontWeight: 700, cursor: 'pointer',
+        fontSize: '.95rem', fontWeight: 700, cursor: 'pointer',
         boxShadow: '0 4px 20px rgba(184,150,90,.35)',
-      }}>Start Free Trial →</button>
-      <p style={{fontSize:'.72rem',color:'rgba(255,255,255,.7)',marginTop:12}}>7-day free trial · Cancel anytime</p>
+      }}>Unlock Pro →</button>
+      <p style={{fontSize:'.75rem',color:'rgba(255,255,255,.72)',marginTop:12}}>{PRO_PRICE_LINE}</p>
+    </div>
+  )
+}
+
+// A whole section that is Pro (Growth): header stays, the page itself is a preview of what's inside.
+function ProSectionGate({ isPro, onUpgrade, icon, title, subtitle, gateTitle, text, points, children }) {
+  if (isPro) return children
+  return (
+    <div className="screen-stack">
+      <PageHeader icon={icon} title={title} subtitle={subtitle} />
+      <ProTabGate isPro={false} onUpgrade={onUpgrade} title={gateTitle} text={text} points={points} />
+      <PageNav />
     </div>
   )
 }
@@ -4057,20 +4124,30 @@ function UpgradeCard({ title, message, onClose }) {
       position: 'fixed', inset: 0, zIndex: 9999,
       background: 'rgba(10,18,30,.92)', backdropFilter: 'blur(8px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 24,
+      padding: 'max(env(safe-area-inset-top), 16px) 16px max(env(safe-area-inset-bottom), 16px)',
+      overflowY: 'auto',
     }}>
-      <div style={{
+      <div role="dialog" aria-modal="true" aria-label={title || 'Upgrade to Pro'} style={{
         background: 'var(--warm-white, white)', borderRadius: 24,
-        padding: '36px 28px', maxWidth: 380, width: '100%', textAlign: 'center',
-        boxShadow: '0 32px 80px rgba(0,0,0,.4)',
+        padding: '28px 22px', maxWidth: 400, width: '100%', textAlign: 'center',
+        boxShadow: '0 32px 80px rgba(0,0,0,.4)', margin: 'auto',
       }}>
-        <div style={{ fontSize: '3rem', marginBottom: 16 }}>✨</div>
+        <div style={{ fontSize: '2.4rem', marginBottom: 10 }} aria-hidden="true">✨</div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--ink)', marginBottom: 8 }}>
           {title || 'Upgrade to Pro'}
         </h2>
-        <p style={{ fontSize: '.88rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 24 }}>
-          {message || 'Unlock unlimited habits, the full finance workflow, wellness, faith and growth tools, and all future features.'}
+        <p style={{ fontSize: '.9rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 16 }}>
+          {message || 'The whole planner, with no limits.'}
         </p>
+
+        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', textAlign: 'left', display: 'grid', gap: 9 }}>
+          {PRO_FEATURES.map(([emoji, name, detail]) => (
+            <li key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
+              <span aria-hidden="true" style={{ fontSize: '1.05rem', lineHeight: 1.2 }}>{emoji}</span>
+              <span><strong>{name}</strong> <span style={{ color: 'var(--ink2)' }}>· {detail}</span></span>
+            </li>
+          ))}
+        </ul>
 
         <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
           <a href={plannerCheckoutUrl(STRIPE_CONFIG.annualLink, user)} target="_blank" rel="noopener noreferrer" style={{
@@ -4079,7 +4156,7 @@ function UpgradeCard({ title, message, onClose }) {
             fontWeight: 700, position: 'relative',
           }}>
             <div style={{ fontSize: '.95rem' }}>Annual — $59.99/year</div>
-            <div style={{ fontSize: '.75rem', opacity: .9, marginTop: 2 }}>$5/mo · 14-day free trial · Save $36</div>
+            <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2 }}>Just $5/mo · Save $36 a year</div>
             <span style={{
               position: 'absolute', top: -8, right: 12,
               background: 'var(--brass, #B8965A)', color: 'white', fontSize: '.65rem',
@@ -4092,7 +4169,7 @@ function UpgradeCard({ title, message, onClose }) {
             fontWeight: 700, border: '1.5px solid var(--border2)',
           }}>
             <div style={{ fontSize: '.95rem' }}>Monthly — $7.99/month</div>
-            <div style={{ fontSize: '.75rem', color: 'var(--ink2)', marginTop: 2 }}>7-day free trial</div>
+            <div style={{ fontSize: '.78rem', color: 'var(--ink2)', marginTop: 2 }}>Cancel anytime</div>
           </a>
         </div>
 
@@ -4104,27 +4181,6 @@ function UpgradeCard({ title, message, onClose }) {
     </div>
   )
 }
-
-// ── Trial Countdown Banner ────────────────────────────────────────────────
-function TrialBanner({ daysLeft, onUpgrade }) {
-  if (!daysLeft || daysLeft > 14) return null
-  return (
-    <div style={{
-      background: daysLeft <= 3 ? 'var(--warning, #F59E0B)' : 'var(--teal)',
-      color: 'white', padding: '8px 14px', borderRadius: 10,
-      margin: '0 14px 12px', display: 'flex', justifyContent: 'space-between',
-      alignItems: 'center', fontSize: '.82rem',
-    }}>
-      <span><strong>{daysLeft} day{daysLeft === 1 ? '' : 's'} left</strong> in your trial</span>
-      <button onClick={onUpgrade} style={{
-        background: 'white', color: 'var(--ink)', border: 'none',
-        padding: '4px 12px', borderRadius: 999, fontSize: '.75rem',
-        fontWeight: 700, cursor: 'pointer',
-      }}>Manage</button>
-    </div>
-  )
-}
-
 
 // ── Empty State Component ─────────────────────────────────────────────────
 // Shown when a goal or project reaches 100%: finish it, or "Not yet" (remembered on this device).
@@ -4973,7 +5029,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.f.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useUrlTab('overview')
+  const [tab, setTab] = useUrlTab(isPro ? 'overview' : 'budget')
   // Weekly target saves when you finish typing (was saving 2, 25, 250 — and 0 when the box was cleared)
   const [targetDraft, setTargetDraft] = useState(String(budget.weeklyTarget ?? ''))
   React.useEffect(() => { setTargetDraft(String(budget.weeklyTarget ?? '')) }, [budget.weeklyTarget])
@@ -5139,6 +5195,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           {/* Net Worth Tracker */}
           {(() => {
@@ -5261,6 +5318,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ))}
           </div>
         </section>
+        </ProTabGate>
       )}
 
       {/* ── INCOME ───────────────────────────────────────────────────────── */}
@@ -7019,7 +7077,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           <TrainingTab workouts={workouts} onSave={saveWorkouts} />
         </ProTabGate>
       )}
-      {tab === 'recovery' && <RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} />}
+      {tab === 'recovery' && <ProTabGate isPro={isPro} onUpgrade={onUpgrade}><RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} /></ProTabGate>}
       {tab === 'nutrition' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <section className="card" style={{marginBottom:14}}>
@@ -9716,9 +9774,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </section>
 
       {/* ── Reading (moved from Wellness) ─────────────────────────────────── */}
-      {isPro ? <ReadingList /> : (
-        <section className="card"><ProTabGate isPro={false} onUpgrade={onUpgrade}><ReadingList /></ProTabGate></section>
-      )}
+      <ReadingList />
 
       <section className="card" style={{ padding: '12px 16px' }}>
         <Link to="/finance" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textDecoration: 'none', color: 'var(--ink2)', fontSize: '.85rem', fontWeight: 600 }}>
@@ -9949,7 +10005,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontWeight:700,fontSize:'1rem',color:'var(--ink)'}}>The Living Planner {isPro ? 'Pro ✓' : ''}</div>
                   <div style={{fontSize:'.82rem',color:'var(--ink2)',marginTop:2}}>
-                    {isPro ? 'All features unlocked · Thanks for supporting' : 'Free tier · Limited features'}
+                    {isPro ? 'All features unlocked · Thanks for supporting' : `Free plan · ${FREE_LIMITS.habits} habits, ${FREE_LIMITS.goals} goals, ${FREE_LIMITS.projects} projects`}
                   </div>
                 </div>
                 {isPro ? (
@@ -9960,7 +10016,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                        fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap',
                      }}>Manage</a>
                 ) : (
-                  <button onClick={() => triggerUpgrade('Upgrade to Pro', 'Unlock unlimited habits and every Pro tool across finance, wellness, faith and growth.')} style={{
+                  <button onClick={() => triggerUpgrade('Upgrade to Pro', 'The whole planner, with no limits.')} style={{
                     padding:'8px 18px', borderRadius:999, background:'var(--teal)',
                     color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
                   }}>Upgrade</button>
@@ -10248,10 +10304,21 @@ function PlannerApp() {
     updateProfile({ ...profile, timezone: DEVICE_TIME_ZONE }).catch(() => {})
   }, [loading, user?.id, settings?.onboardingComplete, profile?.timezone])
 
-  const atHabitLimit = () => !subscription.isPro && habits.length >= FREE_LIMITS.habits
-  const habitLimitUpgrade = () => triggerUpgrade('Unlock unlimited habits', `Free includes ${FREE_LIMITS.habits} habits. Pro removes the limit, plus the full finance, wellness, faith and growth tools.`)
+  // Free limits on new habits, goals and projects (see FREE_LIMITS).
+  const LIMIT_OF = { habit: ['habits', habits], goal: ['goals', goals], project: ['projects', projects] }
+  const atLimit = (type) => {
+    if (subscription.isPro || !LIMIT_OF[type]) return false
+    const [key, items] = LIMIT_OF[type]
+    return activeCount(type, items) >= FREE_LIMITS[key]
+  }
+  const limitUpgrade = (type) => {
+    const key = LIMIT_OF[type][0]
+    const n = FREE_LIMITS[key]
+    const active = type === 'habit' ? '' : ' active'
+    triggerUpgrade(`Unlimited ${key} with Pro`, `Free includes ${n}${active} ${n === 1 ? type : key}. Pro removes the limit and unlocks the whole planner.`)
+  }
   const openCreate = (type = 'task', prefill = null) => {
-    if (type === 'habit' && atHabitLimit()) { habitLimitUpgrade(); return }
+    if (atLimit(type)) { limitUpgrade(type); return }
     setModalState({ open: true, type, mode: 'create', item: prefill })
   }
   const openEdit = (type, item) => setModalState({ open: true, type, mode: 'edit', item })
@@ -10286,28 +10353,31 @@ function PlannerApp() {
 
   return (
     <>
-      {subscription.welcome && <WelcomeProBanner state={subscription.welcome} trial={subscription.tier === 'trial'} onDismiss={subscription.dismissWelcome} />}
+      {subscription.welcome && <WelcomeProBanner state={subscription.welcome} onDismiss={subscription.dismissWelcome} />}
       {showA2HS && !subscription.welcome && <A2HSModal onClose={dismissA2HS} />}
       {showUpgrade && <UpgradeCard title={upgradeContext.title} message={upgradeContext.message} onClose={() => setShowUpgrade(false)} />}
       <ScrollToTop />
-      <Layout onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}
+      <Layout isPro={subscription.isPro} onUpgrade={triggerUpgrade} onQuickAdd={() => openCreate('task')} banner={<StatusBanner syncing={syncing} error={error} />} profile={profile}
         searchData={{ tasks, events, goals, projects, notes, habits }} onOpenItem={openEdit}
         onModeChange={async (id) => { await updateProfile({ ...profile, plannerMode: id }); pushToast(`${id} mode`, 'Home is arranged for this season.', 'success') }}>
         <Routes>
-          <Route path="/" element={<HomePage tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
+          <Route path="/" element={<HomePage isPro={subscription.isPro} onUpgrade={triggerUpgrade} tasks={tasks} goals={goals} projects={projects} expenses={expenses} scores={scores} budget={budget} events={events} habits={habits} habitLogs={habitLogs} settings={settings} profile={profile} onEdit={openEdit} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onToggleHabit={async (id) => { await toggleHabit(id) }} onSaveSteps={saveSteps} />} />
           <Route path="/tasks" element={<TasksPage tasks={tasks} settings={settings} onToggle={async (id) => { await toggleTask(id); pushToast('Task updated', 'Progress and score were refreshed.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { const t = tasks.find((x) => x.id === id); if (!window.confirm(`Delete "${t?.title || 'this task'}"?`)) return; await deleteItem(type, id); pushToast('Task deleted', 'That item is gone.', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/calendar" element={<CalendarPage tasks={tasks} events={events} settings={settings} onSkipOccurrence={async (id, date) => { const ev = events.find((e) => e.id === id); if (!ev) return; await saveItem('event', { ...ev, skipDates: [...(ev.skipDates || []), date] }, 'edit'); pushToast('Removed that day', 'The rest of the series is unchanged.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { await deleteItem(type, id); pushToast('Calendar item deleted', '', 'success') }} onQuickCreate={openCreate} onReschedule={async (type, id, patch) => { const collection = type === 'event' ? events : tasks; const current = collection.find((item) => item.id === id); if (!current) return; const next = { ...current, ...patch }; if (patch.time && current.endTime) next.endTime = shiftEnd(type === 'event' ? current.startTime : current.time, patch.time, current.endTime); await saveItem(type, next, 'edit'); pushToast(type === 'task' ? 'Task rescheduled' : 'Event moved', 'The calendar updated instantly.', 'success') }} />} />
           <Route path="/projects" element={<ProjectsPage projects={projects} tasks={tasks} goals={goals} onStepsChange={(id, steps) => saveSteps('project', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'project' && item.status === 'Completed') pushToast('Project complete', 'Well done. Finish what you start.', 'success') }} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { const pr = projects.find((x) => x.id === id); if (!window.confirm(`Delete the project "${pr?.title || ''}" and its steps?`)) return; await deleteItem(type, id); pushToast('Project removed', '', 'success') }} onQuickCreate={openCreate} />} />
           <Route path="/habits" element={<HabitsPage habits={habits} habitLogs={habitLogs} onToggleHabit={async (id, date) => { await toggleHabit(id, date) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
             <Route path="/goals" element={<GoalsPage goals={goals} tasks={tasks} projects={projects} onStepsChange={(id, steps) => saveSteps('goal', id, steps)} onUpdate={async (type, item, m) => { await saveItem(type, item, m); if (type === 'goal' && item.completed) pushToast('Goal achieved', 'Give thanks — then aim again.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
-            <Route path="/growth" element={<GrowthPage isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Reading Tracker", "Keep your reading list and finished books in Growth.")} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} scoreSeries={scoreSeries} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (!window.confirm(`Delete this ${type}? Its check-in history goes with it.`)) return; await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} />} />
+            <Route path="/growth" element={<ProSectionGate isPro={subscription.isPro} icon={TrendingUp} title="Growth" subtitle="See who you're becoming"
+              gateTitle="Growth is part of Pro" text="See what's really moving your life, week by week."
+              points={['Your Life Score broken into 7 areas, and how each is calculated', 'Score trend over the last 30 days', 'Weekly pulse, intention and end-of-week review', 'Reading list and finished books']}
+              onUpgrade={() => triggerUpgrade('Unlock Growth', 'Your Life Score in 7 areas, 30-day trends, weekly review and reading, plus everything else in Pro.')}><GrowthPage isPro={subscription.isPro} scores={scores} scoreDetails={scoreDetails} scoreHistory={scoreHistory} scoreSeries={scoreSeries} habits={habits} habitLogs={habitLogs} goals={goals} tasks={tasks} projects={projects} onToggleHabit={async (...args) => { await toggleHabit(...args); pushToast('Habit logged', 'Your scorecard picked that up.', 'success') }} onEdit={openEdit} onDelete={async (type, id) => { if (!window.confirm(`Delete this ${type}? Its check-in history goes with it.`)) return; await deleteItem(type, id); pushToast('Habit deleted', '', 'success') }} onQuickCreate={openCreate} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget); pushToast('Budget updated', 'Finance scoring refreshed.', 'success') }} /></ProSectionGate>} />
           <Route path="/calculator" element={<CalculatorPage onQuickCreate={openCreate} />} />
-          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Finance Suite", "Get monthly income tracking, bills, savings goals, debt payoff, giving, and no-spend challenges.")} />} />
-          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
+          <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock the full Finance suite", "Overview and net worth, income, bills, savings, debt payoff, giving and no-spend challenges.")} />} />
+          <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock the Wellness suite", "Training, recovery, nutrition, sleep, vitals, journal, routine, meds and body metrics.")} />} />
           <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists and the focus timer.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onToast={pushToast} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipe cards that fill your shopping list, cleaning tracker, trips, birthdays, and gift ideas.")} />} />
-          <Route path="/faith" element={<FaithPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onCreateGoal={async (g) => { await saveItem('goal', g, 'create') }} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Full Faith Section", "Get access to fasting tracker, sermon notes, and faith goals.")} />} />
-          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock Wellness Suite", "Training, nutrition, vitals, sleep, journal, routine, meds, and body metrics.")} />} />
+          <Route path="/faith" element={<FaithPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onCreateGoal={async (g) => { await saveItem('goal', g, 'create') }} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock all of Faith", "Scripture and memory verses, a Bible reading plan, gratitude, fasting, sermon notes and faith goals.")} />} />
+          <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock the Wellness suite", "Training, recovery, nutrition, sleep, vitals, journal, routine, meds and body metrics.")} />} />
           <Route path="/more" element={<MorePage profile={profile} triggerUpgrade={triggerUpgrade} settings={settings} updateProfile={updateProfile} updateSettings={updateSettings} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} onQuickCreate={openCreate} />} />
         </Routes>
         <QuickAddModal
@@ -10318,8 +10388,10 @@ function PlannerApp() {
           onClose={closeModal}
           goals={goals}
           projects={projects}
+          isLocked={atLimit}
+          onLocked={(type) => { closeModal(); limitUpgrade(type) }}
           onSave={async (type, payload, modeArg) => {
-            if (type === 'habit' && modeArg !== 'edit' && atHabitLimit()) { habitLimitUpgrade(); return }
+            if (modeArg !== 'edit' && atLimit(type)) { limitUpgrade(type); return }
             await saveItem(type, payload, modeArg)
             pushToast(`${labels[type] || type} ${modeArg === 'edit' ? 'updated' : 'added'}`, 'Synced across your devices.', 'success')
           }}
@@ -10840,6 +10912,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
       {/* ── SCRIPTURE ──────────────────────────────────────────────────────── */}
       {tab === 'scripture' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           {/* Memory Verse Practice */}
           {scriptures.filter(s => s.memorizing).length > 0 && (
@@ -10934,6 +11007,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             }}>+ Save Scripture</button>
           </div>
         </section>
+        </ProTabGate>
       )}
 
       {tab === 'reading' && (
@@ -11043,6 +11117,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
 
       {/* ── GRATITUDE ──────────────────────────────────────────────────────── */}
       {tab === 'gratitude' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Gratitude Journal</p>
           <h3 style={{ margin: '4px 0 8px' }}>Count Your Blessings</h3>
@@ -11118,6 +11193,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             </div>
           ))}
         </section>
+        </ProTabGate>
       )}
 
       {/* ── FASTING ────────────────────────────────────────────────────────── */}
