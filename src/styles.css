@@ -2010,3 +2010,18 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .trend-bar.empty { height: 3px; background: var(--stone2); }
 .trend-col.today .trend-bar { box-shadow: 0 0 0 2px var(--brass-dim); }
 .trend-axis { display: flex; justify-content: space-between; margin-left: 18px; font-size: .66rem; color: var(--muted); font-weight: 600; }
+
+/* ── Pro tags (Free vs Pro, 2026-11-14) ─────────────────────────────── */
+.pro-tag {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  padding: 2px 7px; border-radius: 999px; line-height: 1.2;
+  background: #7D6230; color: #fff; /* white on deep brass, 6:1 */
+  font-size: .62rem; font-weight: 800; letter-spacing: .06em;
+}
+.menu-tile { position: relative; }
+.menu-pro, .home-quick-pro { position: absolute; top: 5px; left: 5px; font-size: .56rem; padding: 2px 5px; }
+.side-pro { margin-left: auto; }
+.mode-option.locked .mode-option-text strong { opacity: .85; }
+.pro-teaser { border-color: rgba(184,150,90,.35); }
+.nav-item { position: relative; }
+.nav-pro { position: absolute; top: 2px; left: calc(50% + 6px); font-size: .5rem; padding: 1px 4px; letter-spacing: .04em; }
