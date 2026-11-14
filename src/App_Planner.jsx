@@ -10786,13 +10786,24 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                   color: 'var(--ink)', fontStyle: 'italic', marginBottom: 8,
                 }}>"{vod.v}"</p>
                 <p style={{fontSize: '.78rem', color:'var(--brass-fg)', fontWeight: 700, textAlign: 'right'}}>— {vod.r}</p>
-                <button onClick={() => {
-                  saveScriptures([...scriptures, { id: Date.now(), verse: vod.v, reference: vod.r, date: TODAY }])
-                }} style={{
-                  marginTop: 10, padding: '7px 14px', borderRadius: 999,
-                  background:'var(--brass-text)', color: 'white', border: 'none',
-                  fontSize: '.78rem', fontWeight: 600, cursor: 'pointer',
-                }}>+ Save to Scripture</button>
+                {(() => {
+                  // Saves into Faith → Scripture (Scripture Journal), synced to the account (faith_data, key "scriptures").
+                  const saved = scriptures.some((x) => x.reference === vod.r)
+                  const pill = { marginTop: 10, padding: '7px 14px', borderRadius: 999, fontSize: '.78rem', fontWeight: 600, cursor: 'pointer' }
+                  if (!isPro) return (
+                    <button onClick={onUpgrade} style={{ ...pill, background: 'var(--brass-text)', color: 'white', border: 'none' }}
+                      aria-label="Save to Scripture journal (Pro)">🔒 Save to Scripture · Pro</button>
+                  )
+                  return saved ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                      <span role="status" style={{ fontSize: '.8rem', fontWeight: 700, color: 'var(--success-text, var(--success))' }}>✓ Saved to your Scripture journal</span>
+                      <button onClick={() => setTab('scripture')} style={{ ...pill, marginTop: 0, background: 'transparent', color: 'var(--brass-fg)', border: '1px solid var(--brass)' }}>View →</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => saveScriptures([{ id: Date.now(), reference: vod.r, text: vod.v, date: TODAY }, ...scriptures])}
+                      style={{ ...pill, background: 'var(--brass-text)', color: 'white', border: 'none' }}>+ Save to Scripture</button>
+                  )
+                })()}
               </div>
             )
           })()}
@@ -10931,7 +10942,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               {scriptures.filter(s => s.memorizing && !s.memorized).slice(0, 3).map(s => {
                 const isRevealed = revealedVerse === s.id
                 // Create a fill-in-blank version (hide ~30% of words)
-                const words = (s.verse || '').split(' ')
+                const words = (s.text || s.verse || '').split(' ')
                 const hidden = words.map((w, i) => i % 3 === 1 ? '___' : w).join(' ')
                 return (
                   <div key={s.id} style={{
@@ -10939,7 +10950,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                     borderRadius:10,marginBottom:8,borderLeft:'3px solid var(--brass)',
                   }}>
                     <p style={{fontSize:'.85rem',fontFamily:'var(--serif)',fontStyle:'italic',lineHeight:1.5,marginBottom:6}}>
-                      {isRevealed ? s.verse : hidden}
+                      {isRevealed ? (s.text || s.verse) : hidden}
                     </p>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       <p style={{fontSize:'.74rem',color:'var(--brass-fg)',fontWeight:700,margin:0}}>— {s.reference}</p>
@@ -10982,7 +10993,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                     style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer'}}>✕</button>
                 </div>
               </div>
-              <p style={{fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,margin:'0 0 8px',fontStyle:'italic',color:'var(--ink)'}}>{s.text}</p>
+              <p style={{fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,margin:'0 0 8px',fontStyle:'italic',color:'var(--ink)'}}>{s.text || s.verse}</p>
               {s.reflection && <p style={{fontSize:'.82rem',color:'var(--ink2)',lineHeight:1.5,margin:0}}>💭 {s.reflection}</p>}
               <p className="muted" style={{fontSize:'.72rem',margin:'6px 0 0'}}>{s.date}</p>
             </div>
