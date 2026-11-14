@@ -1659,6 +1659,8 @@ function AuthGate({ children, fallback }) {
 function AuthPage() {
   const { signIn, signUp, mode, setMode } = useAuth()
   const [step, setStep] = useState('welcome') // welcome | features | signin
+  // Each step starts at the top of the page (the page itself scrolls now)
+  useEffect(() => { try { window.scrollTo(0, 0) } catch {} }, [step])
 
   useEffect(() => {
     // Force dark background - override all CSS
@@ -1699,14 +1701,15 @@ function AuthPage() {
     }
   }
 
+  // Same emoji the app's menu and the website use for each section
   const SECTIONS = [
-    { icon: Cross, title: 'Faith', desc: 'Devotionals, prayer journal, scripture, sermon notes, and Bible reading.' },
-    { icon: CalendarDays, title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
-    { icon: Target, title: 'Goals & Habits', desc: 'Break goals and projects into steps you check off, build routines, and watch your Life Score rise.' },
-    { icon: Wallet, title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
-    { icon: Leaf, title: 'Health & Wellness', desc: 'Training, recovery, nutrition, sleep, mood, journal, vitals, and medications.' },
-    { icon: Zap, title: 'Productivity', desc: 'Brain dump, notes, checklists, and a focus timer.' },
-    { icon: Compass, title: 'Lifestyle', desc: 'Groceries, recipes that fill your shopping list, cleaning, trips, birthdays, and gifts.' },
+    { emoji: '🙏', title: 'Faith', desc: 'Devotionals, prayer journal, scripture, sermon notes, and Bible reading.' },
+    { emoji: '📅', title: 'Tasks & Calendar', desc: 'Capture everything, schedule anything, and never miss what matters.' },
+    { emoji: '🎯', title: 'Goals & Habits', desc: 'Break goals and projects into steps you check off, build routines, and watch your Life Score rise.' },
+    { emoji: '💰', title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
+    { emoji: '❤️', title: 'Health & Wellness', desc: 'Training, recovery, nutrition, sleep, mood, journal, vitals, and medications.' },
+    { emoji: '⚡', title: 'Productivity', desc: 'Brain dump, notes, checklists, and a focus timer.' },
+    { emoji: '🏡', title: 'Lifestyle', desc: 'Groceries, recipes that fill your shopping list, cleaning, trips, birthdays, and gifts.' },
   ]
 
   // ── Welcome screen ──────────────────────────────────────────────────────
@@ -1726,7 +1729,7 @@ function AuthPage() {
             style={{background:'linear-gradient(180deg, #C9A86B 0%, var(--brass) 55%, var(--brass2) 100%)', color:'#1C1C1E', border:'none', borderRadius:999, padding:'15px 24px', fontWeight:700, fontSize:'1rem', letterSpacing:'.01em', cursor:'pointer', fontFamily:'inherit', boxShadow:'0 10px 30px rgba(184,150,90,.28)'}}>
             See What's Inside →
           </button>
-          <button onClick={() => setStep('signin')}
+          <button onClick={() => { setIsSignup(false); setStep('signin') }}
             style={{background:'rgba(255,255,255,.12)', color:'rgba(255,255,255,.90)', border:'1.5px solid rgba(255,255,255,.25)', borderRadius:999, padding:'12px 24px', fontWeight:600, fontSize:'.9rem', cursor:'pointer', fontFamily:'inherit'}}>
             I already have an account
           </button>
@@ -1737,7 +1740,7 @@ function AuthPage() {
 
   // ── Features walkthrough ────────────────────────────────────────────────
   if (step === 'features') return (
-    <div className="auth-shell" style={{background:'var(--navy)', alignItems:'flex-start', paddingTop:40}}>
+    <div className="auth-shell" style={{background:'var(--navy)', paddingBottom:'calc(120px + env(safe-area-inset-bottom, 0px))'}}>
       <div style={{maxWidth:460, width:'100%', padding:'0 20px'}}>
         <button onClick={() => setStep('welcome')}
           style={{background:'none', border:'none', color:'rgba(255,255,255,.64)', cursor:'pointer', fontSize:'.85rem', marginBottom:24, fontFamily:'inherit'}}>
@@ -1748,16 +1751,16 @@ function AuthPage() {
         <div style={{display:'grid', gap:10, marginBottom:28}}>
           {SECTIONS.map(s => (
             <div key={s.title} style={{background:'rgba(255,255,255,.09)', border:'1px solid rgba(184,150,90,.25)', borderRadius:'var(--radius)', padding:'12px 14px', display:'flex', gap:12, alignItems:'flex-start'}}>
-              <span style={{width:38,height:38,borderRadius:11,flexShrink:0,display:'grid',placeItems:'center',background:'rgba(184,150,90,.12)',border:'1px solid rgba(184,150,90,.3)'}}><s.icon size={19} strokeWidth={1.6} color="var(--brass)" /></span>
+              <span aria-hidden="true" style={{width:42,height:42,borderRadius:12,flexShrink:0,display:'grid',placeItems:'center',background:'rgba(184,150,90,.12)',border:'1px solid rgba(184,150,90,.3)',fontSize:'1.3rem',lineHeight:1}}>{s.emoji}</span>
               <div>
-                <div style={{fontWeight:700, color:'#FFFFFF', fontSize:'.9rem', marginBottom:3}}>{s.title}</div>
-                <div style={{fontSize:'.78rem', color:'rgba(255,255,255,.70)', lineHeight:1.5}}>{s.desc}</div>
+                <div style={{fontWeight:700, color:'#FFFFFF', fontSize:'1rem', marginBottom:3}}>{s.title}</div>
+                <div style={{fontSize:'.9rem', color:'rgba(255,255,255,.74)', lineHeight:1.5}}>{s.desc}</div>
               </div>
             </div>
           ))}
         </div>
         <div style={{display:'grid', gap:6}}>
-          <button onClick={() => setStep('signin')}
+          <button onClick={() => { setIsSignup(mode === 'supabase'); setStep('signin') }}
             style={{background:'linear-gradient(180deg, #C9A86B 0%, var(--brass) 55%, var(--brass2) 100%)', color:'#1C1C1E', border:'none', borderRadius:999, padding:'15px 24px', fontWeight:700, fontSize:'1rem', letterSpacing:'.01em', cursor:'pointer', fontFamily:'inherit', boxShadow:'0 10px 30px rgba(184,150,90,.28)'}}>
             Get Started →
           </button>
