@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import AccountPrivacy from './AccountPrivacy.jsx'
 import ScriptureCredits from './ScriptureCredits.jsx'
 import { isNative, WEB_ORIGIN, purchasesInApp, nativeAuthStorage, nativeShareFile, NativePush, nativePushSupported, onNativeReminderTap } from './native.js'
+import MindMapTab from './MindMap.jsx'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Banknote, CreditCard, PiggyBank, TrendingDown, HeartHandshake, ClipboardList, CircleSlash,
@@ -15,7 +16,7 @@ import {
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
   House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge, Utensils, Stethoscope, Search, Download,
-  Calculator, Copy, ChevronRight,
+  Calculator, Copy, ChevronRight, Network,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -1778,7 +1779,7 @@ function AuthPage() {
     { emoji: '🎯', title: 'Goals & Habits', desc: 'Break goals and projects into steps you check off, build routines, and watch your Life Score rise.' },
     { emoji: '💰', title: 'Finance & Budget', desc: 'Monthly income, bills, savings goals, debt payoff, and giving.' },
     { emoji: '❤️', title: 'Health & Wellness', desc: 'Training, recovery, nutrition, sleep, mood, journal, vitals, and medications.' },
-    { emoji: '⚡', title: 'Productivity', desc: 'Brain dump, notes, checklists, and a focus timer.' },
+    { emoji: '⚡', title: 'Productivity', desc: 'Brain dump, notes, mind maps, checklists, and a focus timer.' },
     { emoji: '🏡', title: 'Lifestyle', desc: 'Groceries, recipes that fill your shopping list, cleaning, trips, birthdays, and gifts.' },
   ]
 
@@ -2088,6 +2089,7 @@ const SEARCH_SOURCES = [
   ['lifestyle', 'gifts', 'Gift idea', '/lifestyle?tab=gifts'],
   ['productivity', 'checklists', 'Checklist', '/productivity?tab=checklists'],
   ['productivity', 'brainDump', 'Brain dump', '/productivity?tab=braindump'],
+  ['productivity', 'mindMaps', 'Mind map', '/productivity?tab=mindmap'],
   ['faith', 'sermons', 'Sermon', '/faith?tab=sermons'],
   ['faith', 'prayers', 'Prayer', '/faith?tab=prayer'],
   ['faith', 'scriptures', 'Scripture', '/faith?tab=scripture'],
@@ -2101,7 +2103,7 @@ function textOf(v, depth = 0) {
   if (typeof v === 'string') return v
   if (typeof v === 'number') return ''
   if (Array.isArray(v)) return v.map((x) => textOf(x, depth + 1)).join(' ')
-  if (typeof v === 'object') return Object.entries(v).filter(([k]) => !/^(id|date|at|created|updated|done|completed|color)/i.test(k)).map(([, x]) => textOf(x, depth + 1)).join(' ')
+  if (typeof v === 'object') return Object.entries(v).filter(([k]) => !/^(id|date|at|created|updated|done|completed|color)/i.test(k) && !/^(parent|side|collapsed|taskId)$/.test(k)).map(([, x]) => textOf(x, depth + 1)).join(' ')
   return ''
 }
 function titleOf(o) {
@@ -3995,7 +3997,7 @@ const PRO_FEATURES = [
   ['🙏', 'All of Faith', 'scripture, Bible reading plan, gratitude, fasting, sermons, faith goals'],
   ['📈', 'Growth & Life Score', 'the 7 areas behind your score, 30-day trends, weekly review'],
   ['♾️', 'No limits', 'unlimited habits, goals and projects, and every Home mode'],
-  ['🏡', 'Lifestyle & Focus', 'recipes, trips, birthdays, gifts, cleaning, checklists, focus timer'],
+  ['🏡', 'Lifestyle & Focus', 'recipes, trips, birthdays, gifts, cleaning, mind maps, checklists, focus timer'],
 ]
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
@@ -4128,7 +4130,7 @@ const PRO_TABS = {
   faith: ['scripture', 'reading', 'gratitude', 'fasting', 'sermons', 'goals'],
   finance: ['overview', 'income', 'expenses', 'savings', 'debt', 'donations', 'nospend'],
   lifestyle: ['recipes', 'trips', 'birthdays', 'gifts', 'cleaning'],
-  productivity: ['checklists', 'focus'],
+  productivity: ['mindmap', 'checklists', 'focus'],
   wellness: ['training', 'recovery', 'nutrition', 'care', 'sleep', 'journal', 'routine', 'meds', 'metrics', 'anxiety', 'migraines', 'coping'],
 }
 
@@ -4612,7 +4614,7 @@ const SECTION_ICONS = {
   mood: Smile, sleep: Moon, journal: PenLine, routine: Sunrise, reading: BookOpen, meds: Pill,
   metrics: Activity, anxiety: Wind, migraines: CloudLightning, coping: Shield, training: Dumbbell, recovery: BatteryCharging, nutrition: Utensils, care: Stethoscope,
   // Productivity
-  tasks: SquareCheck, braindump: Brain, notes: StickyNote, checklists: ListChecks, focus: Timer, cleaning: Sparkles, tips: Lightbulb,
+  tasks: SquareCheck, braindump: Brain, notes: StickyNote, mindmap: Network, checklists: ListChecks, focus: Timer, cleaning: Sparkles, tips: Lightbulb,
   // Lifestyle
   groceries: ShoppingCart, recipes: ChefHat, trips: Plane, birthdays: Cake, gifts: Gift,
   // Faith
@@ -8066,6 +8068,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
           if (ownPage.wrote(row.data_key)) return
           if (row.data_key === 'checklists') setChecklists(row.data_value || [])
           if (row.data_key === 'brainDump') setBrainDump(row.data_value || [])
+          if (row.data_key === 'mindMaps') setMindMaps(Array.isArray(row.data_value) ? row.data_value : [])
         })
       })
   }, [user?.id])
@@ -8073,6 +8076,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const TABS = [
     { id: 'braindump', label: '🧠 Brain Dump' },
     { id: 'notes', label: '📝 Notes' },
+    { id: 'mindmap', label: '🗺️ Mind Map' },
     { id: 'checklists', label: '📋 Checklists' },
     { id: 'focus', label: '⏱ Focus Timer' },
     { id: 'tips', label: '💡 Tips' },
@@ -8156,6 +8160,10 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const [newItem, setNewItem] = useState({})
 
   const saveChecklists = (c) => { setChecklists(c); syncPageData('checklists', c) }
+  // Mind maps: a list of maps, each a flat list of ideas (see MindMap.jsx)
+  const [mindMaps, setMindMaps] = useState(() => { const v = lsGet('mindMaps', []); return Array.isArray(v) ? v : [] })
+  const saveMindMaps = (v) => { setMindMaps(v); syncPageData('mindMaps', v) }
+  const mindMapTask = (text) => saveItem('task', { title: text, date: TODAY, time: '', endTime: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' }, 'create')
 
 
   return (
@@ -8244,6 +8252,14 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
         </section>
       </ProTabGate>)}
 
+
+      {tab === 'mindmap' && (
+        <ProTabGate isPro={isPro} onUpgrade={onUpgrade} title="Mind Map is part of Pro"
+          text="Put one idea in the center and branch out. Plan a goal, take sermon notes, think through a decision."
+          points={['Templates for goals, sermons, decisions, business ideas and projects', 'Turn any branch into a task', 'Map or outline view, copy as text']}>
+          <MindMapTab maps={mindMaps} onSave={saveMindMaps} tasks={tasks} onMakeTask={mindMapTask} />
+        </ProTabGate>
+      )}
 
       {tab === 'checklists' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
@@ -10643,7 +10659,7 @@ function PlannerApp() {
           <Route path="/calculator" element={<CalculatorPage onQuickCreate={openCreate} />} />
           <Route path="/finance" element={<FinancePage expenses={expenses} budget={budget} setBudget={async (nextBudget) => { await updateBudget(nextBudget) }} saveItem={saveItem} deleteItem={deleteItem} goals={goals} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock the full Finance suite", "Overview and net worth, income, bills, savings, debt payoff, giving and no-spend challenges.")} />} />
           <Route path="/wellness" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock the Wellness suite", "Training, recovery, nutrition, sleep, vitals, journal, routine, meds and body metrics.")} />} />
-          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Checklists and the focus timer.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
+          <Route path="/productivity" element={<ProductivityPage tasks={tasks} notes={notes} saveItem={saveItem} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock Productivity Pro", "Mind maps, checklists and the focus timer.")} onQuickCreate={openCreate} onToggle={async (id) => { await toggleTask(id) }} onEdit={openEdit} onDelete={async (type, id) => { if (window.confirm(`Delete this ${type}?`)) await deleteItem(type, id) }} settings={settings} />} />
           <Route path="/lifestyle" element={<LifestylePage isPro={subscription.isPro} onToast={pushToast} onUpgrade={() => triggerUpgrade("Unlock Full Lifestyle Suite", "Recipe cards that fill your shopping list, cleaning tracker, trips, birthdays, and gift ideas.")} />} />
           <Route path="/faith" element={<FaithPage goals={goals} tasks={tasks} projects={projects} onEdit={openEdit} onCreateGoal={async (g) => { await saveItem('goal', g, 'create') }} isPro={subscription.isPro} onUpgrade={() => triggerUpgrade("Unlock all of Faith", "Scripture and memory verses, a Bible reading plan, gratitude, fasting, sermon notes and faith goals.")} />} />
           <Route path="/health" element={<HealthWellnessPage isPro={subscription.isPro} onAddEvent={async (ev) => { await saveItem('event', ev, 'create') }} onUpgrade={() => triggerUpgrade("Unlock the Wellness suite", "Training, recovery, nutrition, sleep, vitals, journal, routine, meds and body metrics.")} />} />
