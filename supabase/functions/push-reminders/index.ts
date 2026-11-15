@@ -191,14 +191,25 @@ async function remindersFor(userId: string, now: number) {
   }
 
   if (local.weekday === 'Sun' && on.finance) {
+    // Budget can be daily, weekly or monthly (budgets.period / amount); weekly_target is the same limit per week.
     const weekStart = addDays(today, -6)
+    const monthStart = `${today.slice(0, 7)}-01`
+    const from = monthStart < weekStart ? monthStart : weekStart
     const [{ data: budget }, { data: exp }] = await Promise.all([
-      sb.from('budgets').select('weekly_target').eq('user_id', userId).maybeSingle(),
-      sb.from('expenses').select('amount,category,date').eq('user_id', userId).gte('date', weekStart).lte('date', today),
+      sb.from('budgets').select('weekly_target,period,amount').eq('user_id', userId).maybeSingle(),
+      sb.from('expenses').select('amount,category,date').eq('user_id', userId).gte('date', from).lte('date', today),
     ])
-    const spent = (exp || []).filter((e) => !['Bills', 'Utilities', 'Rent', 'Insurance'].includes(e.category)).reduce((n, e) => n + Number(e.amount || 0), 0)
-    const target = Number(budget?.weekly_target || 0)
-    daily('finance', '18:00', 'Weekly spending', target ? `$${spent.toFixed(0)} of your $${target.toFixed(0)} weekly target.` : `$${spent.toFixed(0)} spent this week.`, '/finance')
+    const flexible = (exp || []).filter((e) => !['Bills', 'Utilities', 'Rent', 'Insurance'].includes(e.category))
+    const sum = (list: typeof flexible) => list.reduce((n, e) => n + Number(e.amount || 0), 0)
+    const spent = sum(flexible.filter((e) => e.date >= weekStart))
+    const period = budget?.period || 'weekly'
+    const amount = Number(budget?.amount ?? budget?.weekly_target ?? 0) || 0
+    const $ = (n: number) => `$${n.toFixed(0)}`
+    const body = !amount ? `${$(spent)} spent this week.`
+      : period === 'monthly' ? `${$(spent)} spent this week · ${$(sum(flexible.filter((e) => e.date >= monthStart)))} of your ${$(amount)} monthly budget so far.`
+      : period === 'daily' ? `${$(spent)} spent this week · your ${$(amount)}/day budget allows ${$(amount * 7)}.`
+      : `${$(spent)} of your ${$(amount)} weekly budget.`
+    daily('finance', '18:00', 'Weekly spending', body, '/finance')
   }
 
   return out.filter((r) => r.at <= now && r.at > now - WINDOW_MS)

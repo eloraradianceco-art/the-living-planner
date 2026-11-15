@@ -321,6 +321,43 @@ function weekSpendOf(expenses, from = startOfWeek(TODAY), to = endOfWeek(TODAY))
     return !e.date || e.date <= to ? sum + expenseWeeklyShare(e) : sum
   }, 0)
 }
+// Budget: a spending limit per day, week or month. weeklyTarget is the same limit per week (Life Score,
+// Sunday reminder). Older saves only have weeklyTarget, so they read as a weekly budget.
+const BUDGET_PERIODS = {
+  daily:   { label: 'Daily',   per: '/day',   span: 'today',      perWeek: 7 },
+  weekly:  { label: 'Weekly',  per: '/week',  span: 'this week',  perWeek: 1 },
+  monthly: { label: 'Monthly', per: '/month', span: 'this month', perWeek: 1 / 4.33 },
+}
+function normBudget(b) {
+  const period = BUDGET_PERIODS[b?.period] ? b.period : 'weekly'
+  const perWeek = BUDGET_PERIODS[period].perWeek
+  const raw = b?.amount
+  const amount = raw !== null && raw !== undefined && raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : (Number(b?.weeklyTarget) || 0) / perWeek
+  return { period, amount, weeklyTarget: Math.round(amount * perWeek * 100) / 100 }
+}
+// The same limit in another period, rounded to whole dollars (switching Weekly $200 → Monthly $866)
+const convertBudget = (amount, from, to) => Math.round((Number(amount) || 0) * BUDGET_PERIODS[from].perWeek / BUDGET_PERIODS[to].perWeek)
+function budgetRange(period, date = TODAY) {
+  if (period === 'daily') return [date, date]
+  if (period === 'monthly') {
+    const [y, m] = date.split('-').map(Number)
+    return [`${date.slice(0, 7)}-01`, `${date.slice(0, 7)}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`]
+  }
+  return [startOfWeek(date), endOfWeek(date)]
+}
+// Spending counted against the budget: one-time expenses dated in its day/week/month, plus each repeating
+// expense's share of it ($20 weekly ≈ $2.86 a day, $86.60 a month), once that expense has started.
+function budgetSpend(expenses, period = 'weekly', date = TODAY) {
+  const [from, to] = budgetRange(period, date)
+  const scale = period === 'daily' ? 1 / 7 : period === 'monthly' ? 4.33 : 1
+  let oneTime = 0, repeating = 0
+  for (const e of expenses || []) {
+    const p = e.period || 'one-time'
+    if (p === 'one-time') { if (e.date && e.date >= from && e.date <= to) oneTime += Number(e.amount) || 0 }
+    else if (!e.date || e.date <= to) repeating += expenseWeeklyShare(e) * scale
+  }
+  return { from, to, oneTime, repeating, total: oneTime + repeating }
+}
 // Habits done this week vs their weekly target ("3x per week" → 3, otherwise daily)
 const habitDoneThisWeek = (h, habitLogs) => { const ws = startOfWeek(TODAY), we = endOfWeek(TODAY); return new Set((habitLogs || []).filter((l) => l.habitId === h.id && l.completed && l.date >= ws && l.date <= we).map((l) => l.date)).size }
 const habitWeekTarget = (h) => habitTimesPerWeek(h)
@@ -454,7 +491,7 @@ function scoreDetailsAsOf({ tasks = [], expenses = [], habits = [], habitLogs = 
   const savingHistory = [...(Array.isArray(M.savingsGoals) ? M.savingsGoals : []), ...(Array.isArray(M.sinkingFunds) ? M.sinkingFunds : [])].flatMap((g) => g.history || [])
   const depositDates = savingHistory.filter((h) => Number(h.amount) > 0).map((h) => h.date)
   parts.Finances = [
-    spentWin.length && target > 0 ? { label: 'Spending', detail: `$${Math.round(discretionary)} of $${Math.round(target)} weekly target`, value: clamp01(discretionary <= target ? 1 : 2 - discretionary / target) } : null,
+    spentWin.length && target > 0 ? { label: 'Spending', detail: `$${Math.round(discretionary)} of $${Math.round(target)} ${budget.period && budget.period !== 'weekly' ? 'budget this week' : 'weekly budget'}`, value: clamp01(discretionary <= target ? 1 : 2 - discretionary / target) } : null,
     usedRecently(depositDates) ? { label: 'Saving', detail: `${plural(depositDates.filter((d) => days.includes(d)).length, 'deposit')} this week`, value: depositDates.some((d) => days.includes(d)) ? 1 : 0 } : null,
     habitsPart('Finances', habits, habitLogs, days),
     tasksPart('Finance tasks', tasks, days, (t) => t.category === 'Finances'),
@@ -671,8 +708,9 @@ function getHomeInsights({ tasks, expenses, budget, projects, goals, events, hab
   const weekTasks = tasks.filter((task) => task.date >= weekStart && task.date <= weekEnd)
   const weekCompleted = weekTasks.filter((task) => task.completed).length
   const completionRate = weekTasks.length ? Math.round((weekCompleted / weekTasks.length) * 100) : 0
-  const spend = weekSpendOf(expenses)
-  const budgetRemaining = Number((budget.weeklyTarget - spend).toFixed(2))
+  const b = normBudget(budget)
+  const spend = budgetSpend(expenses, b.period).total
+  const budgetRemaining = Number((b.amount - spend).toFixed(2))
   const activeProjects = projects.filter((project) => project.status === 'Active').length
   const goalCount = goals.length
   const scheduleCount = expandEvents(events, TODAY, TODAY).length + tasks.filter((task) => isToday(task.date) && task.time).length
@@ -714,7 +752,6 @@ function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitL
   const overdue = tasks.filter((task) => !task.completed && isOverdue(task.date))
   const unscheduled = tasks.filter((task) => !task.completed && !task.time && task.date && task.date <= TODAY)
   const healthGap = habits.some((habit) => habit.category === 'Health') && !habitLogs.some((log) => log.date === TODAY && log.completed && habits.find((habit) => habit.id === log.habitId && habit.category === 'Health'))
-  const weeklySpend = weekSpendOf(expenses)
   const activeProjects = projects.filter((project) => project.status === 'Active')
 
   if (overdue.length) {
@@ -727,10 +764,12 @@ function getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitL
     })
   }
 
-  if (budget.weeklyTarget > 0 && weeklySpend > budget.weeklyTarget) {
+  const bud = normBudget(budget)
+  const budSpent = budgetSpend(expenses, bud.period).total
+  if (bud.amount > 0 && budSpent > bud.amount) {
     suggestions.push({
       title: 'Re-center your spending',
-      body: `You are $${(weeklySpend - budget.weeklyTarget).toFixed(2)} over the weekly target. Review subscriptions or flexible spending today.`,
+      body: `You are $${(budSpent - bud.amount).toFixed(2)} over your ${bud.period} budget. Review subscriptions or flexible spending ${bud.period === 'monthly' ? 'this week' : 'today'}.`,
       tone: 'warning',
       actionLabel: 'See Finances',
       route: '/finance',
@@ -792,7 +831,7 @@ const defaultData = {
   events: [],
   habits: [],
   habitLogs: [],
-  budget: { weeklyTarget: 200 },
+  budget: { period: 'weekly', amount: 200, weeklyTarget: 200 },
   profile: {
     displayName: '',
     timezone: 'America/Chicago',
@@ -931,7 +970,7 @@ async function loadLocalAll() {
     events: readLocal(localKeys.events, defaultData.events),
     habits: readLocal(localKeys.habits, defaultData.habits),
     habitLogs: readLocal(localKeys.habitLogs, defaultData.habitLogs),
-    budget: readLocal(localKeys.budget, defaultData.budget),
+    budget: normBudget(readLocal(localKeys.budget, defaultData.budget)),
     profile: readLocal(localKeys.profile, defaultData.profile),
     settings: readLocal(localKeys.settings, defaultData.settings),
   }
@@ -999,7 +1038,7 @@ async function loadSupabaseAll(userId) {
 
   return {
     ...mapped,
-    budget: budgetRows?.[0] ? { weeklyTarget: Number(budgetRows[0].weekly_target) } : defaultData.budget,
+    budget: budgetRows?.[0] ? normBudget({ period: budgetRows[0].period, amount: budgetRows[0].amount, weeklyTarget: Number(budgetRows[0].weekly_target) }) : defaultData.budget,
     profile: profileRows?.[0] ? { displayName: profileRows[0].display_name, timezone: profileRows[0].timezone, plannerMode: profileRows[0].planner_mode } : defaultData.profile,
     settings: settingsRows?.[0] ? { onboardingComplete: settingsRows[0].onboarding_complete, showCompletedTasks: settingsRows[0].show_completed_tasks, compactCalendar: settingsRows[0].compact_calendar, notifications: settingsRows[0].notifications || {} } : defaultData.settings,
   }
@@ -1157,17 +1196,16 @@ const plannerService = {
   },
 
   async saveBudget(nextBudget, userId) {
-    const normalized = { weeklyTarget: Number(nextBudget.weeklyTarget) }
+    const normalized = normBudget(nextBudget)
     if (!hasSupabaseEnv) {
       writeLocal(localKeys.budget, normalized)
       return normalized
     }
 
-    const row = { user_id: userId, weekly_target: normalized.weeklyTarget }
+    const row = { user_id: userId, period: normalized.period, amount: normalized.amount, weekly_target: normalized.weeklyTarget }
     const { data, error } = await supabase.from('budgets').upsert(row, { onConflict: 'user_id' }).select().single()
     if (error) throw error
-    const n = Number(data?.weekly_target)
-    return { weeklyTarget: Number.isFinite(n) ? n : normalized.weeklyTarget }
+    return data && data.period ? normBudget({ period: data.period, amount: data.amount, weeklyTarget: Number(data.weekly_target) }) : normalized
   },
 
   async saveProfile(profile, userId) {
@@ -1337,7 +1375,7 @@ function useAuth() {
 const emptyCollections = {
   tasks: [], goals: [], projects: [], expenses: [], notes: [],
   events: [], habits: [], habitLogs: [],
-  budget: { weeklyTarget: 350 },
+  budget: { period: 'weekly', amount: 350, weeklyTarget: 350 },
   profile: defaultData.profile,
   settings: defaultData.settings,
 }
@@ -2595,7 +2633,8 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
   const todayTasks = tasks.filter((task) => isToday(task.date) && (settings.showCompletedTasks || !task.completed))
   const openTasks = tasks.filter(t => !t.completed)
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.date))
-  const weekSpend = weekSpendOf(expenses)
+  const homeBudget = normBudget(budget)
+  const homeBudgetLeft = homeBudget.amount - budgetSpend(expenses, homeBudget.period).total
   const todaySchedule = [
     ...todayTasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' })),
     ...expandEvents(events, TODAY, TODAY).map((event) => ({ ...event, itemType: 'event' })),
@@ -2878,7 +2917,7 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
       <div className="home-metrics-strip">
         <MetricTile label="Tasks Open" value={insights.openTasks} helper={overdueTasks.length > 0 ? `${overdueTasks.length} overdue` : '✓ on track'} />
         <MetricTile label="Week Done" value={`${insights.completionRate}%`} helper="completion" />
-        <MetricTile label="Budget Left" value={`$${Math.max(0, budget.weeklyTarget - weekSpend).toFixed(0)}`} helper="this week" />
+        <MetricTile label="Budget Left" value={homeBudgetLeft < 0 ? `-$${Math.abs(homeBudgetLeft).toFixed(0)}` : `$${homeBudgetLeft.toFixed(0)}`} helper={homeBudgetLeft < 0 ? `over ${BUDGET_PERIODS[homeBudget.period].span}` : BUDGET_PERIODS[homeBudget.period].span} />
         <MetricTile label="Streak" value={`${insights.currentHabitStreak}d`} helper={`${insights.habitCount} habits`} />
       </div>
     </>
@@ -3919,7 +3958,7 @@ const activeCount = (type, items = []) =>
     : type === 'project' ? items.filter((p) => p.status !== 'Completed').length
     : items.length
 const PRO_FEATURES = [
-  ['💰', 'Full Finance', 'income, bills, savings, debt payoff, giving, net worth'],
+  ['💰', 'Full Finance', 'income, bills, savings, debt payoff & credit cards, giving, net worth'],
   ['❤️', 'Full Health & Wellness', 'training, nutrition, sleep, recovery, meds, body metrics'],
   ['🙏', 'All of Faith', 'scripture, Bible reading plan, gratitude, fasting, sermons, faith goals'],
   ['📈', 'Growth & Life Score', 'the 7 areas behind your score, 30-day trends, weekly review'],
@@ -4968,6 +5007,80 @@ function SavingsItem({ name, target, current, dueDate, history = [], color = 'va
   )
 }
 
+const fmtMoney = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+// Debts are credit cards or loans. Older debts have no type: a name like "Visa" or "Credit Card" reads as a card.
+const DEBT_TYPES = [['card', 'Credit card'], ['loan', 'Loan']]
+const debtTypeOf = (d) => d?.type || (/credit|card|visa|master|amex|discover|capital one/i.test(String(d?.name || '')) ? 'card' : 'loan')
+// Utilization: under 30% is healthy, 30–50% is worth watching, over 50% weighs on a credit score
+const utilTone = (pct) => pct < 30 ? 'var(--success)' : pct <= 50 ? 'var(--warning,#f90)' : 'var(--danger)'
+const EXPENSE_CATEGORIES = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Personal', 'Home', 'Bills', 'Other']
+const EXPENSE_PERIODS = [['one-time', 'One-time'], ['weekly', 'Weekly'], ['biweekly', 'Every 2 weeks'], ['monthly', 'Monthly'], ['yearly', 'Yearly']]
+
+// Edit a logged expense in place: what it was, amount, category, how often, date. Delete lives here too.
+function ExpenseEditor({ expense, onSave, onDelete, onCancel }) {
+  const [d, setD] = useState(() => ({
+    description: expense.description || expense.note || '',
+    amount: expense.amount == null ? '' : String(expense.amount),
+    category: expense.category || 'Other',
+    period: expense.period || 'one-time',
+    date: expense.date || TODAY,
+  }))
+  const [busy, setBusy] = useState(false)
+  const set = (k) => (e) => setD((p) => ({ ...p, [k]: e.target.value }))
+  const cats = EXPENSE_CATEGORIES.includes(d.category) ? EXPENSE_CATEGORIES : [d.category, ...EXPENSE_CATEGORIES]
+  const amt = Number(d.amount)
+  const valid = d.amount !== '' && Number.isFinite(amt) && amt >= 0
+  const save = async () => {
+    if (!valid || busy) return
+    setBusy(true)
+    const text = d.description.trim()
+    try { await onSave({ ...expense, description: text || null, note: text, amount: amt, category: d.category, period: d.period, date: d.date || TODAY }) }
+    catch { setBusy(false) }
+  }
+  const lbl = { display: 'grid', gap: 4, fontSize: '.72rem', fontWeight: 600, color: 'var(--ink2)', minWidth: 0 }
+  return (
+    <div className="expense-editor" style={{ background: 'var(--stone)', borderRadius: 12, padding: 12, margin: '6px 0 10px', display: 'grid', gap: 8 }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 8 }}>
+        <label style={lbl}>What for<input value={d.description} onChange={set('description')} placeholder="e.g. Groceries" aria-label="Description" /></label>
+        <label style={lbl}>Amount<input type="number" inputMode="decimal" min="0" step="0.01" value={d.amount} onChange={set('amount')} aria-label="Amount" /></label>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 8 }}>
+        <label style={lbl}>Category<select value={d.category} onChange={set('category')} aria-label="Category">{cats.map((c) => <option key={c}>{c}</option>)}</select></label>
+        <label style={lbl}>How often<select value={d.period} onChange={set('period')} aria-label="How often">{EXPENSE_PERIODS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      </div>
+      <label style={lbl}>{d.period === 'one-time' ? 'Date' : 'Starting'}<input type="date" value={d.date} onChange={set('date')} aria-label="Date" /></label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="primary-btn" style={{ flex: 1 }} disabled={!valid || busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="ghost-btn" onClick={onCancel}>Cancel</button>
+        <button type="button" className="ghost-btn" style={{ color: 'var(--danger)' }}
+          onClick={() => { if (window.confirm(`Delete "${d.description || expense.category || 'this expense'}"?`)) onDelete() }}>Delete</button>
+      </div>
+    </div>
+  )
+}
+
+// One expense line: tap to edit it.
+function ExpenseRow({ exp, editing, onEdit, onSave, onDelete, onCancel, extra }) {
+  if (editing) return <ExpenseEditor expense={exp} onSave={onSave} onDelete={onDelete} onCancel={onCancel} />
+  const repeating = exp.period && exp.period !== 'one-time'
+  const periodLabel = (EXPENSE_PERIODS.find(([v]) => v === exp.period) || [])[1] || exp.period
+  return (
+    <button type="button" className="expense-row" onClick={onEdit} aria-label={`Edit ${exp.description || exp.category}, ${fmtMoney(exp.amount)}`}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontWeight: 600, fontSize: '.88rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exp.description || exp.category}</span>
+        <span className="muted" style={{ display: 'block', fontSize: '.75rem' }}>
+          {exp.category}{exp.date ? ` · ${repeating ? 'from ' : ''}${shortDate(exp.date)}` : ''}
+          {repeating && <span style={{ color: 'var(--teal)', marginLeft: 6, fontWeight: 600 }}>· {periodLabel}</span>}
+          {extra}
+        </span>
+      </span>
+      <strong style={{ color: 'var(--danger)', whiteSpace: 'nowrap' }}>{fmtMoney(exp.amount)}</strong>
+      <span aria-hidden="true" style={{ color: 'var(--muted)', fontSize: '.85rem', paddingLeft: 2 }}>✎</span>
+    </button>
+  )
+}
+
 function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
 
@@ -5030,9 +5143,24 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useUrlTab(isPro ? 'overview' : 'budget')
-  // Weekly target saves when you finish typing (was saving 2, 25, 250 — and 0 when the box was cleared)
-  const [targetDraft, setTargetDraft] = useState(String(budget.weeklyTarget ?? ''))
-  React.useEffect(() => { setTargetDraft(String(budget.weeklyTarget ?? '')) }, [budget.weeklyTarget])
+  // Budget: daily, weekly or monthly. The amount saves when you finish typing (not on every keystroke).
+  const bud = normBudget(budget)
+  const budInfo = BUDGET_PERIODS[bud.period]
+  const [targetDraft, setTargetDraft] = useState(String(bud.amount))
+  React.useEffect(() => { setTargetDraft(String(bud.amount)) }, [bud.amount, bud.period])
+  const saveBudgetSafe = (next) => Promise.resolve(setBudget(next)).catch(() => {})
+  const budSpend = budgetSpend(expenses, bud.period)
+  const [budListAll, setBudListAll] = useState(false)
+  // Expense being edited (by id) and how many recent expenses the Expenses list shows
+  const [editingExp, setEditingExp] = useState(null)
+  const [expLimit, setExpLimit] = useState(20)
+  const saveExpenseEdit = async (next) => { await saveItem('expense', next, 'edit'); setEditingExp(null) }
+  const deleteExpense = async (exp) => { await deleteItem('expense', exp.id); setEditingExp(null) }
+  const expenseRowProps = (exp) => ({
+    exp, editing: editingExp != null && editingExp === exp.id,
+    onEdit: () => setEditingExp(exp.id), onCancel: () => setEditingExp(null),
+    onSave: saveExpenseEdit, onDelete: () => deleteExpense(exp),
+  })
   const [period, setPeriod] = useState('monthly')
 
   // ── Shared state (linked across tabs) ─────────────────────────────────
@@ -5064,7 +5192,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const saveBills = (v) => { setBills(v); syncPageData('bills', v) }
 
   const [debts, setDebts] = useState(() => lsGet('debts', []))
-  const [newDebt, setNewDebt] = useState({ name: '', balance: '', rate: '', minPayment: '' })
+  const BLANK_DEBT = { type: 'card', name: '', balance: '', limit: '', rate: '', minPayment: '' }
+  const [newDebt, setNewDebt] = useState(BLANK_DEBT)
   const [editingDebt, setEditingDebt] = useState(null)
   const saveDebts = (d) => { setDebts(d); syncPageData('debts', d) }
 
@@ -5152,6 +5281,13 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const totalBillsMonthly = bills.reduce((s, b) => s + billToMonthly(b), 0)
   const totalBillsForPeriod = totalBillsMonthly * ((PERIOD_MULT[period] || 4.33) / 4.33)
   const totalDebtPayments = debts.reduce((s, d) => s + Number(d.minPayment || 0), 0)
+  // Credit cards: available credit = limit − balance; utilization = balance ÷ limit (cards with a limit only)
+  const debtTotals = debts.reduce((t, d) => {
+    const bal = Math.max(0, Number(d.balance) || 0), lim = Number(d.limit) || 0
+    t.balance += bal
+    if (debtTypeOf(d) === 'card' && lim > 0) { t.limit += lim; t.cardBalance += bal; t.available += Math.max(0, lim - bal) }
+    return t
+  }, { balance: 0, limit: 0, cardBalance: 0, available: 0 })
   const totalSavingsStored = savingsGoals.reduce((s, g) => s + Number(g.current || 0), 0)
 
   // 50/30/20
@@ -5268,8 +5404,11 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ['Net Available', fmt(totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend), totalIncomeForPeriod - totalBillsForPeriod - periodDebt - periodSpend >= 0 ? 'var(--success)' : 'var(--danger)'],
             ['This Week Spend', fmt(fpWeekSpend), 'var(--brass-fg)'],
             ['This Month Spend', fmt(fpMonthSpend), 'var(--slate)'],
+            bud.amount > 0 ? [`Budget Left (${budInfo.span})`, fmt(bud.amount - budSpend.total), bud.amount - budSpend.total >= 0 ? 'var(--success)' : 'var(--danger)'] : null,
+            debtTotals.balance > 0 ? ['Total Debt Balance', fmt(debtTotals.balance), 'var(--danger)'] : null,
+            debtTotals.limit > 0 ? ['Credit Available', fmt(debtTotals.available), 'var(--success)'] : null,
             ['Total Saved (goals)', fmt(totalSavingsStored), 'var(--teal)'],
-          ].map(([label, val, col]) => (
+          ].filter(Boolean).map(([label, val, col]) => (
             <div key={label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'9px 0',borderBottom:'1px solid var(--border)'}}>
               <span style={{fontSize:'.88rem',color:'var(--ink2)'}}>{label}</span>
               <strong style={{color:col}}>{val}</strong>
@@ -5703,26 +5842,15 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               ))}
             </div>
             {(expenses||[]).length === 0 && <p className="muted" style={{textAlign:'center',padding:'12px 0'}}><EmptyState icon="💳" title="No expenses yet" message="Log your first expense to start tracking spending." /></p>}
-            {(expenses||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20).map((exp, i) => (
-              <div key={exp.id || i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)',gap:8}}>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontWeight:600,fontSize:'.88rem'}}>{exp.description || exp.category}</div>
-                  <div className="muted" style={{fontSize:'.75rem'}}>
-                    {exp.category}{exp.date ? ` · ${shortDate(exp.date)}` : ''}
-                    {exp.period && exp.period !== 'one-time' && <span style={{color:'var(--teal)',marginLeft:6,fontWeight:600}}>· {exp.period}</span>}
-                  </div>
-                </div>
-                <strong style={{color:'var(--danger)',whiteSpace:'nowrap'}}>{fmt(exp.amount)}</strong>
-                <button onClick={() => {
-                  if (window.confirm(`Delete "${exp.description || exp.category}"?`)) {
-                    deleteItem('expense', exp.id)
-                  }
-                }} style={{
-                  background:'none',border:'none',color:'var(--muted)',
-                  cursor:'pointer',padding:'4px 8px',fontSize:'1rem',
-                }} title="Delete expense">✕</button>
-              </div>
+            {(expenses||[]).length > 0 && <p className="muted" style={{fontSize:'.75rem',margin:'0 0 4px'}}>Tap an expense to edit it.</p>}
+            {(expenses||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,expLimit).map((exp, i) => (
+              <ExpenseRow key={exp.id || i} {...expenseRowProps(exp)} />
             ))}
+            {(expenses||[]).length > expLimit && (
+              <button type="button" className="ghost-btn" style={{width:'100%',marginTop:8}} onClick={() => setExpLimit((n) => n + 30)}>
+                Show more ({(expenses||[]).length - expLimit} older)
+              </button>
+            )}
             {(expenses||[]).length > 0 && (() => {
               // This month: one-time spending dated this month + the monthly share of repeating expenses
               const cats = {}
@@ -5980,14 +6108,23 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       </ProTabGate>)}
       {tab === 'debt' && (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
-        <section className="card">
+        <section className="card debt-card">
           <p className="eyebrow">Debt Tracker</p>
           <h3 style={{ margin: '4px 0 6px' }}>Debt Avalanche — Highest Rate First</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Pay minimums on all debts, then throw every extra dollar at the highest interest rate first.</p>
           {debts.length > 0 && (
-            <div style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'2px solid var(--border)',marginBottom:6}}>
-              <strong>Total Minimum Payments</strong>
-              <strong style={{color:'var(--danger)'}}>{fmt(totalDebtPayments)}/mo</strong>
+            <div className="debt-summary" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(130px, 1fr))',gap:8,marginBottom:12}}>
+              {[
+                ['Total Balance', fmt(debtTotals.balance), 'var(--danger)'],
+                ['Min Payments', `${fmt(totalDebtPayments)}/mo`, 'var(--danger)'],
+                debtTotals.limit > 0 ? ['Credit Available', fmt(debtTotals.available), 'var(--success)'] : null,
+                debtTotals.limit > 0 ? ['Card Utilization', `${Math.round((debtTotals.cardBalance / debtTotals.limit) * 100)}%`, utilTone((debtTotals.cardBalance / debtTotals.limit) * 100)] : null,
+              ].filter(Boolean).map(([label, val, col]) => (
+                <div key={label} style={{background:'var(--stone)',borderRadius:10,padding:'10px 12px'}}>
+                  <p className="muted" style={{fontSize:'.68rem',margin:'0 0 3px',textTransform:'uppercase',letterSpacing:'.05em'}}>{label}</p>
+                  <strong style={{color:col,fontSize:'1rem'}}>{val}</strong>
+                </div>
+              ))}
             </div>
           )}
           {debts.length === 0 && <p className="muted" style={{textAlign:'center',padding:'20px 0'}}><EmptyState icon="📉" title="No debts added" message="Track what you owe and build a payoff plan." /></p>}
@@ -5995,53 +6132,95 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           {[...debts].sort((a, b) => Number(b.rate || 0) - Number(a.rate || 0)).map((debt, i) => {
             const editing = editingDebt && editingDebt.ref === debt
             const patch = (fields) => saveDebts(debts.map((d) => d === debt ? { ...d, ...fields } : d))
+            const type = debtTypeOf(debt)
+            const bal = Number(debt.balance) || 0, lim = Number(debt.limit) || 0
+            const util = lim > 0 ? (Math.max(0, bal) / lim) * 100 : null
+            const startEdit = () => setEditingDebt({ ref: debt, type, name: debt.name || '', balance: debt.balance ?? '', limit: debt.limit ?? '', rate: debt.rate ?? '', minPayment: debt.minPayment ?? '' })
             return (
-            <div key={debt.id || i} style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+            <div key={debt.id || i} className="debt-row" style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-                <strong style={{ fontSize: '.9rem' }}>{i === 0 && debts.length > 1 ? '🎯 ' : ''}{debt.name}</strong>
+                <strong style={{ fontSize: '.9rem', minWidth: 0 }}>
+                  {i === 0 && debts.length > 1 ? '🎯 ' : ''}{debt.name}
+                  <span className="debt-type-tag" style={{ marginLeft: 8, fontSize: '.62rem', fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--ink2)', background: 'var(--stone2)', borderRadius: 999, padding: '2px 7px', verticalAlign: 'middle' }}>{type === 'card' ? 'Card' : 'Loan'}</span>
+                </strong>
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                  <button className="ghost-btn" style={{ fontSize: '.72rem', padding: '4px 8px' }} onClick={() => setEditingDebt(editing ? null : { ref: debt, balance: debt.balance, rate: debt.rate, minPayment: debt.minPayment })}>{editing ? 'Cancel' : 'Update'}</button>
+                  <button className="ghost-btn" style={{ fontSize: '.72rem', padding: '4px 8px' }} onClick={() => editing ? setEditingDebt(null) : startEdit()}>{editing ? 'Cancel' : 'Update'}</button>
                   <button aria-label={`Delete ${debt.name}`} onClick={() => { if (window.confirm(`Delete "${debt.name}"?`)) saveDebts(debts.filter((d) => d !== debt)) }}
                     style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}>✕</button>
                 </div>
               </div>
               {editing ? (
                 <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                    {[['Balance $', 'balance'], ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.4fr)', gap: 8 }}>
+                    <label style={{ fontSize: '.7rem' }}>Type
+                      <select value={editingDebt.type} onChange={(e) => setEditingDebt((p) => ({ ...p, type: e.target.value }))}>
+                        {DEBT_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      </select>
+                    </label>
+                    <label style={{ fontSize: '.7rem' }}>Name<input value={editingDebt.name} onChange={(e) => setEditingDebt((p) => ({ ...p, name: e.target.value }))} /></label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: editingDebt.type === 'card' ? 'repeat(2, minmax(0,1fr))' : 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+                    {[['Balance $', 'balance'], ...(editingDebt.type === 'card' ? [['Credit limit $', 'limit']] : []), ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
                       <label key={key} style={{ fontSize: '.7rem' }}>{ph}<input type="number" inputMode="decimal" value={editingDebt[key] ?? ''} onChange={(e) => setEditingDebt((p) => ({ ...p, [key]: e.target.value }))} /></label>
                     ))}
                   </div>
-                  <button className="primary-btn" onClick={() => { patch({ balance: editingDebt.balance, rate: editingDebt.rate, minPayment: editingDebt.minPayment, updatedAt: TODAY }); setEditingDebt(null) }}>Save</button>
+                  <button className="primary-btn" onClick={() => {
+                    const e = editingDebt
+                    patch({ type: e.type, name: e.name.trim() || debt.name, balance: e.balance, rate: e.rate, minPayment: e.minPayment, limit: e.type === 'card' ? e.limit : '', updatedAt: TODAY })
+                    setEditingDebt(null)
+                  }}>Save</button>
                   {Number(editingDebt.balance) <= 0 && <p className="muted" style={{ fontSize: '.75rem', margin: 0 }}>Paid off? Save it at $0 to celebrate, or delete it.</p>}
                 </div>
               ) : (
+              <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '.8rem' }}>
-                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>BALANCE</p><strong style={Number(debt.balance) <= 0 ? { color: 'var(--success)' } : undefined}>{Number(debt.balance) <= 0 ? 'Paid off ✓' : fmt(debt.balance)}</strong></div>
+                <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>BALANCE</p><strong style={bal <= 0 ? { color: 'var(--success)' } : undefined}>{bal <= 0 ? 'Paid off ✓' : fmt(debt.balance)}</strong></div>
                 <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>RATE</p><strong style={{color:'var(--danger)'}}>{debt.rate || 0}%</strong></div>
                 <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>MIN PMT</p><strong>{fmt(debt.minPayment)}/mo</strong></div>
               </div>
+              {type === 'card' && (lim > 0 ? (
+                <div className="debt-credit" style={{ marginTop: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: '.8rem', marginBottom: 6 }}>
+                    <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>LIMIT</p><strong>{fmt(lim)}</strong></div>
+                    <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>AVAILABLE</p><strong style={{ color: bal > lim ? 'var(--danger)' : 'var(--success)' }}>{bal > lim ? `-${fmt(bal - lim)}` : fmt(lim - Math.max(0, bal))}</strong></div>
+                    <div><p className="muted" style={{margin:'0 0 2px',fontSize:'.7rem'}}>USED</p><strong style={{ color: utilTone(util) }}>{Math.round(util)}%</strong></div>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--stone2)', borderRadius: 999, overflow: 'hidden' }} role="img" aria-label={`${Math.round(util)}% of the credit limit used`}>
+                    <div style={{ height: '100%', width: `${Math.min(100, util)}%`, background: utilTone(util), borderRadius: 999 }} />
+                  </div>
+                  {bal > lim && <p style={{ fontSize: '.72rem', color: 'var(--danger)', margin: '4px 0 0', fontWeight: 600 }}>Over the limit by {fmt(bal - lim)}</p>}
+                </div>
+              ) : (
+                <button type="button" className="ghost-btn" style={{ fontSize: '.74rem', padding: '5px 10px', marginTop: 8 }} onClick={startEdit}>+ Add credit limit to see available credit</button>
+              ))}
+              </>
               )}
             </div>
             )
           })}
           <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
             <p style={{ fontWeight: 600, fontSize: '.85rem', margin: 0 }}>Add a Debt</p>
-            <input placeholder="Debt name (e.g. Credit Card, Car Loan)" value={newDebt.name}
+            <div className="pill-row" role="radiogroup" aria-label="Debt type" style={{ gap: 6 }}>
+              {DEBT_TYPES.map(([v, l]) => (
+                <button key={v} type="button" role="radio" aria-checked={newDebt.type === v} className={newDebt.type === v ? 'pill active-pill' : 'pill'} style={{ fontSize: '.78rem' }}
+                  onClick={() => setNewDebt((p) => ({ ...p, type: v }))}>{l}</button>
+              ))}
+            </div>
+            <input placeholder={newDebt.type === 'card' ? 'Card name (e.g. Chase Visa)' : 'Loan name (e.g. Car Loan, Student Loan)'} value={newDebt.name}
               onChange={e => setNewDebt(p => ({ ...p, name: e.target.value }))}
               style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {[['Balance $', 'balance'], ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
-                <input key={key} type="number" placeholder={ph} value={newDebt[key]}
+            <div style={{ display: 'grid', gridTemplateColumns: newDebt.type === 'card' ? 'repeat(2, minmax(0,1fr))' : 'repeat(3, minmax(0,1fr))', gap: 8 }}>
+              {[['Balance $', 'balance'], ...(newDebt.type === 'card' ? [['Credit limit $', 'limit']] : []), ['Rate %', 'rate'], ['Min Pmt $', 'minPayment']].map(([ph, key]) => (
+                <input key={key} type="number" inputMode="decimal" placeholder={ph} aria-label={ph.replace(/ [$%]$/, '')} value={newDebt[key]}
                   onChange={e => setNewDebt(p => ({ ...p, [key]: e.target.value }))}
                   style={{ padding: '9px 12px', border: '1.5px solid var(--border2)', borderRadius: 'var(--radius-sm)', fontSize: '.85rem' }} />
               ))}
             </div>
             <button className="primary-btn" onClick={() => {
-              if (!newDebt.name) return
-              saveDebts([...debts, { ...newDebt, id: Date.now() }])
-              setNewDebt({ name: '', balance: '', rate: '', minPayment: '' })
-            }}>+ Add Debt</button>
+              if (!newDebt.name.trim()) return
+              saveDebts([...debts, { ...newDebt, name: newDebt.name.trim(), limit: newDebt.type === 'card' ? newDebt.limit : '', id: Date.now() }])
+              setNewDebt((p) => ({ ...BLANK_DEBT, type: p.type }))
+            }}>+ Add {newDebt.type === 'card' ? 'Card' : 'Loan'}</button>
           </div>
         </section>
       </ProTabGate>)}
@@ -6049,40 +6228,76 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
       {/* ── BUDGET PLAN ──────────────────────────────────────────────────── */}
       {tab === 'budget' && (
         <div>
-          {/* Weekly Spending Target (discretionary cap) */}
-          <section className="card">
-            <p className="eyebrow">Weekly Target</p>
-            <h3 style={{margin:'4px 0 6px'}}>Weekly Spending Target</h3>
+          {/* Spending budget: daily, weekly or monthly (discretionary cap) */}
+          <section className="card budget-card">
+            <p className="eyebrow">Spending Budget</p>
+            <h3 style={{margin:'4px 0 6px'}}>{budInfo.label} Budget</h3>
             <p className="muted" style={{fontSize:'.8rem',marginBottom:10}}>
-              Discretionary only — bills and rent don't count. Used to calculate the Finance dimension of your life score.
+              Everyday spending — bills and rent don't count. Choose the window that matches how you think about money. Your Life Score uses the weekly equivalent.
             </p>
+            <div className="pill-row" role="radiogroup" aria-label="Budget period" style={{marginBottom:10,gap:6}}>
+              {Object.entries(BUDGET_PERIODS).map(([p, info]) => (
+                <button key={p} type="button" role="radio" aria-checked={bud.period === p} className={bud.period === p ? 'pill active-pill' : 'pill'} style={{fontSize:'.8rem'}}
+                  onClick={() => { if (p !== bud.period) saveBudgetSafe({ period: p, amount: convertBudget(bud.amount, bud.period, p) }) }}>{info.label}</button>
+              ))}
+            </div>
             <div style={{display:'flex',gap:10,alignItems:'center'}}>
-              <input type="number" inputMode="decimal" value={targetDraft}
+              <span className="muted" style={{fontSize:'.95rem'}}>$</span>
+              <input type="number" inputMode="decimal" min="0" value={targetDraft} aria-label={`${budInfo.label} budget amount`}
                 onChange={(e) => setTargetDraft(e.target.value)}
-                onBlur={() => { const n = Number(targetDraft); if (targetDraft !== '' && Number.isFinite(n) && n >= 0 && n !== Number(budget.weeklyTarget)) setBudget({ weeklyTarget: n }); else setTargetDraft(String(budget.weeklyTarget ?? '')) }}
+                onBlur={() => { const n = Number(targetDraft); if (targetDraft !== '' && Number.isFinite(n) && n >= 0 && n !== bud.amount) saveBudgetSafe({ period: bud.period, amount: n }); else setTargetDraft(String(bud.amount)) }}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
                 style={{flex:1,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem'}} />
-              <span className="muted" style={{fontSize:'.85rem'}}>/week</span>
+              <span className="muted" style={{fontSize:'.85rem'}}>{budInfo.per}</span>
             </div>
-            {/* Progress bar showing how much of weekly target you've spent */}
-            {budget.weeklyTarget > 0 && (
-              <div style={{marginTop:12}}>
-                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
-                  <span className="muted">Spent this week</span>
-                  <strong style={{color: fpWeekSpend > budget.weeklyTarget ? 'var(--danger)' : 'var(--ink)'}}>
-                    {fmt(fpWeekSpend)} / {fmt(budget.weeklyTarget)}
-                  </strong>
-                </div>
-                <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
-                  <div style={{
-                    height:'100%',
-                    width: `${Math.min(100, (fpWeekSpend / budget.weeklyTarget) * 100)}%`,
-                    background: fpWeekSpend > budget.weeklyTarget ? 'var(--danger)' : 'var(--teal)',
-                    borderRadius:999, transition:'width .3s',
-                  }} />
-                </div>
-              </div>
+            {bud.amount > 0 && (
+              <p className="muted budget-equiv" style={{fontSize:'.74rem',margin:'6px 0 0'}}>
+                About {Object.keys(BUDGET_PERIODS).filter((p) => p !== bud.period).map((p) => `${fmt(bud.amount * budInfo.perWeek / BUDGET_PERIODS[p].perWeek)}${BUDGET_PERIODS[p].per}`).join(' · ')}
+              </p>
             )}
+            {bud.amount > 0 && (() => {
+              const spent = budSpend.total, left = bud.amount - spent, over = left < 0
+              const daysLeft = Math.max(1, Math.round((new Date(`${budSpend.to}T12:00:00`) - new Date(`${TODAY}T12:00:00`)) / 864e5) + 1)
+              return (
+                <div className="budget-progress" style={{marginTop:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:'.78rem'}}>
+                    <span className="muted">Spent {budInfo.span}</span>
+                    <strong style={{color: over ? 'var(--danger)' : 'var(--ink)'}}>{fmt(spent)} / {fmt(bud.amount)}</strong>
+                  </div>
+                  <div style={{height:6,background:'var(--stone2)',borderRadius:999,overflow:'hidden'}}>
+                    <div style={{height:'100%',width:`${Math.min(100, (spent / bud.amount) * 100)}%`,background: over ? 'var(--danger)' : 'var(--teal)',borderRadius:999,transition:'width .3s'}} />
+                  </div>
+                  <p className="budget-left" style={{fontSize:'.78rem',margin:'6px 0 0',color: over ? 'var(--danger)' : 'var(--ink2)',fontWeight:600}}>
+                    {over ? `${fmt(-left)} over ${budInfo.span}`
+                      : bud.period === 'daily' ? `${fmt(left)} left today`
+                      : `${fmt(left)} left · ${daysLeft} day${daysLeft === 1 ? '' : 's'} to go (about ${fmt(left / daysLeft)} a day)`}
+                  </p>
+                  {budSpend.repeating > 0 && (
+                    <p className="muted" style={{fontSize:'.72rem',margin:'4px 0 0'}}>Includes {fmt(budSpend.repeating)} as the {bud.period === 'daily' ? 'daily' : bud.period === 'monthly' ? 'monthly' : 'weekly'} share of repeating expenses.</p>
+                  )}
+                </div>
+              )
+            })()}
+            {(() => {
+              // What's counted in this day/week/month — tap one to fix it
+              const counted = (expenses || []).filter((e) => (e.period || 'one-time') === 'one-time' ? e.date && e.date >= budSpend.from && e.date <= budSpend.to : !e.date || e.date <= budSpend.to)
+                .sort((a, b) => ((a.period || 'one-time') === 'one-time' ? 0 : 1) - ((b.period || 'one-time') === 'one-time' ? 0 : 1) || (b.date || '').localeCompare(a.date || ''))
+              if (!counted.length) return <p className="muted" style={{fontSize:'.78rem',margin:'12px 0 0'}}>Nothing logged {budInfo.span} yet. Add spending with the + button.</p>
+              const shown = budListAll ? counted : counted.slice(0, 6)
+              const scale = bud.period === 'daily' ? 1 / 7 : bud.period === 'monthly' ? 4.33 : 1
+              return (
+                <div className="budget-counted" style={{marginTop:14}}>
+                  <p style={{fontWeight:600,fontSize:'.8rem',margin:'0 0 2px'}}>Counted {budInfo.span} <span className="muted" style={{fontWeight:400}}>· tap to edit</span></p>
+                  {shown.map((exp, i) => (
+                    <ExpenseRow key={exp.id || i} {...expenseRowProps(exp)}
+                      extra={(exp.period || 'one-time') !== 'one-time' ? <span> · counts {fmt(expenseWeeklyShare(exp) * scale)}</span> : null} />
+                  ))}
+                  {counted.length > shown.length && (
+                    <button type="button" className="ghost-btn" style={{width:'100%',marginTop:8}} onClick={() => setBudListAll(true)}>Show all {counted.length}</button>
+                  )}
+                </div>
+              )
+            })()}
           </section>
 
           {/* Summary pulled from all tabs */}
@@ -9514,7 +9729,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
     Wellness: 'Mood check-ins, calm (anxiety log), journal, daily routine, plus Wellness habits and tasks.',
     Lifestyle: 'Daily and weekly chores in the cleaning tracker, plus Lifestyle habits and tasks.',
     Productivity: 'Work and business tasks done when due, nothing piling up overdue, goal and project steps checked off, plus Productivity habits.',
-    Finances: 'Spending vs your weekly target (when you log spending), adding to savings, plus Finance habits and tasks.',
+    Finances: 'Spending vs your budget, counted by the week (when you log spending), adding to savings, plus Finance habits and tasks.',
   }
 
   // Overall life score (average of the areas you're tracking)
@@ -9817,7 +10032,7 @@ const REMINDER_TYPES = [
   { key: 'overdue',    icon: CircleSlash, label: 'Overdue tasks',       desc: 'Daily at 9:00 AM, only if something is past due' },
   { key: 'reflection', icon: PenLine,     label: 'Evening reflection',  desc: 'Daily at 7:00 PM' },
   { key: 'goals',      icon: Target,      label: 'Weekly goal review',  desc: 'Sundays at 5:00 PM with your next step' },
-  { key: 'finance',    icon: Wallet,      label: 'Weekly spending',     desc: 'Sundays at 6:00 PM vs your weekly target' },
+  { key: 'finance',    icon: Wallet,      label: 'Weekly spending',     desc: 'Sundays at 6:00 PM vs your budget' },
 ]
 const REMINDER_DEFAULTS = { tasks: true, habits: true, goals: true, faith: true, reflection: true, birthdays: true, overdue: true, finance: false, leadMinutes: 15 }
 
