@@ -7,6 +7,7 @@ import { PushNotifications } from '@capacitor/push-notifications'
 import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { StatusBar, Style } from '@capacitor/status-bar'
+import { Purchases } from '@revenuecat/purchases-capacitor'
 
 export const isNative = Capacitor.isNativePlatform()
 export const nativePlatform = Capacitor.getPlatform() // 'ios' | 'android' | 'web'
@@ -14,11 +15,70 @@ export const nativePlatform = Capacitor.getPlatform() // 'ios' | 'android' | 'we
 // The app runs from files on the phone, so emails and shared links point at the website.
 export const WEB_ORIGIN = 'https://planner.eloraradiance.com'
 
-// Buying Pro inside the phone app. Off until the App Store purchase decision is made
-// (Apple in-app purchase, or a US-only link to the website checkout). While off, the app
-// shows no prices, trials or checkout links; people who already have Pro sign in and have it.
-export const NATIVE_PURCHASES = false
+// Buying Pro inside the phone app: Apple in-app purchase through RevenueCat (decided 2026-11-15).
+// It turns on by itself once REVENUECAT_IOS_KEY holds the app's public RevenueCat key (starts with "appl_";
+// it is meant to ship inside the app). Until then the app shows no prices or buy buttons, and people who
+// already have Pro sign in and have it. Setup steps: claude/in-app-purchases.md in the project.
+export const REVENUECAT_IOS_KEY = '' || import.meta.env.VITE_REVENUECAT_IOS_KEY || ''  // key goes in the first quotes
+export const NATIVE_PURCHASES = isNative && nativePlatform === 'ios' && /^appl_/.test(REVENUECAT_IOS_KEY)
 export const purchasesInApp = !isNative || NATIVE_PURCHASES
+
+// ── Apple in-app purchase (RevenueCat) ───────────────────────────────────
+// Products (App Store Connect, subscription group "Living Planner Pro"): planner_pro_monthly, planner_pro_yearly.
+// RevenueCat: entitlement "pro", current offering with the Monthly and Annual packages.
+// Purchases are tied to the planner account (RevenueCat app user id = account id), so Pro follows the account,
+// and the planner database is updated by the store-sync function (webhook + a check right after buying).
+export const PRO_ENTITLEMENT = 'pro'
+let storeReady = null
+let storeUser = null
+export async function storeSignIn(userId) {
+  if (!NATIVE_PURCHASES || !userId) return false
+  try {
+    if (!storeReady) storeReady = Purchases.configure({ apiKey: REVENUECAT_IOS_KEY, appUserID: userId }).then(() => true)
+    await storeReady
+    if (storeUser && storeUser !== userId) await Purchases.logIn({ appUserID: userId })
+    storeUser = userId
+    return true
+  } catch { storeReady = null; return false }
+}
+export async function storeSignOut() {
+  if (!NATIVE_PURCHASES || !storeReady) return
+  try { await storeReady; await Purchases.logOut() } catch {} // logOut fails for anonymous users; nothing to undo
+  storeUser = null
+}
+const proActive = (info) => !!info?.entitlements?.active?.[PRO_ENTITLEMENT]
+// Monthly and yearly packages with Apple's own price text for this person's country
+export async function storePlans(userId) {
+  if (!(await storeSignIn(userId))) return null
+  const o = await Purchases.getOfferings()
+  const cur = o?.current
+  if (!cur) return null
+  const pick = (type, id) => cur.availablePackages?.find((p) => p.packageType === type || p.identifier === id) || null
+  const plan = (pkg) => pkg && { pkg, id: pkg.product?.identifier, price: pkg.product?.priceString, amount: pkg.product?.price, title: pkg.product?.title }
+  return { monthly: plan(pick('MONTHLY', '$rc_monthly')), annual: plan(pick('ANNUAL', '$rc_annual')) }
+}
+// 'pro' | 'cancelled' | 'pending' (Ask to Buy, etc.) | { error }
+export async function storeBuy(userId, pkg) {
+  if (!(await storeSignIn(userId))) return { error: 'The App Store isn\'t available right now.' }
+  try {
+    const r = await Purchases.purchasePackage({ aPackage: pkg })
+    return proActive(r?.customerInfo) ? 'pro' : 'pending'
+  } catch (e) {
+    if (e?.userCancelled || String(e?.code) === '1') return 'cancelled'        // PURCHASE_CANCELLED_ERROR
+    if (String(e?.code) === '20') return 'pending'                               // PAYMENT_PENDING_ERROR (Ask to Buy)
+    return { error: e?.message || 'The purchase didn\'t go through.' }
+  }
+}
+// true when this Apple ID has Pro to restore onto the signed-in account
+export async function storeRestore(userId) {
+  if (!(await storeSignIn(userId))) return false
+  try { return proActive((await Purchases.restorePurchases())?.customerInfo) } catch { return false }
+}
+// Apple's subscription settings (cancel, change plan): iOS opens this address in the App Store
+export const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions'
+export function storeManage() {
+  try { window.open(APPLE_SUBSCRIPTIONS_URL, '_blank') } catch {}
+}
 
 // Keeps the sign-in in the phone's own storage, which iOS never clears on its own.
 export const nativeAuthStorage = {
