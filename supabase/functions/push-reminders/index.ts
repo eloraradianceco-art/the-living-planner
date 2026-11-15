@@ -191,24 +191,34 @@ async function remindersFor(userId: string, now: number) {
   }
 
   if (local.weekday === 'Sun' && on.finance) {
+    // Same math as the app's budget card: every logged expense counts (bills included); one-time expenses by date,
+    // repeating ones by their share of the period. Sunday recaps the week that just ended (Sun–Sat, the app's week).
     // Budget can be daily, weekly or monthly (budgets.period / amount); weekly_target is the same limit per week.
-    const weekStart = addDays(today, -6)
-    const monthStart = `${today.slice(0, 7)}-01`
-    const from = monthStart < weekStart ? monthStart : weekStart
+    const weekFrom = addDays(today, -7), weekTo = addDays(today, -1)
+    const monthFrom = `${today.slice(0, 7)}-01`
     const [{ data: budget }, { data: exp }] = await Promise.all([
       sb.from('budgets').select('weekly_target,period,amount').eq('user_id', userId).maybeSingle(),
-      sb.from('expenses').select('amount,category,date').eq('user_id', userId).gte('date', from).lte('date', today),
+      sb.from('expenses').select('amount,date,period').eq('user_id', userId).or(`date.is.null,date.lte.${today}`),
     ])
-    const flexible = (exp || []).filter((e) => !['Bills', 'Utilities', 'Rent', 'Insurance'].includes(e.category))
-    const sum = (list: typeof flexible) => list.reduce((n, e) => n + Number(e.amount || 0), 0)
-    const spent = sum(flexible.filter((e) => e.date >= weekStart))
+    const weeklyShare = (e: { amount: number; period?: string }) => {
+      const a = Number(e.amount) || 0, p = e.period || 'one-time'
+      return p === 'weekly' ? a : p === 'biweekly' ? a / 2 : p === 'monthly' ? a / 4.33 : p === 'yearly' ? a / 52 : a
+    }
+    const spentIn = (from: string, to: string, scale: number) => (exp || []).reduce((n, e) => {
+      const p = e.period || 'one-time'
+      if (p === 'one-time') return e.date >= from && e.date <= to ? n + (Number(e.amount) || 0) : n
+      return !e.date || e.date <= to ? n + weeklyShare(e) * scale : n
+    }, 0)
+    const lastWeek = spentIn(weekFrom, weekTo, 1)
     const period = budget?.period || 'weekly'
     const amount = Number(budget?.amount ?? budget?.weekly_target ?? 0) || 0
     const $ = (n: number) => `$${n.toFixed(0)}`
-    const body = !amount ? `${$(spent)} spent this week.`
-      : period === 'monthly' ? `${$(spent)} spent this week · ${$(sum(flexible.filter((e) => e.date >= monthStart)))} of your ${$(amount)} monthly budget so far.`
-      : period === 'daily' ? `${$(spent)} spent this week · your ${$(amount)}/day budget allows ${$(amount * 7)}.`
-      : `${$(spent)} of your ${$(amount)} weekly budget.`
+    const vs = (spent: number, limit: number) => spent <= limit ? `${$(limit - spent)} under` : `${$(spent - limit)} over`
+    let body: string
+    if (!amount) body = `${$(lastWeek)} spent last week.`
+    else if (period === 'monthly') { const m = spentIn(monthFrom, today, 4.33); body = `${$(m)} of your ${$(amount)} monthly budget used so far (${vs(m, amount)}). Last week: ${$(lastWeek)}.` }
+    else if (period === 'daily') body = `${$(lastWeek)} spent last week · your ${$(amount)}/day budget allows ${$(amount * 7)} (${vs(lastWeek, amount * 7)}).`
+    else body = `${$(lastWeek)} of your ${$(amount)} weekly budget last week (${vs(lastWeek, amount)}).`
     daily('finance', '18:00', 'Weekly spending', body, '/finance')
   }
 
