@@ -1296,6 +1296,25 @@ function useResponsive() {
 }
 
 
+// ── Upgrade link from the website (?upgrade=monthly|annual) ─────────
+;(function readUpgradeIntent() {
+  try {
+    const u = new URL(window.location.href)
+    const p = u.searchParams.get('upgrade')
+    if (!p) return
+    localStorage.setItem('planner_upgrade_intent', JSON.stringify({ plan: p === 'annual' ? 'annual' : 'monthly', at: Date.now() }))
+    u.searchParams.delete('upgrade')
+    window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash)
+  } catch {}
+})()
+function takeUpgradeIntent() {
+  try {
+    const v = JSON.parse(localStorage.getItem('planner_upgrade_intent') || 'null')
+    localStorage.removeItem('planner_upgrade_intent')
+    return v && Date.now() - v.at < 3600000 ? v.plan : null
+  } catch { return null }
+}
+
 // ── Auth Context ──────────────────────────────────────────────────────────
 const AuthContext = createContext(null)
 const MOCK_EMAIL = ''
@@ -1303,7 +1322,7 @@ const MOCK_EMAIL = ''
 // Each page keeps a device copy of the account's data in localStorage so it opens instantly.
 // Those copies belong to whoever is signed in: on sign-out, or when a different account signs in
 // on this device, they're cleared so one person's planner never shows up (or gets saved) under another's.
-const DEVICE_ONLY_KEYS = new Set(['planner_a2hs_seen', 'planner_onboarded', 'planner.vapidPub', 'planner.lastUser'])
+const DEVICE_ONLY_KEYS = new Set(['planner_a2hs_seen', 'planner_onboarded', 'planner.vapidPub', 'planner.lastUser', 'planner_upgrade_intent'])
 function clearAccountCache() {
   try {
     const keys = []
@@ -4030,6 +4049,7 @@ function useSubscription(user) {
     } catch { return null }
   })
   const [welcome, setWelcome] = React.useState(arrival ? 'confirming' : null) // confirming | done | waiting
+  const [checked, setChecked] = React.useState(false) // the tier has been confirmed with the server this session
 
   const apply = React.useCallback((row) => {
     if (!row) return null
@@ -4067,6 +4087,7 @@ function useSubscription(user) {
         t = apply(await readProfile())
         if (cancelled) return
       }
+      setChecked(true)
       if (!arrival) return
       if (active(t)) setWelcome('done')
       else if (attempt < 12) timer = setTimeout(() => load(attempt + 1), 2500)
@@ -4120,7 +4141,7 @@ function useSubscription(user) {
   const isPro = tier === 'pro' || tier === 'trial'
   const dismissWelcome = React.useCallback(() => setWelcome(null), [])
 
-  return { tier, isPro, welcome, dismissWelcome }
+  return { tier, isPro, welcome, dismissWelcome, checked }
 }
 
 // ── Welcome Pro Banner ────────────────────────────────────────────────────
@@ -10790,6 +10811,13 @@ function PlannerApp() {
     setUpgradeContext({title, message})
     setShowUpgrade(true)
   }
+  // The website's "Upgrade Monthly / Upgrade Annually" buttons open planner.eloraradiance.com/?upgrade=monthly|annual.
+  // The wish is kept through sign-in (readUpgradeIntent); once the tier is confirmed, free accounts see the plans.
+  React.useEffect(() => {
+    if (!user || !subscription.checked) return
+    const intent = takeUpgradeIntent()
+    if (intent && !subscription.isPro) triggerUpgrade('Upgrade to Pro', 'Everything in The Living Planner, with no limits. Pick monthly or yearly.')
+  }, [user?.id, subscription.checked])
 
   const [modalState, setModalState] = useState(modalEmpty)
   const [toasts, setToasts] = useState([])
