@@ -147,7 +147,7 @@ function PlannerApp() {
     <div style={{ textAlign: 'center' }}>
       <div style={{ marginBottom: 18 }}><img src="/icon-192.png" alt="" width="72" height="72" style={{ width: 72, height: 72, borderRadius: 16, boxShadow: '0 6px 22px rgba(0,0,0,.45)' }} /></div>
       <p style={{ color: 'var(--brass-fg)', fontSize: '.75rem', fontWeight: 700, letterSpacing: '.15em', textTransform: 'uppercase', marginBottom: 8 }}>The Living Planner</p>
-      <p style={{ color: 'rgba(255,255,255,.64)', fontSize: '.88rem' }}>Loading your workspace…</p>
+      <p style={{ color: 'rgba(255,255,255,.64)', fontSize: '.88rem', margin: 0 }}>Loading your workspace…</p>
     </div>
   </div>
 
