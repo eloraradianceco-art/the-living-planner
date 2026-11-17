@@ -4,7 +4,7 @@
 //   npm test                     every spec
 //   npm test -- calendar month   only specs whose file name contains "calendar" or "month"
 //   npm test -- --update         save what the specs see now as the new snapshots (review the diff before committing)
-//   npm test -- --no-build       reuse the last build in tests/.build
+//   npm test -- --no-build       reuse the last build in tests/build
 //
 // A spec fails when: it crashes or times out, it reports failed checks or page errors, its result differs
 // from the snapshot, the fake database
@@ -16,8 +16,8 @@ const { startFakeDb } = require('./fake-db.cjs')
 const ROOT = path.join(__dirname, '..')
 const SPECS = path.join(__dirname, 'specs')
 const SNAPS = path.join(__dirname, 'snapshots')
-const BUILD = path.join(__dirname, '.build')
-const RESULTS = path.join(__dirname, '.results')
+const BUILD = path.join(__dirname, 'build')
+const RESULTS = path.join(__dirname, 'results')
 const args = process.argv.slice(2)
 const UPDATE = args.includes('--update')
 const NO_BUILD = args.includes('--no-build')
@@ -105,7 +105,12 @@ function runSpec(file, env) {
       }
       const ok = problems.length === 0
       console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  (${secs}s)${UPDATE && ok ? '  · snapshot saved' : ''}`)
-      if (!ok) { console.log(problems.join('\n')); fs.mkdirSync(path.join(RESULTS, name), { recursive: true }); fs.writeFileSync(path.join(RESULTS, name, 'log.txt'), log) }
+      if (!ok) {
+        console.log(problems.join('\n'))
+        fs.mkdirSync(path.join(RESULTS, name), { recursive: true })
+        fs.writeFileSync(path.join(RESULTS, name, 'log.txt'), log)
+        if (result) fs.writeFileSync(path.join(RESULTS, name, 'actual.json'), JSON.stringify(result, null, 1) + '\n') // compare with tests/snapshots/<name>.json
+      }
       outcomes.push({ name, ok })
     }
     await server.close()

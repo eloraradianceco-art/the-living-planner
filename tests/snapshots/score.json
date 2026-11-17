@@ -40,32 +40,6 @@
     "Finances": null,
     "_v": 2
    }
-  },
-  {
-   "date": "2026-11-13",
-   "overall": 9,
-   "scores": {
-    "Faith": 10,
-    "Health": 6,
-    "Wellness": 9,
-    "Lifestyle": 10,
-    "Productivity": null,
-    "Finances": null,
-    "_v": 2
-   }
-  },
-  {
-   "date": "2026-11-13",
-   "overall": 9,
-   "scores": {
-    "Faith": 10,
-    "Health": 6,
-    "Wellness": 9,
-    "Lifestyle": 10,
-    "Productivity": null,
-    "Finances": null,
-    "_v": 2
-   }
   }
  ],
  "nextDayDailyDone": "0 of 8 done",

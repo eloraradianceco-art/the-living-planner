@@ -9,7 +9,7 @@ const APP = process.env.TEST_APP || 'http://localhost:4830'
 const DB = process.env.TEST_DB || 'http://localhost:4831'
 const UID = '11111111-2222-3333-4444-555555555555'
 // Where a spec may write screenshots (kept by CI when a run fails)
-const OUT = process.env.TEST_OUT || path.join(__dirname, '.results')
+const OUT = process.env.TEST_OUT || path.join(__dirname, 'results')
 fs.mkdirSync(OUT, { recursive: true })
 
 // A signed-in session the app accepts (the fake database accepts any token)

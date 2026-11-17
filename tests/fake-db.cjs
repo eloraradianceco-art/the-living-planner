@@ -97,7 +97,14 @@ function startFakeDb({ dist, appPort = 4830, dbPort = 4831 } = {}) {
         }
         if (req.method === 'POST') {
           const items = [].concat(JSON.parse(body || '[]')).map((r) => ({ id: r.id || ('row-' + Math.random().toString(36).slice(2, 10)), created_at: new Date().toISOString(), ...r }))
-          for (const it of items) { const i = table.findIndex((r) => r.id === it.id); if (i >= 0) table[i] = { ...table[i], ...it }; else table.push(it) }
+          // Upserts (?on_conflict=user_id,date) replace the row with the same key, like the real database
+          const keyCols = (q.get('on_conflict') || '').split(',').filter(Boolean)
+          const raw = [].concat(JSON.parse(body || '[]'))
+          items.forEach((it, n) => {
+            let i = table.findIndex((r) => r.id === it.id)
+            if (i < 0 && keyCols.length && !raw[n].id) { i = table.findIndex((r) => keyCols.every((c) => r[c] === it[c])); if (i >= 0) it.id = table[i].id }
+            if (i >= 0) table[i] = { ...table[i], ...it }; else table.push(it)
+          })
           state.writes.push({ table: tm[1], method: 'POST', body: JSON.parse(body || '{}') })
           return reply(items, 201)
         }
