@@ -82,6 +82,8 @@ const fmt12 = (t: string) => {
   return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
 }
 const isTime = (t?: string | null) => !!t && /^\d{1,2}:\d{2}/.test(t)
+// "Dentist" + "Main St Dental" → "Dentist · 📍 Main St Dental" (tasks and events can carry a place)
+const withPlace = (title: string, place?: string | null) => (place && place.trim() ? `${title} · 📍 ${place.trim()}` : title)
 
 // Repeating events: one row per series → the occurrences that fall in [from, to]
 function expandEvents(rows: Array<Record<string, any>>, from: string, to: string) {
@@ -122,20 +124,20 @@ async function remindersFor(userId: string, now: number) {
 
   if (on.tasks) {
     const [{ data: tasks }, { data: events }, { data: appts }] = await Promise.all([
-      sb.from('tasks').select('id,title,date,time,completed').eq('user_id', userId).in('date', [today, tomorrow]).eq('completed', false),
-      sb.from('events').select('id,title,date,time,recurrence,recurrence_until,skip_dates').eq('user_id', userId).lte('date', tomorrow)
+      sb.from('tasks').select('id,title,date,time,completed,location').eq('user_id', userId).in('date', [today, tomorrow]).eq('completed', false),
+      sb.from('events').select('id,title,date,time,location,recurrence,recurrence_until,skip_dates').eq('user_id', userId).lte('date', tomorrow)
         .or(`recurrence.neq.none,date.in.(${today},${tomorrow})`),
       sb.from('page_data').select('data_value').eq('user_id', userId).eq('page', 'wellness').eq('data_key', 'appointments').maybeSingle(),
     ])
     for (const t of tasks || []) {
       if (!isTime(t.time)) continue
       out.push({ key: `task:${t.id}:${t.date}T${t.time}`, at: zonedToUtc(t.date, t.time, tz) - lead * 60000,
-        title: lead ? `In ${lead} min · ${fmt12(t.time)}` : `Now · ${fmt12(t.time)}`, body: t.title, url: '/calendar', tag: `task-${t.id}` })
+        title: lead ? `In ${lead} min · ${fmt12(t.time)}` : `Now · ${fmt12(t.time)}`, body: withPlace(t.title, t.location), url: '/calendar', tag: `task-${t.id}` })
     }
     for (const e of expandEvents(events || [], today, tomorrow)) {
       if (!isTime(e.time)) continue
       out.push({ key: `event:${e.id}:${e.date}T${e.time}`, at: zonedToUtc(e.date, e.time, tz) - lead * 60000,
-        title: lead ? `In ${lead} min · ${fmt12(e.time)}` : `Now · ${fmt12(e.time)}`, body: e.title, url: '/calendar', tag: `event-${e.id}` })
+        title: lead ? `In ${lead} min · ${fmt12(e.time)}` : `Now · ${fmt12(e.time)}`, body: withPlace(e.title, e.location), url: '/calendar', tag: `event-${e.id}` })
     }
     for (const a of (appts?.data_value || []) as Array<{ id: number; date: string; time?: string; who: string; reason?: string }>) {
       if (!a?.date || (a.date !== today && a.date !== tomorrow && a.date !== addDays(today, 2))) continue
