@@ -682,6 +682,36 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 .agenda-row.done .agenda-row-title { text-decoration: line-through; color: var(--muted); }
 .agenda-row-kind { font-size: .68rem; font-weight: 600; color: var(--muted); }
 
+/* ── Apple Calendar events (App Store app, 2026-11-17): each takes its calendar's colour (--cal-color) ── */
+.time-card.device { border-left: 4px solid var(--cal-color, #6B7A8F); background: color-mix(in srgb, var(--cal-color, #6B7A8F) 12%, var(--warm-white)); }
+.week-item.device { border-left: 3px solid var(--cal-color, #6B7A8F); }
+.month-dot.device { background: var(--cal-color, #6B7A8F); }
+.month-chip.device { border-left-color: var(--cal-color, #6B7A8F); background: color-mix(in srgb, var(--cal-color, #6B7A8F) 14%, var(--warm-white)); }
+.agenda-row.device .agenda-row-mark::before { background: var(--cal-color, #6B7A8F); }
+.agenda-row.device .agenda-row-time { color: var(--text2); }
+.cal-allday-item.device { border-left: 3px solid var(--cal-color, #6B7A8F); padding-left: 8px; }
+.cal-allday-kind, .agenda-row-kind { max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.devcal-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.devcal-group { margin-top: 14px; }
+.devcal-account { font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px; }
+.devcal-group .rem-row { align-items: center; }
+.devcal-tip { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.devcal-tip > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.devcal-tip strong { font-size: .9rem; color: var(--ink); }
+.devcal-tip span { font-size: .78rem; color: var(--muted); line-height: 1.35; }
+.devcal-tip .primary-btn { font-size: .8rem; padding: 8px 14px; flex-shrink: 0; }
+.devcal-close { width: 34px; height: 34px; flex-shrink: 0; border: none; border-radius: 50%; background: var(--surface); color: var(--muted); font-size: .9rem; cursor: pointer; }
+.devcal-sheet .modal-title { overflow-wrap: anywhere; }
+.devcal-cal { display: flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600; color: var(--text2); margin-bottom: 10px; }
+.devcal-when { margin: 0 0 8px; font-size: 1rem; font-weight: 600; color: var(--ink); }
+.devcal-line { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: .84rem; color: var(--text2); }
+.devcal-place { font-size: .88rem; margin-bottom: 8px; }
+.devcal-notes { margin: 6px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface); font-size: .86rem; line-height: 1.5; color: var(--text2); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; }
+.devcal-hint { font-size: .8rem; line-height: 1.45; margin: 12px 0 0; }
+.devcal-error { font-size: .82rem; color: var(--danger); margin: 10px 0 0; }
+.devcal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.devcal-actions button { flex: 1; }
+
 /* ── Locations (2026-11-16) ─────────────────────────────────────────── */
 .place-link, .place-text { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; vertical-align: middle; }
 .place-link > span, .place-text > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

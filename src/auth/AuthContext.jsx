@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { isNative, WEB_ORIGIN, storeSignOut } from '../native.js'
 import { hasSupabaseEnv, supabase } from '../lib/supabase.js'
+import { deviceCal } from '../lib/deviceCalendar.js'
 
 // ── Auth Context ──────────────────────────────────────────────────────────
 const AuthContext = createContext(null)
@@ -20,6 +21,7 @@ function clearAccountCache() {
       localStorage.removeItem(k)
     })
   } catch {}
+  deviceCal.forget() // the device calendar is each account's own choice
 }
 function noteSignedInUser(u) {
   if (!u?.id) return

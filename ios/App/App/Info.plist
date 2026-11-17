@@ -62,6 +62,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>The Living Planner shows your calendar events next to your tasks, and adds or changes an event only when you ask it to. Your calendar stays on this device.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>The Living Planner shows your calendar events next to your tasks, and adds or changes an event only when you ask it to. Your calendar stays on this device.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>If you choose to connect Reminders, The Living Planner shows them with your tasks. Your reminders stay on this device.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>If you choose to connect Reminders, The Living Planner shows them with your tasks. Your reminders stay on this device.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIViewControllerBasedStatusBarAppearance</key>

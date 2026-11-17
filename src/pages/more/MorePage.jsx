@@ -13,6 +13,7 @@ import { PageNav } from '../../components/PageNav.jsx'
 import { A2HSModal } from '../../components/A2HS.jsx'
 import { NotificationSettings } from './NotificationSettings.jsx'
 import { BackupButton } from './Backup.jsx'
+import { CalendarSettings } from './CalendarSettings.jsx'
 
 const PLANNER_SETTINGS_THEME = {
   text: 'var(--ink)', muted: 'var(--muted)', card: 'var(--surface)', border: 'var(--border2)',
@@ -249,6 +250,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       {/* ── Push Notifications (coming soon) ──────────────────────────── */}
 
       {/* ── Notifications ─────────────────────────────────────────── */}
+      <CalendarSettings />
       <NotificationSettings settings={settings} updateSettings={updateSettings} />
 
       {/* ── More from Elora Radiance ─────────────────────────────── */}

@@ -8,25 +8,44 @@ import {
 import { cleanPlace, PlaceLink, PlaceText } from '../components/Place.jsx'
 import { useResponsive } from '../lib/responsive.js'
 import { PageNav } from '../components/PageNav.jsx'
+import { deviceCal, useDeviceCalendar, useDeviceEvents } from '../lib/deviceCalendar.js'
+import { DeviceEventSheet } from '../components/DeviceEventSheet.jsx'
 
-function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule, onToggle, onSkipOccurrence }) {
+// What each calendar item is called, and (for Apple Calendar events) its calendar's colour
+const kindOf = (item) => (item.itemType === 'task' ? 'Task' : item.itemType === 'device' ? item.calendarName : 'Event')
+const tint = (item) => (item.itemType === 'device' ? { '--cal-color': item.color } : undefined)
+const canDrag = (item) => (item.itemType === 'device' ? deviceCal.canChange(item) : !item.isRepeat)
+const TIP_KEY = 'planner_device_cal_tip'
+
+function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate, onReschedule, onToggle, onSkipOccurrence, onToast = () => {} }) {
   const [view, setView] = useState('day')
   const [selectedDate, setSelectedDate] = useState(TODAY)
   const { prefersTouch, isMobile } = useResponsive()
 
-  const scheduled = useMemo(() => {
+  // The dates on screen: the month grid shows whole weeks, so it reaches into the months either side
+  const [from, to] = useMemo(() => {
     const md = getMonthDays(selectedDate), wd = getWeekDays(selectedDate)
-    // The month grid shows whole weeks, so it reaches into the months either side
     const gridFrom = addDays(md[0], -new Date(md[0] + 'T12:00:00').getDay())
     const gridTo = addDays(md[md.length - 1], 6 - new Date(md[md.length - 1] + 'T12:00:00').getDay())
-    const from = [gridFrom, wd[0], selectedDate].sort()[0], to = [gridTo, wd[6], selectedDate].sort()[2]
+    return [[gridFrom, wd[0], selectedDate].sort()[0], [gridTo, wd[6], selectedDate].sort()[2]]
+  }, [selectedDate])
+  // Apple Calendar events on this device (App Store app, once connected); read live, never stored by the planner
+  const deviceCalendar = useDeviceCalendar()
+  const deviceItems = useDeviceEvents(from, to)
+  const [deviceItem, setDeviceItem] = useState(null)
+  const [tipHidden, setTipHidden] = useState(() => { try { return localStorage.getItem(TIP_KEY) === '1' } catch { return false } })
+  const showTip = deviceCalendar.supported && !deviceCalendar.on && deviceCalendar.status !== 'denied' && deviceCalendar.status !== 'unknown' && !tipHidden
+  const hideTip = () => { setTipHidden(true); try { localStorage.setItem(TIP_KEY, '1') } catch {} }
+
+  const scheduled = useMemo(() => {
     // Every dated task shows: timed ones on the grid, untimed ones in the All-day row
     const taskItems = tasks.filter((task) => task.date).map((task) => ({ ...task, startTime: task.time || '', itemType: 'task' }))
     const eventItems = expandEvents(events, from, to).map((event) => ({ ...event, itemType: 'event' }))
-    return [...taskItems, ...eventItems].sort((a, b) => `${a.date}-${a.startTime || ''}`.localeCompare(`${b.date}-${b.startTime || ''}`))
-  }, [tasks, events, selectedDate])
+    return [...taskItems, ...eventItems, ...deviceItems].sort((a, b) => `${a.date}-${a.startTime || ''}`.localeCompare(`${b.date}-${b.startTime || ''}`))
+  }, [tasks, events, deviceItems, from, to])
   // Editing a repeat opens the series (with its real start date), never the single occurrence
-  const openItem = (item) => item.itemType === 'event' && item.isRepeat
+  const openItem = (item) => item.itemType === 'device' ? setDeviceItem(item)
+    : item.itemType === 'event' && item.isRepeat
     ? onEdit('event', events.find((e) => e.id === item.id) || item)
     : onEdit(item.itemType, item)
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -80,6 +99,12 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
 
   const handleDropItem = async (payload, date, time) => {
     if (!payload?.id || !payload?.type || payload.repeat) return
+    if (payload.type === 'device') { // an Apple Calendar event: the change is saved to that calendar
+      const item = scheduled.find((x) => x.itemType === 'device' && x.id === payload.id)
+      try { if (item && await deviceCal.move(item, { date, time })) onToast('Event moved', `Saved to ${item.calendarName}.`, 'success') }
+      catch { onToast('Could not move it', 'Open Apple Calendar to change this event.', 'error') }
+      return
+    }
     await onReschedule(payload.type, payload.id, { date, ...(time ? { time, startTime: time } : {}) })
   }
 
@@ -148,6 +173,15 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </div>
       </section>
 
+      {/* App Store app, before Apple Calendar is connected: a one-line offer (dismissible) */}
+      {showTip && (
+        <section className="card devcal-tip">
+          <div><strong>See your Apple Calendar here</strong><span>Your appointments next to your tasks. Nothing leaves this device.</span></div>
+          <button type="button" className="primary-btn" onClick={() => deviceCal.connect()}>Connect</button>
+          <button type="button" className="devcal-close" onClick={hideTip} aria-label="Not now">✕</button>
+        </section>
+      )}
+
       {/* ── Day view ─────────────────────────────────────────────── */}
       {view === 'day' && (
         <section className="card">
@@ -163,8 +197,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               {dayAllDay.map((item) => {
                 const done = item.itemType === 'task' && item.completed
                 return (
-                  <div key={`${item.itemType}-${item.id}`} className={'cal-allday-item ' + item.itemType + (done ? ' done' : '')}
-                    draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
+                  <div key={`${item.itemType}-${item.id}`} className={'cal-allday-item ' + item.itemType + (done ? ' done' : '')} style={tint(item)}
+                    draggable={canDrag(item)} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                     {item.itemType === 'task' && onToggle && (
                       <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
                         aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
@@ -175,7 +209,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                       <span className="cal-allday-name">{item.title}</span>
                       <PlaceText place={item.location} className="cal-allday-place" />
                     </button>
-                    <span className="cal-allday-kind">{item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                    <span className="cal-allday-kind">{kindOf(item)}</span>
                   </div>
                 )
               })}
@@ -225,7 +259,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   </div>
                 ) : (
                   <div key={`${item.itemType}-${item.id}`} className={`time-card premium-time-card time-block ${item.itemType}${done ? ' done' : ''}${short ? ' short' : ''}${cols > 1 ? ' narrow' : ''}`}
-                    style={{ ...place, height }} draggable={!item.isRepeat}
+                    style={{ ...place, height, ...tint(item) }} draggable={canDrag(item)}
                     onClick={(e) => { if (e.target === e.currentTarget) openItem(item) }}
                     onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                     {item.itemType === 'task' && onToggle && (
@@ -236,10 +270,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                     )}
                     <button className="time-card-main" onClick={() => openItem(item)}>
                       <span className="time-card-title">{item.title}</span>
-                      <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)}{short && cleanPlace(item.location) ? <> · <PlaceText place={item.location} /></> : ''} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
+                      <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)}{short && cleanPlace(item.location) ? <> · <PlaceText place={item.location} /></> : ''} · {kindOf(item)}{item.isRepeat ? (item.itemType === 'device' ? ' · ↻' : ` · ↻ ${repeatLabel(item.recurrence)}`) : ''}</span>
                       {!short && <PlaceText place={item.location} className="time-card-place" />}
                     </button>
-                    <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
+                    {item.itemType !== 'device' && <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>}
                   </div>
                 )
               })}
@@ -263,8 +297,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                     {formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}
                   </button>
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
-                    <button key={`${item.itemType}-${item.id}`} className={'week-item ' + item.itemType} onClick={() => openItem(item)}
-                      draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
+                    <button key={`${item.itemType}-${item.id}`} className={'week-item ' + item.itemType} style={tint(item)} onClick={() => openItem(item)}
+                      draggable={canDrag(item)} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                       <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{item.startTime ? fmtRange(item.startTime, item.endTime) : 'All day'}</span>
                       <strong style={{fontSize:'.8rem', color:'var(--ink)', textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none', opacity: item.itemType === 'task' && item.completed ? .6 : 1}}>{item.title}</strong>
                       <PlaceText place={item.location} className="week-item-place" />
@@ -301,12 +335,12 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   <span className="month-cell-num" aria-hidden="true">{Number(date.slice(8))}</span>
                   {items.length > 0 && (<>
                     <span className="month-dots" aria-hidden="true">
-                      {items.slice(0, 3).map((item) => <span key={`${item.itemType}-${item.id}`} className={`month-dot ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`} />)}
+                      {items.slice(0, 3).map((item) => <span key={`${item.itemType}-${item.id}`} className={`month-dot ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`} style={tint(item)} />)}
                       {items.length > 3 && <span className="month-dots-more">+</span>}
                     </span>
                     <span className="month-chips" aria-hidden="true">
                       {shown.map((item) => (
-                        <span key={`${item.itemType}-${item.id}`} className={`month-chip ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`}>
+                        <span key={`${item.itemType}-${item.id}`} className={`month-chip ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`} style={tint(item)}>
                           {item.startTime && <span className="month-chip-time">{shortTime(item.startTime)}</span>}
                           <span className="month-chip-title">{item.title}</span>
                         </span>
@@ -338,7 +372,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               {dayScheduled.map((item) => {
                 const done = item.itemType === 'task' && item.completed
                 return (
-                  <div key={`${item.itemType}-${item.id}`} className={`agenda-row ${item.itemType}${done ? ' done' : ''}`}>
+                  <div key={`${item.itemType}-${item.id}`} className={`agenda-row ${item.itemType}${done ? ' done' : ''}`} style={tint(item)}>
                     {item.itemType === 'task' && onToggle ? (
                       <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
                         aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
@@ -352,7 +386,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                       </button>
                       <PlaceLink place={item.location} />
                     </div>
-                    <span className="agenda-row-kind">{item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                    <span className="agenda-row-kind">{kindOf(item)}</span>
                   </div>
                 )
               })}
@@ -360,6 +394,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
           )}
         </section>
       </>)}
+      <DeviceEventSheet item={deviceItem} onClose={() => setDeviceItem(null)} onToast={onToast} />
       <PageNav />
     </div>
   )

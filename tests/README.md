@@ -57,6 +57,7 @@ stand-in database rejected one of its writes.
 | `free-vs-pro`, `upgrade-links` | What Free can and can't do, upgrade sheet and website links |
 | `welcome` | Signed-out welcome, tour, sign-up and sign-in screens |
 | `app-store-shell`, `app-store-signed-out`, `app-store-purchases` | The iPhone/iPad app: sign-in storage, Apple reminders, backup, no web prices, in-app purchase |
+| `app-store-calendar` | Apple Calendar in the iPhone/iPad app (simulated calendar): connect, Day / Month / Home, edit, delete, move, save to a calendar, hide, turn off, access denied, and that the website shows none of it |
 
 ## Adding or changing a test
 

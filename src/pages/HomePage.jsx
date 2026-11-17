@@ -19,6 +19,8 @@ import { useWellnessKey, usePageKey } from '../lib/pageData.js'
 import { readinessOf, readinessBand } from './wellness/helpers.js'
 import { DEFAULT_TARGETS, dayProtein } from './wellness/NutritionTab.jsx'
 import { getVerseOfDay } from './faith/verses.js'
+import { useDeviceEvents } from '../lib/deviceCalendar.js'
+import { DeviceEventSheet } from '../components/DeviceEventSheet.jsx'
 
 function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
@@ -31,9 +33,13 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
   const overdueTasks = tasks.filter((task) => !task.completed && isOverdue(task.date))
   const homeBudget = normBudget(budget)
   const homeBudgetLeft = homeBudget.amount - budgetSpend(expenses, homeBudget.period).total
+  // Today's timed Apple Calendar events (App Store app, once connected) sit on the same timeline
+  const deviceToday = useDeviceEvents(TODAY, TODAY)
+  const [deviceItem, setDeviceItem] = React.useState(null)
   const todaySchedule = [
     ...todayTasks.filter((task) => task.time).map((task) => ({ ...task, startTime: task.time, itemType: 'task' })),
     ...expandEvents(events, TODAY, TODAY).map((event) => ({ ...event, itemType: 'event' })),
+    ...deviceToday.filter((item) => item.startTime),
   ].sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
   const insights = getHomeInsights({ tasks, expenses, budget, projects, goals, events, habits, habitLogs })
   const suggestions = getSmartSuggestions({ tasks, expenses, budget, projects, habits, habitLogs })
@@ -350,16 +356,17 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
           <Link className="ghost-btn" to="/calendar" style={{fontSize:'.8rem'}}>Calendar →</Link>
         </div>
         {todaySchedule.slice(0, 6).map((item) => (
-            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
+            <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => item.itemType === 'device' ? setDeviceItem(item) : onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
               <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600, whiteSpace:'nowrap'}}>{fmtRange(item.startTime, item.endTime)}</strong>
               <span style={{flex:1, minWidth:0, textAlign:'left', display:'grid', gap:2}}>
                 <span style={{fontSize:'.9rem', color: item.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none'}}>{item.title}</span>
                 <PlaceText place={item.location} className="row-place" />
               </span>
-              <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
+              <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : item.itemType === 'device' ? item.calendarName : 'Event'}</small>
             </button>
           ))}
+        <DeviceEventSheet item={deviceItem} onClose={() => setDeviceItem(null)} />
       </section>
     </>
   )

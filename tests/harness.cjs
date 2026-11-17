@@ -43,8 +43,10 @@ function report(result) {
 
 // Simulated iPhone/iPad App Store app: installed before the app loads, it mimics the bridge
 // that the iOS app injects (window.webkit.messageHandlers.bridge + Capacitor.nativePromise/nativeCallback),
-// so the app runs its App Store code paths. Pass as ctx.addInitScript(fakeIphone, { prefs, store }).
-function fakeIphone({ prefs = {}, store = null } = {}) {
+// so the app runs its App Store code paths. Pass as ctx.addInitScript(fakeIphone, { prefs, store, calendar }).
+// calendar: the phone's Apple Calendar, e.g. { permission: 'prompt' | 'granted' | 'denied', calendars: [...], events: [...],
+// editResult: 'saved' | 'deleted' | 'canceled', editPatch: { title: … } } (what Apple's own edit sheet "does").
+function fakeIphone({ prefs = {}, store = null, calendar = null } = {}) {
   const PLUGINS = {
     Preferences: ['get', 'set', 'remove', 'keys', 'clear'],
     PushNotifications: ['checkPermissions', 'requestPermissions', 'register', 'unregister', 'getDeliveredNotifications', 'removeAllDeliveredNotifications', 'createChannel', 'removeAllListeners'],
@@ -52,9 +54,14 @@ function fakeIphone({ prefs = {}, store = null } = {}) {
     Share: ['share', 'canShare'],
     Filesystem: ['writeFile', 'readFile', 'deleteFile', 'mkdir', 'getUri', 'stat'],
     App: ['exitApp', 'getInfo', 'getState', 'minimizeApp', 'removeAllListeners'],
+    CapacitorCalendar: ['checkPermission', 'requestFullCalendarAccess', 'listCalendars', 'listEventsInRange', 'createEvent', 'modifyEvent', 'deleteEvent', 'modifyEventWithPrompt', 'openCalendar'],
     Purchases: ['configure', 'logIn', 'logOut', 'getOfferings', 'purchasePackage', 'restorePurchases', 'getCustomerInfo', 'showManageSubscriptions', 'setLogLevel', 'isConfigured'],
   }
-  const f = window.__fake = { prefs: { ...prefs }, calls: [], listeners: {}, push: 'prompt', n: 0, store }
+  const f = window.__fake = { prefs: { ...prefs }, calls: [], listeners: {}, push: 'prompt', n: 0, store,
+    cal: { permission: 'prompt', calendars: [], events: [], editResult: 'saved', editPatch: null, ...(calendar || {}) }, calCalls: [] }
+  // The phone's calendar outlives a page reload (the fake is rebuilt on every load, so keep it in the tab's storage)
+  try { const kept = sessionStorage.getItem('__fakeCal'); if (kept) f.cal = JSON.parse(kept) } catch {}
+  const keepCal = () => { try { sessionStorage.setItem('__fakeCal', JSON.stringify(f.cal)) } catch {} }
   window.webkit = { messageHandlers: { bridge: { postMessage() {} } } }
   window.Capacitor = window.Capacitor || {}
   window.Capacitor.PluginHeaders = Object.entries(PLUGINS).map(([name, ms]) => ({
@@ -67,6 +74,32 @@ function fakeIphone({ prefs = {}, store = null } = {}) {
     return id
   }
   window.Capacitor.nativePromise = async (plugin, method, o = {}) => {
+    if (plugin === 'CapacitorCalendar') { // kept apart from f.calls so older specs' call lists don't change
+      const c = f.cal
+      f.calCalls.push({ method, ...o })
+      setTimeout(keepCal, 0)
+      if (method === 'checkPermission') return { result: c.permission }
+      if (method === 'requestFullCalendarAccess') { if (c.permission === 'prompt') c.permission = c.answer || 'granted'; return { result: c.permission } }
+      if (c.permission !== 'granted') return method === 'listCalendars' || method === 'listEventsInRange' ? { result: [] } : Promise.reject(new Error('No calendar access'))
+      const find = (id) => { const e = c.events.find((x) => x.id === id); if (!e) throw new Error('Event not found.'); return e }
+      if (method === 'listCalendars') return { result: c.calendars }
+      if (method === 'listEventsInRange') return { result: c.events.filter((e) => e.startDate < o.to && e.endDate >= o.from) }
+      if (method === 'createEvent') {
+        if (!c.calendars.some((x) => x.id === o.calendarId && x.allowsContentModifications !== false)) throw new Error('Calendar not found.')
+        const id = 'new-' + (c.events.length + 1)
+        c.events.push({ id, title: o.title, startDate: o.startDate, endDate: o.endDate, isAllDay: !!o.isAllDay, calendarId: o.calendarId, location: o.location || null, description: o.description || null, isPartOfSeries: !!o.recurrence, color: null })
+        return { id, ics: null }
+      }
+      if (method === 'modifyEvent') { const e = find(o.id); if (e.isPartOfSeries) e.isPartOfSeries = false /* the real plugin drops the repeat rule: the app must never do this */; Object.assign(e, { startDate: o.startDate ?? e.startDate, endDate: o.endDate ?? e.endDate }); return }
+      if (method === 'deleteEvent') { find(o.id); c.events = c.events.filter((x) => x.id !== o.id); return }
+      if (method === 'modifyEventWithPrompt') {
+        const e = find(o.id)
+        if (c.editResult === 'saved' && c.editPatch) Object.assign(e, c.editPatch)
+        if (c.editResult === 'deleted') c.events = c.events.filter((x) => x.id !== o.id)
+        return { result: c.editResult }
+      }
+      return {}
+    }
     f.calls.push(plugin + '.' + method + (plugin === 'Filesystem' || plugin === 'Share' || plugin === 'StatusBar' ? ' ' + JSON.stringify({ ...o, data: o.data ? `[${o.data.length} chars]` : undefined }) : ''))
     if (method === 'removeListener') { for (const k in f.listeners) f.listeners[k] = f.listeners[k].filter((l) => l.id !== o.callbackId); return }
     if (plugin === 'Preferences') {

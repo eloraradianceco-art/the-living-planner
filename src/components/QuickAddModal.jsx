@@ -6,6 +6,7 @@ import { habitTimesPerWeek } from '../lib/score.js'
 import { mapsUrl, cleanPlace } from './Place.jsx'
 import { categories } from '../lib/plannerService.js'
 import { StepsChecklist } from './StepsChecklist.jsx'
+import { deviceCal, useDeviceCalendar } from '../lib/deviceCalendar.js'
 
 const baseForms = {
   task: { title: '', date: TODAY, time: '', endTime: '', location: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
@@ -63,13 +64,20 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
   }, [type, item, isOpen])
 
   const title = useMemo(() => `${mode === 'edit' ? 'Edit' : 'Add'} ${labels[selectedType]}`, [mode, selectedType])
+  // App Store app with Apple Calendar connected: a new event can be saved to one of the person's own calendars
+  const deviceCalendar = useDeviceCalendar()
+  const ownCalendars = deviceCalendar.on && deviceCalendar.status === 'granted' ? deviceCalendar.calendars.filter((c) => c.writable && !deviceCalendar.hidden.includes(c.id)) : []
+  const [saveTo, setSaveTo] = useState('')
+  useEffect(() => { setSaveTo(ownCalendars.some((c) => c.id === deviceCalendar.saveTo) ? deviceCalendar.saveTo : '') }, [isOpen, deviceCalendar.saveTo, ownCalendars.length])
   if (!isOpen) return null
+  const toDevice = selectedType === 'event' && mode !== 'edit' && saveTo && ownCalendars.some((c) => c.id === saveTo)
 
   const submit = (e) => {
     e.preventDefault()
     if (selectedType === 'task' && endBeforeStart(form.time, form.endTime)) return
     if (selectedType === 'event' && endBeforeStart(form.startTime, form.endTime)) return
-    onSave(selectedType, { ...form, id: item?.id }, mode)
+    onSave(selectedType, { ...form, id: item?.id, ...(toDevice ? { deviceCalendarId: saveTo } : {}) }, mode)
+    if (selectedType === 'event' && mode !== 'edit' && !toDevice && ownCalendars.length) deviceCal.setSaveTo('') // remember "The Living Planner" too
     onClose()
   }
 
@@ -125,9 +133,17 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
           </>)}
 
           {selectedType === 'event' && (<>
+            {mode !== 'edit' && ownCalendars.length > 0 && (
+              <label className="full-span">Save to
+                <select value={toDevice ? saveTo : ''} onChange={(e) => setSaveTo(e.target.value)}>
+                  <option value="">The Living Planner</option>
+                  {ownCalendars.map((c) => <option key={c.id} value={c.id}>{c.account && c.account !== c.title ? `${c.title} (${c.account})` : c.title}</option>)}
+                </select>
+              </label>
+            )}
             <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
             <TimeRangeFields start={form.startTime} end={form.endTime} onChange={(startTime, endTime) => setForm({ ...form, startTime, endTime })} />
-            <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
+            {!toDevice && <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>}
             <LocationField value={form.location} places={places} onChange={(location) => setForm({ ...form, location })} />
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>{EVENT_REPEATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
             {(form.recurrence || 'none') !== 'none' && (

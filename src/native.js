@@ -8,6 +8,7 @@ import { Share } from '@capacitor/share'
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem'
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { Purchases } from '@revenuecat/purchases-capacitor'
+import { CapacitorCalendar } from '@ebarooni/capacitor-calendar'
 
 export const isNative = Capacitor.isNativePlatform()
 export const nativePlatform = Capacitor.getPlatform() // 'ios' | 'android' | 'web'
@@ -140,6 +141,47 @@ export const NativePush = {
   async rememberToken(token) {
     try { if (token) await Preferences.set({ key: TOKEN_KEY, value: token }); else await Preferences.remove({ key: TOKEN_KEY }) } catch {}
   },
+}
+
+// ── Apple Calendar on this iPhone/iPad (2026-11-17) ──────────────────────
+// Reads the calendars the person already has on the device (iCloud, plus any Google / Outlook / work account
+// added in iOS Settings) so the planner can show them next to tasks. Everything stays on the device: nothing
+// here talks to the planner database. The planner changes a calendar only when the person asks it to.
+// Plugin notes (@ebarooni/capacitor-calendar 8.10): modifyEvent() rewrites an event's repeat rule, and
+// delete / edit work on the FIRST event of a series, so repeating events are never changed from here;
+// the app sends people to Apple Calendar for those (see lib/deviceCalendar.js).
+export const deviceCalendarSupported = isNative && nativePlatform === 'ios'
+const calState = (r) => (r?.result === 'granted' ? 'granted' : r?.result === 'denied' ? 'denied' : 'prompt')
+export const NativeCalendar = {
+  // 'granted' | 'denied' | 'prompt' | 'unsupported'
+  async status() {
+    if (!deviceCalendarSupported) return 'unsupported'
+    try { return calState(await CapacitorCalendar.checkPermission({ scope: 'readCalendar' })) } catch { return 'prompt' }
+  },
+  async request() {
+    if (!deviceCalendarSupported) return 'unsupported'
+    try { return calState(await CapacitorCalendar.requestFullCalendarAccess()) } catch { return 'denied' }
+  },
+  async calendars() {
+    const { result } = await CapacitorCalendar.listCalendars()
+    return (result || []).map((c) => ({
+      id: c.id, title: c.title || 'Calendar', color: c.color || null,
+      writable: c.allowsContentModifications !== false && c.isImmutable !== true && c.isSubscribed !== true,
+      account: c.source?.title || '',
+    }))
+  },
+  async events(fromMs, toMs) {
+    const { result } = await CapacitorCalendar.listEventsInRange({ from: fromMs, to: toMs })
+    return result || []
+  },
+  // options: { title, startDate, endDate, isAllDay, location, description, calendarId, recurrence }
+  async create(options) { return (await CapacitorCalendar.createEvent(options))?.id || null },
+  // Only for events that don't repeat (see the note above)
+  async move(id, startMs, endMs) { await CapacitorCalendar.modifyEvent({ id, startDate: startMs, endDate: endMs }) },
+  async remove(id) { await CapacitorCalendar.deleteEvent({ id }) },
+  // Apple's own edit sheet, shown over the planner: 'saved' | 'deleted' | 'canceled' | null
+  async editWithApple(id) { return (await CapacitorCalendar.modifyEventWithPrompt({ id }))?.result || null },
+  async openInCalendar(ms) { await CapacitorCalendar.openCalendar({ date: ms }) },
 }
 
 // Tapping a reminder opens the page it is about (the reminder carries a path such as /calendar).
