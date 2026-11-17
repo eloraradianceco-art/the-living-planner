@@ -1,0 +1,45 @@
+# Cloud builds for The Living Planner iPhone/iPad app (codemagic.io), from the `capacitor` branch.
+# Each build: install → build the web app → copy it into the iOS project → compile → TestFlight.
+# The website on Vercel is not affected by anything in this file.
+# The app carries the planner database's public address and key (src/App_Planner.jsx), so no
+# database settings are needed here.
+#
+# Before the first build (see claude/living-planner-app-store.md in the project):
+#  1. Apple Developer: App ID com.eloraradiance.livingplanner with Push Notifications turned on.
+#  2. App Store Connect: create the app with that bundle ID.
+#  3. Codemagic → Team settings → Integrations → App Store Connect API key named "Elora Radiance"
+#     (the same key the Armed & Anchored build uses).
+
+workflows:
+  ios-testflight:
+    name: iOS to TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Elora Radiance
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.eloraradiance.livingplanner
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Build the web app
+        script: |
+          npm ci
+          npm run build
+      - name: Copy into the iOS project
+        script: npx cap sync ios
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Give this build a new build number
+        script: |
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" ios/App/App.xcodeproj/project.pbxproj
+      - name: Build the iPhone/iPad app
+        script: xcode-project build-ipa --project "ios/App/App.xcodeproj" --scheme "App"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

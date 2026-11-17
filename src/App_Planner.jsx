@@ -3,6 +3,7 @@ import Reviews from "./Reviews"
 import { createClient } from '@supabase/supabase-js'
 import AccountPrivacy from './AccountPrivacy.jsx'
 import ScriptureCredits from './ScriptureCredits.jsx'
+import { isNative, WEB_ORIGIN, purchasesInApp, nativeAuthStorage, nativeShareFile, NativePush, nativePushSupported, onNativeReminderTap, NATIVE_PURCHASES, storeSignIn, storeSignOut, storePlans, storeBuy, storeRestore, storeManage } from './native.js'
 import MindMapTab from './MindMap.jsx'
 import { Routes, Route, Link, BrowserRouter, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -19,12 +20,19 @@ import {
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// The website reads these from Vercel settings. The App Store app is built without them, so it
+// carries the planner's public database address and public (anon) key, which every browser receives anyway.
+const NATIVE_SUPABASE_URL = 'https://pxvgolgwrlqzjykvzzzy.supabase.co'
+const NATIVE_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dmdvbGd3cmxxemp5a3Z6enp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMjQxODIsImV4cCI6MjA5MjcwMDE4Mn0.MtT8fz4P_V1yZG-T1t1pO-FZeQk4Ua8J404Mvi65ZYI'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (isNative ? NATIVE_SUPABASE_URL : '')
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (isNative ? NATIVE_SUPABASE_ANON_KEY : '')
 const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey)
 const supabase = hasSupabaseEnv
   ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      // In the phone app the sign-in lives in the phone's own storage (iOS can clear web storage).
+      auth: isNative
+        ? { storage: nativeAuthStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        : { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     })
   : null
 
@@ -76,13 +84,22 @@ const bufToB64Url = (buf) => {
 }
 const isIOS = () => typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
+// In the App Store app the same reminders arrive through Apple's notification service (see native.js).
 const PlannerPush = {
   async isSupported() {
+    if (isNative) return nativePushSupported
     return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  },
+
+  // 'granted' | 'denied' | 'default'
+  async permission() {
+    if (isNative) return NativePush.permission()
+    try { return typeof Notification === 'undefined' ? 'default' : Notification.permission } catch { return 'default' }
   },
 
   async requestPermission() {
     if (!(await this.isSupported())) return 'unsupported'
+    if (isNative) return NativePush.requestPermission()
     return Notification.requestPermission()
   },
 
@@ -112,6 +129,14 @@ const PlannerPush = {
   // Subscribe this device (or refresh it) and save it to the user's account.
   async subscribe() {
     if (!hasSupabaseEnv) return null
+    if (isNative) {
+      const token = await NativePush.register()
+      if (!token) return null
+      const { error } = await supabase.rpc('register_native_push', { p_token: token, p_platform: 'ios', p_user_agent: navigator.userAgent.slice(0, 200) })
+      if (error) { console.warn('Native push register failed:', error.message); return null }
+      await NativePush.rememberToken(token)
+      return { token }
+    }
     const reg = await this.registerSW()
     if (!reg) return null
     const key = await this.publicKey()
@@ -132,6 +157,12 @@ const PlannerPush = {
   },
 
   async unsubscribe() {
+    if (isNative) {
+      const token = await NativePush.savedToken()
+      if (token && hasSupabaseEnv) await supabase.from('push_subscriptions').delete().eq('endpoint', 'apns:' + token.toLowerCase())
+      await NativePush.rememberToken(null)
+      return
+    }
     const reg = await navigator.serviceWorker.getRegistration('/sw.js')
     const sub = reg && await reg.pushManager.getSubscription()
     if (sub) {
@@ -141,6 +172,7 @@ const PlannerPush = {
   },
 
   async deviceConnected() {
+    if (isNative) return Boolean(await NativePush.savedToken()) && (await NativePush.permission()) === 'granted'
     try {
       const reg = await navigator.serviceWorker.getRegistration('/sw.js')
       return Boolean(reg && await reg.pushManager.getSubscription())
@@ -1385,7 +1417,7 @@ function AuthProvider({ children }) {
     if (!hasSupabaseEnv) return { data: null, error: new Error('Supabase env vars missing.') }
     return supabase.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin }
+      options: { emailRedirectTo: isNative ? WEB_ORIGIN : window.location.origin }
     })
   }
 
@@ -1397,6 +1429,7 @@ function AuthProvider({ children }) {
     }
     if (!hasSupabaseEnv) return { error: null }
     const res = await supabase.auth.signOut()
+    storeSignOut()
     clearAccountCache()
     try { localStorage.removeItem('planner.lastUser') } catch {}
     return res
@@ -1894,7 +1927,7 @@ function AuthPage() {
               if (!email) { setError('Enter your email above first.'); return }
               setLoading(true); setError('')
               const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-                redirectTo: window.location.origin + '/reset-password'
+                redirectTo: (isNative ? WEB_ORIGIN : window.location.origin) + '/reset-password'
               })
               setLoading(false)
               if (resetError) setError(resetError.message)
@@ -3111,10 +3144,10 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
         <div><p className="eyebrow">Life Balance</p><h3>What's behind your score?</h3></div>
         <span className="pro-tag">PRO</span>
       </div>
-      <p className="muted" style={{fontSize:'.86rem',lineHeight:1.55,margin:'0 0 12px'}}>
-        Pro breaks your Life Score into its 7 areas, tracks it over 30 days, and walks you through a weekly review.
+      <p className="muted" style={{fontSize:'.86rem',lineHeight:1.55,margin: purchasesInApp ? '0 0 12px' : 0}}>
+        Pro breaks your Life Score into its 7 areas, tracks it over 30 days, and walks you through a weekly review.{!purchasesInApp && ' If you have Pro, sign in with that account to see it.'}
       </p>
-      <button type="button" className="primary-btn" onClick={() => onUpgrade('See your full Life Score', 'Your score in 7 areas, 30-day trends and a weekly review, plus everything else in Pro.')}>Unlock Pro →</button>
+      {purchasesInApp && <button type="button" className="primary-btn" onClick={() => onUpgrade('See your full Life Score', 'Your score in 7 areas, 30-day trends and a weekly review, plus everything else in Pro.')}>Unlock Pro →</button>}
     </section>
   ) : (
     <>
@@ -4071,7 +4104,7 @@ const STRIPE_CONFIG = {
     annual: 59.99,
   },
 }
-const PRO_PRICE_LINE = '$7.99/mo or $59.99/yr · Cancel anytime'
+const PRO_PRICE_LINE = isNative ? 'Monthly or yearly · Cancel anytime' : '$7.99/mo or $59.99/yr · Cancel anytime'
 
 // ── Free vs Pro (2026-11-14) ──────────────────────────────────────────────
 // Free: Home (Balanced mode), Tasks, Calendar, reminders, Calculator, and a starter tab in each life area
@@ -4189,6 +4222,31 @@ function useSubscription(user) {
     return () => { cancelled = true; clearTimeout(timer); supabase.removeChannel(channel) }
   }, [user?.id])
 
+  // App Store app: a purchase or restore just finished (NativeProPlans) → have the server read it from Apple
+  // (store-sync) and show Confirming → Welcome. Also checked once on each open, so renewals, cancellations
+  // and refunds show up even if a notice was missed.
+  React.useEffect(() => {
+    if (!NATIVE_PURCHASES || !user || !hasSupabaseEnv) return
+    let cancelled = false, timer = null
+    const read = async () => {
+      const { data } = await supabase.from('profiles').select('tier, pro_comp').eq('user_id', user.id).maybeSingle()
+      return data ? apply(data) : null
+    }
+    const sync = () => supabase.functions.invoke('store-sync', { body: { action: 'sync' } }).catch(() => null)
+    const confirm = async (attempt = 0) => {
+      if (attempt === 0) await sync()
+      const t = await read()
+      if (cancelled) return
+      if (t === 'pro' || t === 'trial') setWelcome('done')
+      else if (attempt < 8) timer = setTimeout(() => { if (attempt % 3 === 2) sync(); confirm(attempt + 1) }, 2000)
+      else setWelcome('waiting')
+    }
+    const onPurchased = () => { setWelcome('confirming'); clearTimeout(timer); confirm(0) }
+    window.addEventListener('planner-store-purchased', onPurchased)
+    storeSignIn(user.id).then(() => sync()).then(() => !cancelled && read())
+    return () => { cancelled = true; clearTimeout(timer); window.removeEventListener('planner-store-purchased', onPurchased) }
+  }, [user?.id])
+
   // 'trial' is kept as Pro for any subscription that started before trials were removed.
   const isPro = tier === 'pro' || tier === 'trial'
   const dismissWelcome = React.useCallback(() => setWelcome(null), [])
@@ -4201,7 +4259,7 @@ function WelcomeProBanner({ state = 'done', onDismiss }) {
   const copy = state === 'confirming'
     ? { icon: '⏳', title: 'Confirming your subscription…', text: 'This usually takes a few seconds.' }
     : state === 'waiting'
-      ? { icon: '⏳', title: 'Still confirming your payment', text: "Pro turns on as soon as Stripe confirms it. Make sure you're signed in with the email you paid with, or email support@eloraradiance.com." }
+      ? { icon: '⏳', title: 'Still confirming your payment', text: isNative ? "Pro turns on as soon as Apple confirms it. Open the planner again in a minute, or email support@eloraradiance.com." : "Pro turns on as soon as Stripe confirms it. Make sure you're signed in with the email you paid with, or email support@eloraradiance.com." }
       : { icon: '🎉', title: 'Welcome to Pro!', text: 'Every Pro feature is unlocked. Plan with faith, live with purpose.' }
   return (
     <div style={{
@@ -4254,6 +4312,11 @@ function ProTabGate({ isPro, onUpgrade, children, title = 'Pro Feature', text, p
       <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white', marginBottom: 8 }}>
         {title}
       </div>
+      {!purchasesInApp ? (
+        <p style={{ fontSize: '.88rem', color: 'rgba(255,255,255,.8)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto' }}>
+          This is part of Living Planner Pro. If you have Pro, sign in with that account and it opens right up.
+        </p>
+      ) : (<>
       <p style={{ fontSize: '.88rem', color: 'rgba(255,255,255,.8)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 18px' }}>
         {text || 'Part of Living Planner Pro, with the full finance, wellness, faith and lifestyle tools, Life Score insights, and no limits.'}
       </p>
@@ -4274,6 +4337,7 @@ function ProTabGate({ isPro, onUpgrade, children, title = 'Pro Feature', text, p
         boxShadow: '0 4px 20px rgba(184,150,90,.35)',
       }}>Unlock Pro →</button>
       <p style={{fontSize:'.75rem',color:'rgba(255,255,255,.72)',marginTop:12}}>{PRO_PRICE_LINE}</p>
+      </>)}
     </div>
   )
 }
@@ -4290,6 +4354,90 @@ function ProSectionGate({ isPro, onUpgrade, icon, title, subtitle, gateTitle, te
   )
 }
 
+
+// ── App Store purchase (Apple in-app purchase through RevenueCat) ──────────
+// Prices come from Apple for the person's own country. Pro attaches to the signed-in planner account.
+// Apple requires: the price and period, how renewal works, Restore Purchases, and links to the terms and privacy policy.
+function NativeProPlans({ onDone }) {
+  const { user } = useAuth()
+  const [plans, setPlans] = useState(undefined) // undefined = loading, null = store unavailable
+  const [busy, setBusy] = useState(null)
+  const [msg, setMsg] = useState('')
+  React.useEffect(() => {
+    let alive = true
+    storePlans(user?.id).then((p) => { if (alive) setPlans(p && (p.monthly || p.annual) ? p : null) }).catch(() => { if (alive) setPlans(null) })
+    return () => { alive = false }
+  }, [user?.id])
+  const finished = () => { window.dispatchEvent(new CustomEvent('planner-store-purchased')); onDone?.() }
+  const buy = async (kind) => {
+    const plan = plans?.[kind]
+    if (!plan || busy) return
+    setBusy(kind); setMsg('')
+    const r = await storeBuy(user.id, plan.pkg)
+    setBusy(null)
+    if (r === 'pro') finished()
+    else if (r === 'pending') setMsg('Your purchase is waiting for approval. Pro turns on as soon as it is approved.')
+    else if (r && r.error) setMsg(r.error)
+  }
+  const restore = async () => {
+    if (busy) return
+    setBusy('restore'); setMsg('')
+    const ok = await storeRestore(user.id)
+    setBusy(null)
+    if (ok) finished()
+    else setMsg('No Living Planner Pro subscription was found for this Apple ID.')
+  }
+  const perMonth = (() => {
+    const a = plans?.annual?.pkg?.product
+    if (!a?.price || !a?.currencyCode) return null
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: a.currencyCode }).format(a.price / 12) } catch { return null }
+  })()
+  const btn = { display: 'block', width: '100%', padding: '14px', borderRadius: 14, fontWeight: 700, cursor: 'pointer', font: 'inherit', textAlign: 'center' }
+  return (
+    <div className="native-plans">
+      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', textAlign: 'left', display: 'grid', gap: 9 }}>
+        {PRO_FEATURES.map(([emoji, name, detail]) => (
+          <li key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
+            <span aria-hidden="true" style={{ fontSize: '1.05rem', lineHeight: 1.2 }}>{emoji}</span>
+            <span><strong>{name}</strong> <span style={{ color: 'var(--ink2)' }}>· {detail}</span></span>
+          </li>
+        ))}
+      </ul>
+      {plans === undefined && <p className="muted" style={{ fontSize: '.85rem', margin: '0 0 16px' }}>Loading plans from the App Store…</p>}
+      {plans === null && <p style={{ fontSize: '.85rem', color: 'var(--ink2)', lineHeight: 1.55, margin: '0 0 16px', background: 'var(--stone)', borderRadius: 12, padding: '12px 14px' }}>The App Store isn't reachable right now. Check your connection and try again.</p>}
+      {plans && (
+        <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
+          {plans.annual && (
+            <button type="button" disabled={!!busy} onClick={() => buy('annual')} style={{ ...btn, background: 'var(--teal)', color: 'white', border: 'none', position: 'relative' }}>
+              <div style={{ fontSize: '.95rem' }}>{busy === 'annual' ? 'Opening the App Store…' : `Yearly — ${plans.annual.price} a year`}</div>
+              {perMonth && <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2, fontWeight: 600 }}>About {perMonth} a month</div>}
+              <span style={{ position: 'absolute', top: -8, right: 12, background: 'var(--brass, #B8965A)', color: 'white', fontSize: '.65rem', padding: '3px 10px', borderRadius: 999, fontWeight: 700 }}>BEST VALUE</span>
+            </button>
+          )}
+          {plans.monthly && (
+            <button type="button" disabled={!!busy} onClick={() => buy('monthly')} style={{ ...btn, background: 'var(--stone)', color: 'var(--ink)', border: '1.5px solid var(--border2)' }}>
+              <div style={{ fontSize: '.95rem' }}>{busy === 'monthly' ? 'Opening the App Store…' : `Monthly — ${plans.monthly.price} a month`}</div>
+              <div style={{ fontSize: '.78rem', color: 'var(--ink2)', marginTop: 2, fontWeight: 600 }}>Cancel anytime</div>
+            </button>
+          )}
+        </div>
+      )}
+      {msg && <p role="status" style={{ fontSize: '.82rem', color: 'var(--ink)', background: 'var(--brass-dim, #F5EEDF)', borderRadius: 10, padding: '10px 12px', margin: '0 0 12px', lineHeight: 1.5 }}>{msg}</p>}
+      <button type="button" disabled={!!busy} onClick={restore} style={{ background: 'none', border: 'none', color: 'var(--teal)', fontWeight: 700, fontSize: '.84rem', cursor: 'pointer', marginBottom: 12 }}>
+        {busy === 'restore' ? 'Restoring…' : 'Restore purchases'}
+      </button>
+      <p className="native-plans-legal" style={{ fontSize: '.7rem', color: 'var(--muted)', lineHeight: 1.55, margin: '0 0 14px', textAlign: 'left' }}>
+        Living Planner Pro is an auto-renewing subscription. Payment is charged to your Apple ID when you confirm. It renews
+        automatically at the same price unless cancelled at least 24 hours before the end of the current period, and your
+        account is charged for the renewal within 24 hours before the period ends. Manage or cancel anytime in your
+        Apple ID's subscriptions (Settings → your name → Subscriptions). Pro is linked to the account you're signed in with.{' '}
+        <a href="https://eloraradiance.com/terms.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--teal)' }}>Terms of Use</a>
+        {' · '}
+        <a href="https://eloraradiance.com/privacy.html" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--teal)' }}>Privacy Policy</a>
+      </p>
+    </div>
+  )
+}
 
 // ── Upgrade Card ──────────────────────────────────────────────────────────
 function UpgradeCard({ title, message, onClose }) {
@@ -4315,6 +4463,13 @@ function UpgradeCard({ title, message, onClose }) {
           {message || 'The whole planner, with no limits.'}
         </p>
 
+        {!purchasesInApp ? (
+          <p style={{ fontSize: '.85rem', color: 'var(--ink2)', lineHeight: 1.6, marginBottom: 20, background: 'var(--stone)', borderRadius: 12, padding: '12px 14px' }}>
+            Pro can't be purchased in the app yet. If you already have Pro, sign in with that account and everything unlocks.
+          </p>
+        ) : isNative ? (
+          <NativeProPlans onDone={onClose} />
+        ) : (<>
         <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', textAlign: 'left', display: 'grid', gap: 9 }}>
           {PRO_FEATURES.map(([emoji, name, detail]) => (
             <li key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
@@ -4347,11 +4502,12 @@ function UpgradeCard({ title, message, onClose }) {
             <div style={{ fontSize: '.78rem', color: 'var(--ink2)', marginTop: 2 }}>Cancel anytime</div>
           </a>
         </div>
+        </>)}
 
         <button onClick={onClose} style={{
           background: 'none', border: 'none', color: 'var(--muted)',
           fontSize: '.82rem', cursor: 'pointer',
-        }}>Maybe later</button>
+        }}>{purchasesInApp ? 'Maybe later' : 'OK'}</button>
       </div>
     </div>
   )
@@ -4651,6 +4807,7 @@ const A2HS_PLATFORMS = [
 ]
 
 function isStandalone() {
+  if (isNative) return true // the App Store app is already installed
   try {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
   } catch { return false }
@@ -10277,6 +10434,7 @@ function NotificationSettings({ settings, updateSettings }) {
 
   useEffect(() => {
     PlannerPush.isSupported().then(setSupported)
+    PlannerPush.permission().then(setPermission)
     PlannerPush.deviceConnected().then(setConnected)
   }, [])
 
@@ -10387,6 +10545,7 @@ async function downloadBackup(user) {
   const backup = await buildBackup(user)
   const name = `living-planner-backup-${TODAY}.json`
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+  if (isNative) return nativeShareFile(JSON.stringify(backup, null, 2), name, 'Living Planner backup')
   const file = typeof File !== 'undefined' ? new File([blob], name, { type: 'application/json' }) : null
   // iPhone/iPad Home Screen apps can't download directly — hand the file to the share sheet (Save to Files)
   // (iPads report themselves as a Mac, so check for touch too)
@@ -10437,6 +10596,16 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
   React.useEffect(() => { setNameDraft(profile.displayName || '') }, [profile.displayName])
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
   const [showReviews, setShowReviews] = React.useState(false)
+  // App Store app: is this account's Pro an Apple subscription? (then Manage opens Apple's subscriptions)
+  const [appleSub, setAppleSub] = React.useState(false)
+  const [restoreMsg, setRestoreMsg] = React.useState('')
+  React.useEffect(() => {
+    if (!isNative || !user || !hasSupabaseEnv) return
+    let alive = true
+    supabase.from('app_store_entitlements').select('active, expires_at').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => { if (alive) setAppleSub(!!data?.active && (!data.expires_at || new Date(data.expires_at) > new Date())) })
+    return () => { alive = false }
+  }, [user?.id])
 
   return (
     <div className="screen-stack">
@@ -10453,14 +10622,21 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                     {isPro ? 'All features unlocked · Thanks for supporting' : `Free plan · ${FREE_LIMITS.habits} habits, ${FREE_LIMITS.goals} goals, ${FREE_LIMITS.projects} projects`}
                   </div>
                 </div>
-                {isPro ? (
+                {isPro && appleSub ? (
+                  <button type="button" onClick={storeManage}
+                     style={{
+                       padding:'8px 18px', borderRadius:999, background:'var(--stone)',
+                       color:'var(--ink)', border:'1.5px solid var(--border2)',
+                       fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap', cursor:'pointer',
+                     }}>Manage</button>
+                ) : isPro ? (
                   <a href="mailto:support@eloraradiance.com?subject=Manage%20My%20Subscription"
                      style={{
                        padding:'8px 18px', borderRadius:999, background:'var(--stone)',
                        color:'var(--ink)', textDecoration:'none', border:'1.5px solid var(--border2)',
                        fontWeight:600, fontSize:'.82rem', whiteSpace:'nowrap',
                      }}>Manage</a>
-                ) : (
+                ) : purchasesInApp && (
                   <button onClick={() => triggerUpgrade('Upgrade to Pro', 'The whole planner, with no limits.')} style={{
                     padding:'8px 18px', borderRadius:999, background:'var(--teal)',
                     color:'white', border:'none', fontWeight:700, fontSize:'.85rem', cursor:'pointer',
@@ -10469,11 +10645,28 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
               </div>
             )
           })()}
+          {appleSub ? (
+            <p className="muted" style={{fontSize:'.72rem',marginTop:12,marginBottom:0,lineHeight:1.5}}>
+              Your Pro subscription is through the App Store. Change or cancel it with Manage (your Apple ID's subscriptions).
+              You keep Pro until the end of the period you've paid for.
+            </p>
+          ) : (purchasesInApp || ['pro', 'trial'].includes((typeof window !== 'undefined' && localStorage.getItem('planner_tier')) || '')) &&
           <p className="muted" style={{fontSize:'.72rem',marginTop:12,marginBottom:0,lineHeight:1.5}}>
-            To cancel or update payment, email{' '}
-            <a href="mailto:support@eloraradiance.com" style={{color:'var(--teal)'}}>support@eloraradiance.com</a>.
-            You keep Pro until the end of the period you've paid for.
-          </p>
+            {isNative && NATIVE_PURCHASES
+              ? <>Pro bought in this app is managed in your Apple ID's subscriptions. If you subscribed on the website, email{' '}<a href="mailto:support@eloraradiance.com" style={{color:'var(--teal)'}}>support@eloraradiance.com</a> to make changes.</>
+              : <>To cancel or update payment, email{' '}<a href="mailto:support@eloraradiance.com" style={{color:'var(--teal)'}}>support@eloraradiance.com</a>. You keep Pro until the end of the period you've paid for.</>}
+          </p>}
+          {isNative && NATIVE_PURCHASES && !['pro', 'trial'].includes((typeof window !== 'undefined' && localStorage.getItem('planner_tier')) || '') && (
+            <button type="button" onClick={async () => {
+              setRestoreMsg('Checking your Apple ID…')
+              const ok = await storeRestore(user?.id)
+              if (ok) { window.dispatchEvent(new CustomEvent('planner-store-purchased')); setRestoreMsg('') }
+              else setRestoreMsg('No Living Planner Pro subscription was found for this Apple ID.')
+            }} style={{background:'none',border:'none',color:'var(--teal)',fontWeight:700,fontSize:'.8rem',padding:'10px 0 0',cursor:'pointer'}}>
+              Restore purchases
+            </button>
+          )}
+          {restoreMsg && <p role="status" className="muted" style={{fontSize:'.75rem',margin:'6px 0 0'}}>{restoreMsg}</p>}
         </section>
 
       <div style={{display:"flex",alignItems:"center",gap:8,paddingBottom:2}}>
@@ -10538,8 +10731,8 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         ))}
       </section>
 
-      {/* ── Add to Home Screen ─────────────────── */}
-      <section className="card">
+      {/* ── Add to Home Screen (website only; the App Store app is already installed) ── */}
+      {!isNative && <section className="card">
         <p className="eyebrow">Quick Access</p>
         <button onClick={() => setA2hsOpen(true)} style={{
           width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
@@ -10553,7 +10746,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           </div>
           <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
         </button>
-      </section>
+      </section>}
 
       {/* ── Ratings & Reviews ─────── */}
       <section className="card">
@@ -10805,10 +10998,16 @@ function PlannerApp() {
   // Reminders come from the server; just make sure this device is registered.
   useEffect(() => {
     if (!user || !hasSupabaseEnv) return
-    try { if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return } catch { return }
-    const t = setTimeout(() => { PlannerPush.subscribe() }, 1500)
-    return () => clearTimeout(t)
+    let cancelled = false
+    const t = setTimeout(async () => {
+      if (!cancelled && (await PlannerPush.permission()) === 'granted') PlannerPush.subscribe()
+    }, 1500)
+    return () => { cancelled = true; clearTimeout(t) }
   }, [user?.id])
+
+  // Phone app: tapping a reminder opens the page it is about.
+  const navigateTo = useNavigate()
+  useEffect(() => onNativeReminderTap(navigateTo), [navigateTo])
 
   if (loading) return <div className="auth-shell"><div className="auth-card"><p className="eyebrow">Planner Data</p><h1>Loading your workspace…</h1></div></div>
 

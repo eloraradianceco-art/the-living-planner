@@ -1,0 +1,20 @@
+{
+  "appId": "com.eloraradiance.livingplanner",
+  "appName": "The Living Planner",
+  "webDir": "dist",
+  "backgroundColor": "#1A2332",
+  "ios": {
+    "backgroundColor": "#1A2332",
+    "contentInset": "never"
+  },
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "overlaysWebView": true,
+      "backgroundColor": "#00000000"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
