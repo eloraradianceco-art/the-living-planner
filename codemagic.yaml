@@ -1,7 +1,7 @@
 # Cloud builds for The Living Planner iPhone/iPad app (codemagic.io), from the `capacitor` branch.
 # Each build: install → build the web app → copy it into the iOS project → compile → TestFlight.
 # The website on Vercel is not affected by anything in this file.
-# The app carries the planner database's public address and key (src/App_Planner.jsx), so no
+# The app carries the planner database's public address and key (src/lib/supabase.js), so no
 # database settings are needed here.
 #
 # Before the first build (see claude/living-planner-app-store.md in the project):
