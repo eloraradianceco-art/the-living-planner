@@ -1,0 +1,63 @@
+{
+ "bars": [
+  {
+   "t": "Nov 1: 10/10",
+   "h": 129
+  },
+  {
+   "t": "Nov 2: 10/10",
+   "h": 129
+  },
+  {
+   "t": "Nov 3: 7/10",
+   "h": 90
+  },
+  {
+   "t": "Nov 4: 9/10",
+   "h": 116
+  },
+  {
+   "t": "Nov 5: 8/10",
+   "h": 103
+  },
+  {
+   "t": "Nov 6: 9/10",
+   "h": 116
+  },
+  {
+   "t": "Nov 7: 8/10",
+   "h": 103
+  },
+  {
+   "t": "Nov 8: 4/10",
+   "h": 52
+  },
+  {
+   "t": "Nov 9: 8/10",
+   "h": 103
+  },
+  {
+   "t": "Nov 10: 9/10",
+   "h": 116
+  },
+  {
+   "t": "Nov 11: 7/10",
+   "h": 90
+  },
+  {
+   "t": "Nov 12: 8/10",
+   "h": 103
+  },
+  {
+   "t": "Nov 13: 7/10",
+   "h": 90
+  }
+ ],
+ "cols": 30,
+ "note": "13 of 30 days tracked. Each day is the same 7-day Life Score you see on Home, as it stood that day. Empty days had nothing logged.",
+ "todaySnapshotVersion": [
+  2,
+  2
+ ],
+ "errors": []
+}

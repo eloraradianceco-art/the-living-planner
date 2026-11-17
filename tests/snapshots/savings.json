@@ -1,0 +1,58 @@
+{
+ "addBtnLabel": "+ Add $250.00",
+ "afterAdd": {
+  "shown": "$250.00",
+  "total": "$250.00",
+  "stored": 250
+ },
+ "afterTakeOut": "$200.00",
+ "clamped": [
+  "-200|",
+  "-50|",
+  "250|Paycheck"
+ ],
+ "reached": "🎉 Goal reached",
+ "historyRows": [
+  "Nov 16Added+$1,000.00",
+  "Nov 16Taken out−$200.00",
+  "Nov 16Taken out−$50.00",
+  "Nov 16Paycheck+$250.00"
+ ],
+ "afterEdit": {
+  "label": "Emergency Fund (3 mo)",
+  "goal": 6000,
+  "current": 1200,
+  "targetDate": "2027-11-01",
+  "lastHistory": "200|Balance corrected",
+  "hint": "Save $400.00/month to reach it by Nov 1, 2027 · $4,800.00 to go"
+ },
+ "newGoal": {
+  "goal": 8000,
+  "current": 1500,
+  "history": [
+   "1500|Starting balance"
+  ],
+  "total": "$2,700.00"
+ },
+ "sinking": {
+  "id": 7,
+  "name": "Car repair",
+  "target": 600,
+  "current": 175.5,
+  "dueDate": "",
+  "history": [
+   {
+    "id": 1794852007645,
+    "date": "2026-11-16",
+    "amount": 75.5,
+    "note": ""
+   }
+  ]
+ },
+ "newSinkingHint": "Save $400.00/month to reach it by Dec 20 · $800.00 to go",
+ "afterDelete": [
+  "Emergency Fund (3 mo)"
+ ],
+ "overviewTotal": "Total Saved (goals)$1,200.00",
+ "errors": []
+}

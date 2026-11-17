@@ -1,0 +1,27 @@
+{
+ "metrics": "TASKS OPEN 5 2 overdue WEEK DONE 0% completion BUDGET LEFT $150 this week STREAK 4d 2 habits",
+ "topHabit": "TOP HABIT · TAP CIRCLE Stretch",
+ "taskGroups": [
+  "Overdue",
+  "Today",
+  "No Date"
+ ],
+ "newOccurrences": [
+  "Overdue weekly → 2026-11-17",
+  "Monthly on 31st → 2026-11-30"
+ ],
+ "allDay": "ALL DAY Due today untimed Task",
+ "monthNav": [
+  "November 2026",
+  "December 2026",
+  "January 2027",
+  "February 2027"
+ ],
+ "habitRows": [
+  "3/3 this week ✓",
+  "🔥 2wk streak",
+  "1/2 this week"
+ ],
+ "smartOpen": "",
+ "errors": []
+}

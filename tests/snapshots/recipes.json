@@ -1,0 +1,51 @@
+{
+ "legacyRow": "⭐Old Link RecipeDinnerSaved link",
+ "legacyDetail": {
+  "source": "https://example.com/r",
+  "emptyIng": true,
+  "stepsHint": true
+ },
+ "savedShape": {
+  "ing": 7,
+  "steps": [
+   "Brown the beef with the onion.",
+   "Stir in the sauce.",
+   "Layer and bake 45 minutes."
+  ],
+  "url": "https://example.com/lasagna",
+  "servings": "6"
+ },
+ "detailOpensAfterSave": "Weeknight Lasagna",
+ "meta": "DinnerServes 6Prep 20 minCook 45 min",
+ "onListMarked": true,
+ "addLabel": "Add 6 to Shopping List",
+ "addLabelAfterSkip": "Add 5 to Shopping List",
+ "addedMsg": "Added 5 items to your shopping list. View list →",
+ "groceries": [
+  "Onions|||",
+  "Milk|1 gal||Weeknight Lasagna",
+  "Ground beef|1 lb||Weeknight Lasagna",
+  "Pasta sauce|1 (24 oz) jar||Weeknight Lasagna",
+  "Shredded mozzarella|2 cups||Weeknight Lasagna",
+  "Garlic|2 cloves||Weeknight Lasagna"
+ ],
+ "afterAddButton": "Nothing selected",
+ "stepChecked": 1,
+ "listShowsFrom": 5,
+ "editPrefilled": 7,
+ "renamed": [
+  "Old Link Recipe",
+  "Sunday Lasagna"
+ ],
+ "favCount": 1,
+ "cacheKeys": {
+  "prefixed": true,
+  "groceries": 6
+ },
+ "searchOpens": "Sunday Lasagna",
+ "searchUrlCleaned": "?tab=recipes",
+ "afterDelete": [
+  "Old Link Recipe"
+ ],
+ "errors": []
+}

@@ -1,0 +1,40 @@
+{
+ "slotStart": "06:00",
+ "slotEndEmpty": true,
+ "created": "6:00 – 7:00 AM · Task",
+ "savedRow": {
+  "time": "06:00",
+  "end_time": "07:00"
+ },
+ "endFollows": "07:30",
+ "afterMove": "6:30 – 7:30 AM · Task",
+ "errorShown": true,
+ "blocked": true,
+ "endCleared": true,
+ "afterClear": "6:30 AM · Task",
+ "clearedRow": {
+  "method": "PATCH",
+  "end_time": null
+ },
+ "eventDefaults": [
+  "09:00",
+  "10:00"
+ ],
+ "eventEndFollows": "14:00",
+ "eventCard": "1:00 – 2:00 PM · Event",
+ "dragged": {
+  "time": "05:00",
+  "end_time": "06:00"
+ },
+ "draggedCard": "5:00 – 6:00 AM · Event",
+ "weekShowsRange": "5:00 – 6:00 AMTeam meeting",
+ "nextWeek": {
+  "title": "Training block",
+  "date": "2026-11-23",
+  "time": "08:00",
+  "end_time": "08:45",
+  "hasCamel": false
+ },
+ "homeRange": "5:00 – 6:00 AMTeam meetingEvent",
+ "errors": []
+}

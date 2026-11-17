@@ -1,0 +1,22 @@
+{
+ "heroDate": "FRIDAY, NOVEMBER 13",
+ "otherCacheGone": null,
+ "lastUser": "11111111-2222-3333-4444-555555555555",
+ "limitShown": "none",
+ "profileWrites": {
+  "whileTyping": 0,
+  "afterBlur": 1
+ },
+ "tzOptions": [
+  "Central (Chicago)",
+  "Pacific (Los Angeles) · this device",
+  "Eastern (New York)",
+  "Mountain (Denver)"
+ ],
+ "tzHint": 1,
+ "afterSignOut": [
+  "planner_a2hs_seen",
+  "planner_onboarded"
+ ],
+ "errors": []
+}

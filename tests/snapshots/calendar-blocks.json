@@ -1,0 +1,16 @@
+{
+ "clientSpans6to7": true,
+ "meetingSpans630to730": true,
+ "overlapSideBySide": true,
+ "noEndIsOneHalfHour": true,
+ "quickCallFullWidth": true,
+ "dragged": {
+  "time": "15:00",
+  "end_time": "16:00"
+ },
+ "draggedBlockSpans3to4": true,
+ "clientNowFullWidth": true,
+ "tapOpensEditor": true,
+ "checkWorks": true,
+ "errors": []
+}

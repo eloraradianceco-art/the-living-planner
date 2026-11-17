@@ -1,0 +1,131 @@
+{
+ "app_config": {
+  "cols": "key!,value!",
+  "uniq": [
+   "key"
+  ]
+ },
+ "app_store_entitlements": {
+  "cols": "user_id!,active,product_id,store,period_type,is_sandbox,expires_at,will_renew,billing_issue,checked_at",
+  "uniq": [
+   "user_id"
+  ]
+ },
+ "budgets": {
+  "cols": "id,user_id!,weekly_target,created_at,updated_at,period,amount",
+  "uniq": [
+   "id",
+   "user_id"
+  ]
+ },
+ "comp_access": {
+  "cols": "email!,note,granted_at,applied_at,user_id",
+  "uniq": [
+   "email"
+  ]
+ },
+ "events": {
+  "cols": "id,user_id!,title!,date!,time,end_time,location,notes,color,all_day,created_at,updated_at,category,recurrence,recurrence_until,skip_dates",
+  "uniq": [
+   "id"
+  ]
+ },
+ "expenses": {
+  "cols": "id,user_id!,description,amount!,category,date!,created_at,period,updated_at",
+  "uniq": [
+   "id"
+  ]
+ },
+ "faith_data": {
+  "cols": "id,user_id!,updated_at,data_key!,data_value!",
+  "uniq": [
+   "id",
+   "user_id,data_key"
+  ]
+ },
+ "goals": {
+  "cols": "id,user_id!,title!,description,category,timeframe,target_date,completed,created_at,updated_at,why,steps",
+  "uniq": [
+   "id"
+  ]
+ },
+ "habit_logs": {
+  "cols": "id,user_id!,habit_id!,date!,completed,created_at,updated_at",
+  "uniq": [
+   "id",
+   "user_id,habit_id,date"
+  ]
+ },
+ "habits": {
+  "cols": "id,user_id!,name!,category,frequency,color,icon,created_at,updated_at",
+  "uniq": [
+   "id"
+  ]
+ },
+ "notes": {
+  "cols": "id,user_id!,title,content,category,pinned,created_at,updated_at,date",
+  "uniq": [
+   "id"
+  ]
+ },
+ "page_data": {
+  "cols": "id,user_id,page!,data_key!,data_value,updated_at",
+  "uniq": [
+   "id",
+   "user_id,page,data_key"
+  ]
+ },
+ "planner_settings": {
+  "cols": "id,user_id!,onboarding_complete,show_completed_tasks,compact_calendar,created_at,updated_at,notifications",
+  "uniq": [
+   "id",
+   "user_id"
+  ]
+ },
+ "profiles": {
+  "cols": "id,user_id!,display_name,timezone,planner_mode,avatar_url,created_at,updated_at,tier,trial_ends_at,pro_comp",
+  "uniq": [
+   "id",
+   "user_id"
+  ]
+ },
+ "projects": {
+  "cols": "id,user_id!,title!,description,status,color,goal_id,due_date,created_at,updated_at,steps",
+  "uniq": [
+   "id"
+  ]
+ },
+ "push_subscriptions": {
+  "cols": "id,user_id!,endpoint!,p256dh,auth,user_agent,created_at,last_success_at,kind",
+  "uniq": [
+   "endpoint",
+   "id"
+  ]
+ },
+ "reminder_log": {
+  "cols": "user_id!,reminder_key!,sent_at",
+  "uniq": [
+   "user_id,reminder_key"
+  ]
+ },
+ "score_history": {
+  "cols": "id,user_id,date!,overall_score!,scores,created_at",
+  "uniq": [
+   "id",
+   "user_id,date"
+  ]
+ },
+ "stripe_subscriptions": {
+  "cols": "subscription_id!,customer_id,checkout_session_id,email,user_id,status!,price_id,billing_interval,trial_end,current_period_end,cancel_at_period_end,last_event_at,created_at,updated_at",
+  "uniq": [
+   "checkout_session_id",
+   "subscription_id"
+  ]
+ },
+ "tasks": {
+  "cols": "id,user_id!,title!,completed,date,time,priority,category,notes,recurrence,goal_id,project_id,created_at,updated_at,end_time,location",
+  "uniq": [
+   "id"
+  ]
+ }
+}

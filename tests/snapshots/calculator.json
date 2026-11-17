@@ -1,0 +1,24 @@
+{
+ "multiply": "56",
+ "floating": "0.3",
+ "addPercent": "220",
+ "timesPercent": "5",
+ "minusPercent": "75",
+ "precedence": "14",
+ "divZero": "Can't divide by 0",
+ "big": "3,703,701",
+ "continueFromResult": "3,703,705",
+ "signFlip": "-15",
+ "backspaceExpr": "12",
+ "keyboard": "36",
+ "livePreview": "10",
+ "tapeCount": 10,
+ "tapeReuse": "36",
+ "expenseModal": {
+  "title": "Add Expense",
+  "amount": "36.00"
+ },
+ "financeLink": "/calculator",
+ "errors": [],
+ "menuHasCalculator": true
+}

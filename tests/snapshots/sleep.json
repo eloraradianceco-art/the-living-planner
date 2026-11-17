@@ -1,0 +1,38 @@
+{
+ "listBefore": [
+  "Thu, Nov 12 9:30 PM → 4:30 AM · 7h 5",
+  "Wed, Nov 11 10:45 PM → 6:15 AM · 7h 30m 7"
+ ],
+ "preview": "7h 30m of sleep 10:15 PM → 5:45 AM · bedtime switched to PM",
+ "saved1": {
+  "date": "2026-11-13",
+  "bed": "22:15",
+  "wake": "05:45",
+  "hours": 7.5,
+  "quality": 5,
+  "notes": ""
+ },
+ "todayEntries": 1,
+ "saved2": {
+  "date": "2026-11-13",
+  "bed": "23:00",
+  "wake": "06:30",
+  "hours": 7.5,
+  "quality": 5,
+  "notes": ""
+ },
+ "listAfter": [
+  "Fri, Nov 13 11:00 PM → 6:30 AM · 7h 30m 5",
+  "Thu, Nov 12 9:30 PM → 4:30 AM · 7h 5",
+  "Wed, Nov 11 10:45 PM → 6:15 AM · 7h 30m 7"
+ ],
+ "prefill": "7.5",
+ "err": 1,
+ "btn": "Check sleep hours",
+ "btnDisabled": true,
+ "err2": 0,
+ "health": [
+  "💪 Health 7/10 Workouts, sleep (quality + hours), water, recovery energy, meals logged, plus Health habits and tasks. Sleep quality 5.7/10 · avg 7h 30m · 3 nights Recovery energy avg 3.0/5"
+ ],
+ "errors": []
+}

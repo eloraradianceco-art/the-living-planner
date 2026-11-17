@@ -1,0 +1,19 @@
+{
+ "allDoneToday": {
+  "focus": " | Three things that matter today | ✓ | TODAY'S TASKS DONE | Both of today's tasks checked off 🔥",
+  "timeline": 0
+ },
+ "nothingToday": {
+  "focus": " | Three things that matter today | ✓ | TOP TASK | Nothing due today",
+  "timeline": 0
+ },
+ "overdueWins": {
+  "focus": " | Three things that matter today | TOP TASK · TAP CIRCLE | Late one | 🔁",
+  "timeline": 0
+ },
+ "timedToday": {
+  "focus": " | Three things that matter today | TOP TASK · TAP CIRCLE | Joey Training | 🔁",
+  "timeline": 1
+ },
+ "errors": []
+}

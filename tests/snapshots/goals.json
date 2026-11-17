@@ -1,0 +1,22 @@
+{
+ "projectGoalSaved": true,
+ "taskGoalFilled": true,
+ "taskGoalLocked": true,
+ "lockHint": true,
+ "taskSavedWithGoal": {
+  "goal": true,
+  "project": true
+ },
+ "goalAfterTask": "50%",
+ "goalSummary": "0/1 steps · 1 project",
+ "noPromptYet": true,
+ "projectPrompt": true,
+ "goalAt100": "100%",
+ "goalPrompt": true,
+ "singleAchieveButton": 1,
+ "notYetHides": true,
+ "achieveLinkAfterNotYet": 1,
+ "notYetRemembered": true,
+ "taskFollowedProject": true,
+ "errors": []
+}
