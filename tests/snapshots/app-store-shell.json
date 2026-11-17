@@ -1,0 +1,38 @@
+{
+ "native": {
+  "signedInFromNativeStorage": true,
+  "statusBarDark": "StatusBar.setStyle {\"style\":\"DARK\"}",
+  "noInstallPrompt": true,
+  "gateText": true,
+  "gateHasNoTrial": true,
+  "moreNoUpgrade": true,
+  "moreNoInstallCard": true,
+  "noStripeLinksMore": true,
+  "reminderNoHomeScreenNote": true,
+  "tokenSaved": [
+   {
+    "p_platform": "ios",
+    "tokenLen": 64
+   }
+  ],
+  "reminderStatusShown": true,
+  "tokenKeptOnDevice": "A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4A1B2C3D4",
+  "testMessage": "This device is registered, but the test could not be delivered right now. Try again in a minute.",
+  "backupCalls": [
+   "Filesystem.writeFile {\"path\":\"living-planner-backup-2026-11-16.json\",\"data\":\"[657 chars]\",\"directory\":\"CACHE\",\"encoding\":\"utf8\"}",
+   "Share.share {\"title\":\"Living Planner backup\",\"files\":[\"file:///var/mobile/Caches/living-planner-backup-2026-11-16.json\"],\"dialogTitle\":\"Livi"
+  ],
+  "offDeletes": [
+   "/rest/v1/push_subscriptions?endpoint=eq.apns:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4"
+  ],
+  "tapOpens": "/habits",
+  "upgradeCardNoPlans": true,
+  "pageErrors": []
+ },
+ "web": {
+  "webUpgradeButton": true,
+  "webInstallCard": true,
+  "webReminderNote": true,
+  "webCheckoutLinks": 2
+ }
+}

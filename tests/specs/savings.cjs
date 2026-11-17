@@ -68,6 +68,7 @@ const fin = async (k) => ((await (await fetch(DB + '/__state')).json()).pageData
   await item('Car repair').getByLabel(/Amount for/).fill('75.50')
   await item('Car repair').locator('.money-move .primary-btn').click(); await p.waitForTimeout(600)
   r.sinking = (await fin('sinkingFunds'))[0]
+  r.sinking = { ...r.sinking, history: (r.sinking.history || []).map(({ id, ...h }) => h) } // entry ids are timestamps, so leave them out
   // New sinking fund with labels
   await p.getByRole('button', { name: '+ New' }).click()
   const sf = p.locator('.sav-new').first()

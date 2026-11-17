@@ -1,0 +1,55 @@
+# Every change is pushed to the "dev" branch. This runs the whole browser test suite on it, and only
+# if everything passes moves "main" (the live website, deployed by Vercel) and "capacitor" (the branch the
+# App Store build is made from) to that tested commit. A failing test stops the change from going live.
+name: Test and release
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: test-and-release
+  cancel-in-progress: false
+
+jobs:
+  test-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the app
+        run: npm ci
+
+      - name: Install the test browser
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Run every test
+        run: npm test
+
+      - name: Keep screenshots and logs from a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/.results
+          retention-days: 14
+
+      - name: Go live (move main and capacitor to this tested commit)
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          git push origin HEAD:refs/heads/main
+          git push origin HEAD:refs/heads/capacitor

@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "preview": "vite preview",
     "cap:sync": "vite build && cap sync ios",
     "test": "node tests/run.cjs"
   },

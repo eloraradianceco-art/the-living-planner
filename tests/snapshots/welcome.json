@@ -1,0 +1,19 @@
+{
+ "phone": {
+  "backVisibleAtTop": true,
+  "pageScrolls": true,
+  "getStartedClearOfToolbar": true,
+  "afterGetStarted": "Welcome / Create Account",
+  "scrollTopAfter": 0,
+  "alreadyHave": "Welcome back"
+ },
+ "ipad": {
+  "backVisibleAtTop": true,
+  "pageScrolls": true,
+  "getStartedClearOfToolbar": true,
+  "afterGetStarted": "Welcome / Create Account",
+  "scrollTopAfter": 0,
+  "alreadyHave": "Welcome back"
+ },
+ "errors": []
+}
