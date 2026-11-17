@@ -16,7 +16,7 @@ import {
   CircleCheck, Folder, Receipt, ListTodo,
   ChevronUp, ChevronDown, CalendarPlus, Trash2, Check, Flag,
   House, Ellipsis, LayoutGrid, X, BatteryCharging, Gauge, Utensils, Stethoscope, Search, Download,
-  Calculator, Copy, ChevronRight, Network,
+  Calculator, Copy, ChevronRight, Network, MapPin,
 } from 'lucide-react'
 
 // ── Supabase ──────────────────────────────────────────────────────────────
@@ -689,6 +689,29 @@ function shiftEnd(oldStart, newStart, end) {
 }
 const endBeforeStart = (start, end) => toMin(start) != null && toMin(end) != null && toMin(end) <= toMin(start)
 const hourLabel = (hh) => { const h = Number(String(hh).slice(0, 2)); return `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}` }
+// "09:00" → "9a", "13:30" → "1:30p" (month-view chips)
+const shortTime = (t) => { const m = toMin(t); if (m == null) return ''; const h = Math.floor(m / 60), mi = m % 60; return `${h % 12 || 12}${mi ? ':' + String(mi).padStart(2, '0') : ''}${h < 12 ? 'a' : 'p'}` }
+
+// ── Locations (2026-11-16) ────────────────────────────────────────────
+// A place opens in Maps: the Maps app on iPhone, iPad and Mac (the app hands the link to iOS), Apple's web map elsewhere.
+const mapsUrl = (place) => `https://maps.apple.com/?q=${encodeURIComponent(String(place || '').trim())}`
+const cleanPlace = (place) => String(place || '').trim()
+function PlaceLink({ place, className = '' }) {
+  const p = cleanPlace(place)
+  if (!p) return null
+  return (
+    <a className={'place-link ' + className} href={mapsUrl(p)} target="_blank" rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()} aria-label={`${p}, open in Maps`}>
+      <MapPin size={12} strokeWidth={2.2} aria-hidden="true" /><span>{p}</span>
+    </a>
+  )
+}
+// Plain text version for inside buttons (a link can't sit inside a button)
+function PlaceText({ place, className = '' }) {
+  const p = cleanPlace(place)
+  if (!p) return null
+  return <span className={'place-text ' + className}><MapPin size={11} strokeWidth={2.2} aria-hidden="true" /><span>{p}</span></span>
+}
 
 const upsertById = (list, item) => list.some((x) => x.id === item.id)
   ? list.map((x) => x.id === item.id ? item : x)
@@ -941,6 +964,7 @@ function normalizePayload(type, payload, userId) {
     if ('endTime' in raw) { raw.end_time = raw.endTime || null; delete raw.endTime }
     if ('time' in raw && !raw.time) raw.end_time = null // an end time needs a start time
     if (!raw.recurrence) raw.recurrence = 'none'
+    if ('location' in raw) raw.location = cleanPlace(raw.location) || null
     // clean up extra fields not in schema
     delete raw.linkedType; delete raw.linkedId; delete raw.goalId; delete raw.startTime
     return raw
@@ -967,6 +991,7 @@ function normalizePayload(type, payload, userId) {
     if ('recurrenceUntil' in raw) { raw.recurrence_until = raw.recurrenceUntil || null; delete raw.recurrenceUntil }
     if ('skipDates' in raw) { raw.skip_dates = Array.isArray(raw.skipDates) ? raw.skipDates : []; delete raw.skipDates }
     if (!raw.recurrence) raw.recurrence = 'none'
+    if ('location' in raw) raw.location = cleanPlace(raw.location) || null
     delete raw.seriesStart; delete raw.isRepeat; delete raw.itemType
     delete raw.linkedType; delete raw.linkedId
     return raw
@@ -1026,10 +1051,10 @@ function mapDbRow(type, row) {
           : type
   if (t === 'habits')     { r.title = r.name; delete r.name }
   if (t === 'tasks')      { r.linkedGoalId = r.goal_id; r.linkedProjectId = r.project_id; delete r.goal_id; delete r.project_id
-                            r.endTime = r.end_time || ''; delete r.end_time }
+                            r.endTime = r.end_time || ''; delete r.end_time; r.location = r.location || '' }
   if (t === 'goals')      { r.targetDate = r.target_date; delete r.target_date; r.steps = normalizeSteps(r.steps) }
   if (t === 'projects')   { r.goalId = r.goal_id; r.dueDate = r.due_date; delete r.goal_id; delete r.due_date; r.steps = normalizeSteps(r.steps) }
-  if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time
+  if (t === 'events')     { r.startTime = r.time; r.endTime = r.end_time; delete r.time; delete r.end_time; r.location = r.location || ''
                             r.recurrence = r.recurrence || 'none'; r.recurrenceUntil = r.recurrence_until || ''; r.skipDates = Array.isArray(r.skip_dates) ? r.skip_dates : []
                             delete r.recurrence_until; delete r.skip_dates }
   if (t === 'expenses')   { r.note = r.description }
@@ -2187,7 +2212,7 @@ function SearchSheet({ open, onClose, data, onOpenItem }) {
       const inTitle = title.toLowerCase().includes(query)
       out.push({ group, title, sub: inTitle ? (sub || '') : [sub, snippet(hay, query)].filter(Boolean).join(' · '), go, rank: inTitle ? 0 : 1 })
     }
-    for (const t of data.tasks || []) add('Tasks', t.title || '', t.notes || '', () => onOpenItem('task', t), [t.date ? shortDate(t.date) : '', t.time ? fmtRange(t.time, t.endTime) : '', t.completed ? 'Done' : ''].filter(Boolean).join(' · '))
+    for (const t of data.tasks || []) add('Tasks', t.title || '', `${t.location || ''} ${t.notes || ''}`, () => onOpenItem('task', t), [t.date ? shortDate(t.date) : '', t.time ? fmtRange(t.time, t.endTime) : '', t.completed ? 'Done' : ''].filter(Boolean).join(' · '))
     for (const e of data.events || []) add('Events', e.title || '', `${e.location || ''} ${e.notes || ''}`, () => onOpenItem('event', e), [e.date ? shortDate(e.date) : '', e.startTime ? fmtRange(e.startTime, e.endTime) : '', e.recurrence && e.recurrence !== 'none' ? `↻ ${repeatLabel(e.recurrence)}` : ''].filter(Boolean).join(' · '))
     for (const g of data.goals || []) add('Goals', g.title || '', `${g.why || ''} ${g.description || ''} ${(g.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('goal', g), g.category)
     for (const pr of data.projects || []) add('Projects', pr.title || '', `${pr.description || ''} ${(pr.steps || []).map((x) => x.text).join(' ')}`, () => onOpenItem('project', pr), pr.status)
@@ -2460,7 +2485,7 @@ function ToastStack({ toasts, onDismiss }) {
 
 
 const baseForms = {
-  task: { title: '', date: TODAY, time: '', endTime: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
+  task: { title: '', date: TODAY, time: '', endTime: '', location: '', category: 'Productivity', linkedGoalId: '', linkedProjectId: '', priority: 'Medium', completed: false, recurrence: 'none' },
   event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '', recurrence: 'none', recurrenceUntil: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
@@ -2489,7 +2514,23 @@ function TimeRangeFields({ start, end, onChange }) {
 const labels = { task: 'Task', event: 'Event', expense: 'Expense', note: 'Note', goal: 'Goal', project: 'Project', habit: 'Habit' }
 const getInitialForm = (type, item) => ({ ...baseForms[type], ...(item || {}) })
 
-function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, goals, projects, onSave, onDelete, isLocked = () => false, onLocked = () => {} }) {
+// Location field for tasks and events: suggests places used before, and opens the place in Maps once filled in
+function LocationField({ value, onChange, places = [] }) {
+  return (
+    <label className="full-span">Location
+      <input value={value || ''} onChange={(e) => onChange(e.target.value)} placeholder="Optional · an address or a place name"
+        list={places.length ? 'planner-places' : undefined} autoComplete="off" />
+      {places.length > 0 && <datalist id="planner-places">{places.map((pl) => <option key={pl} value={pl} />)}</datalist>}
+      {cleanPlace(value) && (
+        <a className="place-link field-place" href={mapsUrl(value)} target="_blank" rel="noopener noreferrer">
+          <MapPin size={12} strokeWidth={2.2} aria-hidden="true" /><span>Open in Maps ↗</span>
+        </a>
+      )}
+    </label>
+  )
+}
+
+function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, goals, projects, places = [], onSave, onDelete, isLocked = () => false, onLocked = () => {} }) {
   const [selectedType, setSelectedType] = useState(type)
   const [form, setForm] = useState(getInitialForm(type, item))
 
@@ -2546,6 +2587,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
           {selectedType === 'task' && (<>
             <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
             <TimeRangeFields start={form.time} end={form.endTime} onChange={(time, endTime) => setForm({ ...form, time, endTime })} />
+            <LocationField value={form.location} places={places} onChange={(location) => setForm({ ...form, location })} />
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Priority<select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}><option>High</option><option>Medium</option><option>Low</option></select></label>
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}><option value="none">Does not repeat</option><option value="daily">Every day</option><option value="weekdays">Every weekday</option><option value="weekly">Every week</option><option value="biweekly">Every 2 weeks</option><option value="monthly">Every month</option></select></label>
@@ -2563,7 +2605,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
             <label>Date<input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
             <TimeRangeFields start={form.startTime} end={form.endTime} onChange={(startTime, endTime) => setForm({ ...form, startTime, endTime })} />
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
-            <label className="full-span">Location<input value={form.location || ''} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Optional" /></label>
+            <LocationField value={form.location} places={places} onChange={(location) => setForm({ ...form, location })} />
             <label>Repeats<select value={form.recurrence || 'none'} onChange={(e) => setForm({ ...form, recurrence: e.target.value })}>{EVENT_REPEATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
             {(form.recurrence || 'none') !== 'none' && (
               <label>Until (optional)<input type="date" value={form.recurrenceUntil || ''} min={form.date} onChange={(e) => setForm({ ...form, recurrenceUntil: e.target.value })} /></label>
@@ -3014,7 +3056,10 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
             <button key={`${item.itemType}-${item.id}`} className="timeline-preview premium-list-row" onClick={() => onEdit(item.itemType, item.isRepeat ? (events.find((e) => e.id === item.id) || item) : item)}
               style={{width:'100%', borderBottom:'1px solid var(--surface)', padding:'9px 0'}}>
               <strong style={{color:'var(--brass-fg)', fontSize:'.8rem', minWidth:62, fontWeight:600, whiteSpace:'nowrap'}}>{fmtRange(item.startTime, item.endTime)}</strong>
-              <span style={{flex:1, textAlign:'left', fontSize:'.9rem', color: item.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none'}}>{item.title}</span>
+              <span style={{flex:1, minWidth:0, textAlign:'left', display:'grid', gap:2}}>
+                <span style={{fontSize:'.9rem', color: item.completed ? 'var(--muted)' : 'var(--text)', fontWeight:500, textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none'}}>{item.title}</span>
+                <PlaceText place={item.location} className="row-place" />
+              </span>
               <small style={{color:'var(--muted)', fontSize:'.72rem'}}>{item.itemType === 'task' ? 'Task' : 'Event'}</small>
             </button>
           ))}
@@ -3361,6 +3406,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete }) {
           <span style={{color:'var(--muted)',fontSize:'.7rem'}}>{task.category}</span>
           {task.date && <span style={{color: isTaskOverdue ? 'var(--danger)' : 'var(--muted)'}}>{isTaskOverdue ? '⚠ Overdue ' : ''}{shortDate(task.date)}</span>}
           {task.time && <span style={{color:'var(--brass-fg)',fontWeight:600}}>{fmtRange(task.time, task.endTime)}</span>}
+          <PlaceLink place={task.location} />
         </div>
       </div>
 
@@ -3483,7 +3529,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
 
   const scheduled = useMemo(() => {
     const md = getMonthDays(selectedDate), wd = getWeekDays(selectedDate)
-    const from = [md[0], wd[0], selectedDate].sort()[0], to = [md[md.length - 1], wd[6], selectedDate].sort()[2]
+    // The month grid shows whole weeks, so it reaches into the months either side
+    const gridFrom = addDays(md[0], -new Date(md[0] + 'T12:00:00').getDay())
+    const gridTo = addDays(md[md.length - 1], 6 - new Date(md[md.length - 1] + 'T12:00:00').getDay())
+    const from = [gridFrom, wd[0], selectedDate].sort()[0], to = [gridTo, wd[6], selectedDate].sort()[2]
     // Every dated task shows: timed ones on the grid, untimed ones in the All-day row
     const taskItems = tasks.filter((task) => task.date).map((task) => ({ ...task, startTime: task.time || '', itemType: 'task' }))
     const eventItems = expandEvents(events, from, to).map((event) => ({ ...event, itemType: 'event' }))
@@ -3561,23 +3610,29 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   }
   const go = (dir) => setSelectedDate(view === 'month' ? shiftMonth(selectedDate, dir) : addDays(selectedDate, dir * step))
 
-  // Build 6-week grid for month view
-  const buildMonthGrid = () => {
+  // Month grid: whole weeks, with the days of the months either side filled in (faded)
+  const monthKey = selectedDate.slice(0, 7)
+  const monthCells = useMemo(() => {
     if (monthDays.length === 0) return []
-    const firstDay = new Date(monthDays[0] + 'T12:00:00').getDay()
-    const weeks = []
-    let week = Array(firstDay).fill(null)
-    for (const day of monthDays) {
-      week.push(day)
-      if (week.length === 7) { weeks.push(week); week = [] }
-    }
-    if (week.length > 0) {
-      while (week.length < 7) week.push(null)
-      weeks.push(week)
-    }
-    return weeks
+    const first = monthDays[0], last = monthDays[monthDays.length - 1]
+    const lead = new Date(first + 'T12:00:00').getDay(), trail = 6 - new Date(last + 'T12:00:00').getDay()
+    return [...Array.from({ length: lead }, (_, i) => addDays(first, i - lead)), ...monthDays, ...Array.from({ length: trail }, (_, i) => addDays(last, i + 1))]
+  }, [monthKey])
+  const itemsByDate = useMemo(() => {
+    const m = {}
+    for (const item of scheduled) (m[item.date] ||= []).push(item)
+    return m
+  }, [scheduled])
+  // Tapping a day lists it under the grid; if that list is off the bottom of the screen (or under the tab bar), bring it up
+  const agendaRef = React.useRef(null)
+  const pickMonthDay = (date) => {
+    if (date === selectedDate) { setView('day'); return }
+    setSelectedDate(date)
+    requestAnimationFrame(() => {
+      const el = agendaRef.current
+      if (el && el.getBoundingClientRect().top > window.innerHeight - 190) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) // 190: tab bar + the first row
+    })
   }
-  const monthGrid = buildMonthGrid()
 
   return (
     <div className="screen-stack">
@@ -3629,7 +3684,10 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                         {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
                       </button>
                     )}
-                    <button type="button" className="cal-allday-title" onClick={() => openItem(item)}>{item.title}</button>
+                    <button type="button" className="cal-allday-title" onClick={() => openItem(item)}>
+                      <span className="cal-allday-name">{item.title}</span>
+                      <PlaceText place={item.location} className="cal-allday-place" />
+                    </button>
                     <span className="cal-allday-kind">{item.itemType === 'task' ? 'Task' : 'Event'}</span>
                   </div>
                 )
@@ -3691,7 +3749,8 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                     )}
                     <button className="time-card-main" onClick={() => openItem(item)}>
                       <span className="time-card-title">{item.title}</span>
-                      <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
+                      <span className="time-card-meta">{fmtRange(item.startTime, item.endTime)}{short && cleanPlace(item.location) ? <> · <PlaceText place={item.location} /></> : ''} · {item.itemType === 'task' ? 'Task' : 'Event'}{item.isRepeat ? ` · ↻ ${repeatLabel(item.recurrence)}` : ''}</span>
+                      {!short && <PlaceText place={item.location} className="time-card-place" />}
                     </button>
                     <button className="time-card-del" onClick={() => confirmDelete(item)} aria-label={`Delete ${item.title}`}>✕</button>
                   </div>
@@ -3717,10 +3776,11 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                     {formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}
                   </button>
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
-                    <button key={`${item.itemType}-${item.id}`} className="week-item" onClick={() => openItem(item)}
+                    <button key={`${item.itemType}-${item.id}`} className={'week-item ' + item.itemType} onClick={() => openItem(item)}
                       draggable={!item.isRepeat} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
                       <span style={{fontSize:'.7rem', color:'var(--brass-fg)', fontWeight:600}}>{item.startTime ? fmtRange(item.startTime, item.endTime) : 'All day'}</span>
                       <strong style={{fontSize:'.8rem', color:'var(--ink)', textDecoration: item.itemType === 'task' && item.completed ? 'line-through' : 'none', opacity: item.itemType === 'task' && item.completed ? .6 : 1}}>{item.title}</strong>
+                      <PlaceText place={item.location} className="week-item-place" />
                     </button>
                   ))}
                 </div>
@@ -3730,39 +3790,89 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
         </section>
       )}
 
-      {/* ── Month view — proper calendar table ────────────────────── */}
-      {view === 'month' && (
-        <section className="card" style={{padding:'12px 10px'}}>
-          <div style={{fontWeight:700, fontSize:'1rem', color:'var(--text)', marginBottom:10, textAlign:'center'}}>{selectedMonthLabel}</div>
-          <table className="month-table">
-            <thead>
-              <tr>{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => <th key={d}>{d}</th>)}</tr>
-            </thead>
-            <tbody>
-              {monthGrid.map((week, wi) => (
-                <tr key={wi}>
-                  {week.map((date, di) => {
-                    if (!date) return <td key={di} />
-                    const count = scheduled.filter(item => item.date === date).length
-                    const isToday_ = date === TODAY
-                    const isSelected = date === selectedDate
-                    return (
-                      <td key={di}>
-                        <div
-                          className={`month-day-cell${isToday_ ? ' today' : ''}${isSelected ? ' selected' : ''}`}
-                          onClick={() => { setSelectedDate(date); setView('day') }}>
-                          <div className="month-day-num">{new Date(date + 'T12:00:00').getDate()}</div>
-                          {count > 0 && <div className="month-day-dot">{count} ·</div>}
-                         </div>
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* ── Month view (2026-11-16) ───────────────────────────────────
+           Taller days. Phones: coloured dots. iPad and wider: the titles themselves.
+           Tap a day to list it underneath (time, title, location); tap it again for the day view. */}
+      {view === 'month' && (<>
+        <section className="card month-card">
+          <div className="month-dows" aria-hidden="true">
+            {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => <div key={d} className="month-dow">{d}</div>)}
+          </div>
+          <div className="month-grid">
+            {monthCells.map((date, i) => {
+              const items = itemsByDate[date] || []
+              const inMonth = date.slice(0, 7) === monthKey
+              const isSel = date === selectedDate
+              const shown = items.length > 3 ? items.slice(0, 2) : items
+              const label = formatDateLabel(date, { weekday: 'long', month: 'long', day: 'numeric' })
+                + (items.length ? `, ${items.length} ${items.length === 1 ? 'item' : 'items'}` : '')
+                + (isSel ? '. Tap again to open the day' : '')
+              return (
+                <button key={date} type="button" onClick={() => pickMonthDay(date)} aria-label={label} aria-pressed={isSel}
+                  aria-current={date === TODAY ? 'date' : undefined}
+                  className={'month-cell' + (inMonth ? '' : ' other-month') + (date === TODAY ? ' today' : '') + (isSel ? ' selected' : '') + (i % 7 === 0 || i % 7 === 6 ? ' weekend' : '')}>
+                  <span className="month-cell-num" aria-hidden="true">{Number(date.slice(8))}</span>
+                  {items.length > 0 && (<>
+                    <span className="month-dots" aria-hidden="true">
+                      {items.slice(0, 3).map((item) => <span key={`${item.itemType}-${item.id}`} className={`month-dot ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`} />)}
+                      {items.length > 3 && <span className="month-dots-more">+</span>}
+                    </span>
+                    <span className="month-chips" aria-hidden="true">
+                      {shown.map((item) => (
+                        <span key={`${item.itemType}-${item.id}`} className={`month-chip ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`}>
+                          {item.startTime && <span className="month-chip-time">{shortTime(item.startTime)}</span>}
+                          <span className="month-chip-title">{item.title}</span>
+                        </span>
+                      ))}
+                      {items.length > 3 && <span className="month-more">+{items.length - 2} more</span>}
+                    </span>
+                  </>)}
+                </button>
+              )
+            })}
+          </div>
         </section>
-      )}
+
+        <section className="card month-agenda" ref={agendaRef} aria-live="polite">
+          <div className="month-agenda-head">
+            <div>
+              <p className="eyebrow">{selectedDate === TODAY ? 'Today' : formatDateLabel(selectedDate, { weekday: 'long' })}</p>
+              <h3>{formatDateLabel(selectedDate, { month: 'long', day: 'numeric' })}</h3>
+            </div>
+            <button type="button" className="ghost-btn" onClick={() => setView('day')}>Open day →</button>
+          </div>
+          {dayScheduled.length === 0 ? (
+            <div className="month-agenda-empty">
+              <span className="muted">Nothing planned.</span>
+              <button type="button" className="ghost-btn" onClick={() => onQuickCreate('event', { date: selectedDate })}>+ Add</button>
+            </div>
+          ) : (
+            <div className="month-agenda-list">
+              {dayScheduled.map((item) => {
+                const done = item.itemType === 'task' && item.completed
+                return (
+                  <div key={`${item.itemType}-${item.id}`} className={`agenda-row ${item.itemType}${done ? ' done' : ''}`}>
+                    {item.itemType === 'task' && onToggle ? (
+                      <button type="button" className={'step-check' + (done ? ' done' : '')} onClick={() => onToggle(item.id)}
+                        aria-label={done ? `Mark ${item.title} not done` : `Mark ${item.title} done`} aria-pressed={done}>
+                        {done && <Check size={13} strokeWidth={3} color="var(--warm-white)" />}
+                      </button>
+                    ) : <span className="agenda-row-mark" aria-hidden="true" />}
+                    <div className="agenda-row-body">
+                      <button type="button" className="agenda-row-main" onClick={() => openItem(item)}>
+                        <span className="agenda-row-time">{item.startTime ? fmtRange(item.startTime, item.endTime) : 'All day'}{item.isRepeat ? ' · ↻' : ''}</span>
+                        <span className="agenda-row-title">{item.title}</span>
+                      </button>
+                      <PlaceLink place={item.location} />
+                    </div>
+                    <span className="agenda-row-kind">{item.itemType === 'task' ? 'Task' : 'Event'}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </>)}
       <PageNav />
     </div>
   )
@@ -10799,6 +10909,16 @@ function ScrollToTop() {
 function PlannerApp() {
   const { tasks, goals, projects, expenses, notes, events, habits, habitLogs, budget, profile, settings, scores, scoreDetails, scoreHistory, scoreSeries, loading, syncing, error, saveItem, deleteItem, toggleTask, toggleHabit, saveSteps, updateBudget, updateProfile, updateSettings } = usePlannerData()
   const { user } = useAuth()
+  // Places used before (newest first) — suggested in the Location field
+  const recentPlaces = useMemo(() => {
+    const seen = new Map()
+    for (const it of [...events, ...tasks]) {
+      const p = cleanPlace(it.location); if (!p) continue
+      const key = p.toLowerCase(), when = it.updated_at || it.created_at || ''
+      if (!seen.has(key) || seen.get(key).when < when) seen.set(key, { p, when })
+    }
+    return [...seen.values()].sort((a, b) => String(b.when).localeCompare(String(a.when))).slice(0, 15).map((x) => x.p)
+  }, [events, tasks])
   // Subscription
   const subscription = useSubscription(user)
   const [showA2HS, setShowA2HS] = useState(() => {
@@ -10929,6 +11049,7 @@ function PlannerApp() {
           onClose={closeModal}
           goals={goals}
           projects={projects}
+          places={recentPlaces}
           isLocked={atLimit}
           onLocked={(type) => { closeModal(); limitUpgrade(type) }}
           onSave={async (type, payload, modeArg) => {
