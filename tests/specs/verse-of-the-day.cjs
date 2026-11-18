@@ -38,7 +38,7 @@ const out = []; const check = (n, ok, x = '') => out.push((ok ? 'PASS ' : 'FAIL 
       const lock = p.getByRole('button', { name: 'Save to Scripture journal (Pro)' })
       check('Free: lock button shown', await lock.count() === 1)
       await lock.click(); await p.waitForTimeout(300)
-      check('Free: opens upgrade card', await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Annual' }).count() === 1)
+      check('Free: opens upgrade card', await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Get Pro' }).count() === 1)
     }
     check(tier + ': no page errors', errs.length === 0, errs.join(' | '))
     await b.close()
