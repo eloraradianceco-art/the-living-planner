@@ -25,8 +25,8 @@ export const NATIVE_PURCHASES = isNative && nativePlatform === 'ios' && /^appl_/
 export const purchasesInApp = !isNative || NATIVE_PURCHASES
 
 // ── Apple in-app purchase (RevenueCat) ───────────────────────────────────
-// Products (App Store Connect, subscription group "Living Planner Pro"): planner_pro_monthly, planner_pro_yearly.
-// RevenueCat: entitlement "pro", current offering with the Monthly and Annual packages.
+// Product (App Store Connect, subscription group "Living Planner Pro"): planner_pro_yearly ($49.99 a year).
+// RevenueCat: entitlement "pro", current offering with the Annual package. One plan since 2026-11-18.
 // Purchases are tied to the planner account (RevenueCat app user id = account id), so Pro follows the account,
 // and the planner database is updated by the store-sync function (webhook + a check right after buying).
 export const PRO_ENTITLEMENT = 'pro'
@@ -48,7 +48,7 @@ export async function storeSignOut() {
   storeUser = null
 }
 const proActive = (info) => !!info?.entitlements?.active?.[PRO_ENTITLEMENT]
-// Monthly and yearly packages with Apple's own price text for this person's country
+// The yearly package with Apple's own price text for this person's country
 export async function storePlans(userId) {
   if (!(await storeSignIn(userId))) return null
   const o = await Purchases.getOfferings()
@@ -56,7 +56,7 @@ export async function storePlans(userId) {
   if (!cur) return null
   const pick = (type, id) => cur.availablePackages?.find((p) => p.packageType === type || p.identifier === id) || null
   const plan = (pkg) => pkg && { pkg, id: pkg.product?.identifier, price: pkg.product?.priceString, amount: pkg.product?.price, title: pkg.product?.title }
-  return { monthly: plan(pick('MONTHLY', '$rc_monthly')), annual: plan(pick('ANNUAL', '$rc_annual')) }
+  return { annual: plan(pick('ANNUAL', '$rc_annual')) }
 }
 // 'pro' | 'cancelled' | 'pending' (Ask to Buy, etc.) | { error }
 export async function storeBuy(userId, pkg) {

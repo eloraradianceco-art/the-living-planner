@@ -29,7 +29,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   const p = await ctx.newPage(); const errs = []
   p.on('pageerror', (e) => errs.push(e.message))
   await p.clock.install({ time: new Date('2026-11-13T12:00:00-06:00') })
-  const upgradeOpen = async () => (await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Annual' }).count()) > 0
+  const upgradeOpen = async () => (await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Get Pro' }).count()) > 0
   const closeUpgrade = async () => { const btn = p.getByRole('button', { name: 'Maybe later' }); if (await btn.count()) await btn.click(); await p.waitForTimeout(200) }
 
   // Home
@@ -40,7 +40,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   if (tier === 'free') {
     await p.locator('.pro-teaser button').click(); await p.waitForTimeout(300)
     check('Teaser opens upgrade card', await upgradeOpen())
-    const txt = await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Annual' }).innerText()
+    const txt = await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Get Pro' }).innerText()
     check('Upgrade card has no trial wording', !/trial/i.test(txt), txt.match(/.*trial.*/i)?.[0] || '')
     check('Upgrade card lists Pro features', /Full Finance/.test(txt) && /No limits/.test(txt))
     await p.screenshot({ path: `${OUT}/${tier}-upgrade.png` })
@@ -69,7 +69,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
     check('Goal pill open (1 active, 1 completed)', pills.some((t) => /^Goal$/.test(t.trim())), pills.join(' | '))
     await p.locator('.modal-tabs .pill', { hasText: 'Project' }).click(); await p.waitForTimeout(300)
     check('Locked pill opens upgrade card', await upgradeOpen())
-    const txt = await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Annual' }).innerText()
+    const txt = await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Get Pro' }).innerText()
     check('Limit message names projects', /Free includes 2 active projects/.test(txt), txt.split('\n').slice(0, 3).join(' / '))
     await closeUpgrade()
   } else {

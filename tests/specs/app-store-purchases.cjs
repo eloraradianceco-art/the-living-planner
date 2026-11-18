@@ -46,7 +46,7 @@ function fakeIphone({ prefs }) {
       if (method === 'getCustomerInfo') return { customerInfo: info() }
       if (method === 'getOfferings') {
         const pk = (id, type, pid, price, amt) => ({ identifier: id, packageType: type, offeringIdentifier: 'default', product: { identifier: pid, priceString: price, price: amt, currencyCode: 'USD', title: 'Living Planner Pro' } })
-        const cur = { identifier: 'default', availablePackages: [pk('$rc_monthly', 'MONTHLY', 'planner_pro_monthly', '$7.99', 7.99), pk('$rc_annual', 'ANNUAL', 'planner_pro_yearly', '$59.99', 59.99)] }
+        const cur = { identifier: 'default', availablePackages: [pk('$rc_annual', 'ANNUAL', 'planner_pro_yearly', '$49.99', 49.99)] }
         return { current: cur, all: { default: cur } }
       }
       if (method === 'purchasePackage') {
@@ -86,22 +86,22 @@ const check = (name, ok, extra = '') => results.push((ok ? 'PASS ' : 'FAIL ') + 
   // ── Pro gate now offers Pro, with no web prices or Stripe ──
   await p.goto(APP + '/finance?tab=income'); await p.waitForTimeout(1500)
   check('Gate shows Unlock Pro', (await p.getByRole('button', { name: /Unlock Pro/ }).count()) === 1)
-  check('Gate price line has no web prices', /Monthly or yearly · Cancel anytime/.test(await p.locator('main').innerText()) && !/\$7\.99|\$59\.99/.test(await p.locator('main').innerText()))
+  check('Gate price line has no web prices', /Billed yearly · Cancel anytime/.test(await p.locator('main').innerText()) && !/\$49\.99|\$7\.99|\$59\.99/.test(await p.locator('main').innerText()))
   await p.getByRole('button', { name: /Unlock Pro/ }).click(); await p.waitForTimeout(800)
   const card = p.getByRole('dialog')
   const ct = await card.innerText()
-  check('Plans come from Apple: yearly, per-month, monthly', /Yearly — \$59\.99 a year/.test(ct) && /About \$5\.00 a month/.test(ct) && /Monthly — \$7\.99 a month/.test(ct), ct.replace(/\s+/g, ' ').slice(0, 200))
+  check('One plan from Apple: yearly with per-month, no monthly plan', /Yearly — \$49\.99 a year/.test(ct) && /About \$4\.17 a month/.test(ct) && !/Monthly —/.test(ct), ct.replace(/\s+/g, ' ').slice(0, 200))
   check('Restore purchases + renewal terms + links', /Restore purchases/.test(ct) && /renews\s+automatically/.test(ct) && (await card.getByRole('link', { name: 'Terms of Use' }).count()) === 1 && (await card.getByRole('link', { name: 'Privacy Policy' }).count()) === 1)
   check('No Stripe links in the app', !(await p.content()).includes('buy.stripe.com'))
   await p.screenshot({ path: path.join(out, 'iap-plans.png') })
 
   // ── Cancel: nothing happens ──
   await p.evaluate(() => { window.__fake.buy = 'cancel' })
-  await card.getByRole('button', { name: /Monthly —/ }).click(); await p.waitForTimeout(600)
+  await card.getByRole('button', { name: /Yearly —/ }).click(); await p.waitForTimeout(600)
   check('Cancel leaves the sheet quietly', (await p.getByRole('dialog').count()) === 1 && !(await p.getByRole('status').count()))
   // ── Ask to Buy: pending message ──
   await p.evaluate(() => { window.__fake.buy = 'pending' })
-  await card.getByRole('button', { name: /Monthly —/ }).click(); await p.waitForTimeout(600)
+  await card.getByRole('button', { name: /Yearly —/ }).click(); await p.waitForTimeout(600)
   check('Pending purchase explains itself', /waiting for approval/.test(await card.innerText()))
   // ── Store error: message ──
   await p.evaluate(() => { window.__fake.buy = 'fail' })

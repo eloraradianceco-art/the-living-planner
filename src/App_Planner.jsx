@@ -65,12 +65,12 @@ function PlannerApp() {
     setUpgradeContext({title, message})
     setShowUpgrade(true)
   }
-  // The website's "Upgrade Monthly / Upgrade Annually" buttons open planner.eloraradiance.com/?upgrade=monthly|annual.
+  // The website's "Upgrade to Pro" button opens planner.eloraradiance.com/?upgrade=annual.
   // The wish is kept through sign-in (readUpgradeIntent); once the tier is confirmed, free accounts see the plans.
   React.useEffect(() => {
     if (!user || !subscription.checked) return
     const intent = takeUpgradeIntent()
-    if (intent && !subscription.isPro) triggerUpgrade('Upgrade to Pro', 'Everything in The Living Planner, with no limits. Pick monthly or yearly.')
+    if (intent && !subscription.isPro) triggerUpgrade('Upgrade to Pro', 'Everything in The Living Planner, with no limits, for one yearly price.')
   }, [user?.id, subscription.checked])
 
   const [modalState, setModalState] = useState(modalEmpty)

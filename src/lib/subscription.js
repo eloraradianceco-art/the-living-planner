@@ -3,13 +3,13 @@ import React from 'react'
 import { isNative, NATIVE_PURCHASES, storeSignIn } from '../native.js'
 import { hasSupabaseEnv, supabase } from './supabase.js'
 
-// ── Upgrade link from the website (?upgrade=monthly|annual) ─────────
+// ── Upgrade link from the website (?upgrade=annual; older links said monthly) ─────────
 ;(function readUpgradeIntent() {
   try {
     const u = new URL(window.location.href)
     const p = u.searchParams.get('upgrade')
     if (!p) return
-    localStorage.setItem('planner_upgrade_intent', JSON.stringify({ plan: p === 'annual' ? 'annual' : 'monthly', at: Date.now() }))
+    localStorage.setItem('planner_upgrade_intent', JSON.stringify({ plan: 'annual', at: Date.now() }))
     u.searchParams.delete('upgrade')
     window.history.replaceState(window.history.state, '', u.pathname + u.search + u.hash)
   } catch {}
@@ -26,15 +26,14 @@ function takeUpgradeIntent() {
 // ── Stripe Configuration ──────────────────────────────────────────────────
 const STRIPE_CONFIG = {
   publishableKey: 'pk_live_51Sxe7pBr8nMXOo8tUrruWNZ7BkQ0OsKlfqtgKuksLAIcBfCHGtnPv19QP2sIrZz7nQJzDr4SH0OT6ZJ7yxubDUF3007nOd9RJE',
-  monthlyLink: 'https://buy.stripe.com/00w7sKcrG8dEe110Rl57W05',
-  annualLink: 'https://buy.stripe.com/dRm14majydxYaOP8jN57W06',
-  // No free trial (removed 2026-11-14): both links charge at checkout.
+  // One plan since 2026-11-18: $49.99 a year (the $7.99 monthly and $59.99 yearly links are retired).
+  // No free trial (removed 2026-11-14): the link charges at checkout.
+  annualLink: 'https://buy.stripe.com/dRm5kC63i79A5uvgQj57W0c',
   prices: {
-    monthly: 7.99,
-    annual: 59.99,
+    annual: 49.99,
   },
 }
-const PRO_PRICE_LINE = isNative ? 'Monthly or yearly · Cancel anytime' : '$7.99/mo or $59.99/yr · Cancel anytime'
+const PRO_PRICE_LINE = isNative ? 'Billed yearly · Cancel anytime' : '$49.99 a year · Cancel anytime'
 
 // ── Free vs Pro (2026-11-14) ──────────────────────────────────────────────
 // Free: Home (Balanced mode), Tasks, Calendar, reminders, Calculator, and a starter tab in each life area

@@ -117,7 +117,7 @@ function NativeProPlans({ onDone }) {
   const [msg, setMsg] = useState('')
   React.useEffect(() => {
     let alive = true
-    storePlans(user?.id).then((p) => { if (alive) setPlans(p && (p.monthly || p.annual) ? p : null) }).catch(() => { if (alive) setPlans(null) })
+    storePlans(user?.id).then((p) => { if (alive) setPlans(p && p.annual ? p : null) }).catch(() => { if (alive) setPlans(null) })
     return () => { alive = false }
   }, [user?.id])
   const finished = () => { window.dispatchEvent(new CustomEvent('planner-store-purchased')); onDone?.() }
@@ -162,14 +162,7 @@ function NativeProPlans({ onDone }) {
           {plans.annual && (
             <button type="button" disabled={!!busy} onClick={() => buy('annual')} style={{ ...btn, background: 'var(--teal)', color: 'white', border: 'none', position: 'relative' }}>
               <div style={{ fontSize: '.95rem' }}>{busy === 'annual' ? 'Opening the App Store…' : `Yearly — ${plans.annual.price} a year`}</div>
-              {perMonth && <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2, fontWeight: 600 }}>About {perMonth} a month</div>}
-              <span style={{ position: 'absolute', top: -8, right: 12, background: 'var(--brass, #B8965A)', color: 'white', fontSize: '.65rem', padding: '3px 10px', borderRadius: 999, fontWeight: 700 }}>BEST VALUE</span>
-            </button>
-          )}
-          {plans.monthly && (
-            <button type="button" disabled={!!busy} onClick={() => buy('monthly')} style={{ ...btn, background: 'var(--stone)', color: 'var(--ink)', border: '1.5px solid var(--border2)' }}>
-              <div style={{ fontSize: '.95rem' }}>{busy === 'monthly' ? 'Opening the App Store…' : `Monthly — ${plans.monthly.price} a month`}</div>
-              <div style={{ fontSize: '.78rem', color: 'var(--ink2)', marginTop: 2, fontWeight: 600 }}>Cancel anytime</div>
+              <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2, fontWeight: 600 }}>{perMonth ? `About ${perMonth} a month · ` : ''}Cancel anytime</div>
             </button>
           )}
         </div>
@@ -235,23 +228,10 @@ function UpgradeCard({ title, message, onClose }) {
           <a href={plannerCheckoutUrl(STRIPE_CONFIG.annualLink, user)} target="_blank" rel="noopener noreferrer" style={{
             display: 'block', padding: '16px', borderRadius: 14,
             background: 'var(--teal)', color: 'white', textDecoration: 'none',
-            fontWeight: 700, position: 'relative',
+            fontWeight: 700,
           }}>
-            <div style={{ fontSize: '.95rem' }}>Annual — $59.99/year</div>
-            <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2 }}>Just $5/mo · Save $36 a year</div>
-            <span style={{
-              position: 'absolute', top: -8, right: 12,
-              background: 'var(--brass, #B8965A)', color: 'white', fontSize: '.65rem',
-              padding: '3px 10px', borderRadius: 999, fontWeight: 700,
-            }}>BEST VALUE</span>
-          </a>
-          <a href={plannerCheckoutUrl(STRIPE_CONFIG.monthlyLink, user)} target="_blank" rel="noopener noreferrer" style={{
-            display: 'block', padding: '14px', borderRadius: 14,
-            background: 'var(--stone)', color: 'var(--ink)', textDecoration: 'none',
-            fontWeight: 700, border: '1.5px solid var(--border2)',
-          }}>
-            <div style={{ fontSize: '.95rem' }}>Monthly — $7.99/month</div>
-            <div style={{ fontSize: '.78rem', color: 'var(--ink2)', marginTop: 2 }}>Cancel anytime</div>
+            <div style={{ fontSize: '.95rem' }}>Get Pro — $49.99 a year</div>
+            <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2 }}>About $4.17 a month · Cancel anytime</div>
           </a>
         </div>
         </>)}

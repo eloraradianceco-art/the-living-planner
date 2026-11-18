@@ -1,5 +1,5 @@
 // Ported from the session test scripts on 2026-11-16 (upgrade-link-test.cjs). Run with: npm test -- upgrade-links
-// Website "Upgrade Monthly / Annually" → planner opens the upgrade sheet for free accounts only.
+// Website "Upgrade to Pro" (older links: Upgrade Monthly / Annually) → planner opens the upgrade sheet for free accounts only.
 const H = require('../harness.cjs')
 const { chromium, devices } = H
 const APP = 'http://localhost:4830', DB = 'http://localhost:4831'
@@ -19,7 +19,7 @@ const results = []; const check = (n, ok, x = '') => results.push((ok ? 'PASS ' 
   }
   let { ctx, p, errs } = await run('free', '/?upgrade=annual')
   let dlg = await p.getByRole('dialog').count() ? await p.getByRole('dialog').innerText() : ''
-  check('Free account: upgrade sheet opens', /Pro/.test(dlg) && /\$59\.99/.test(dlg), dlg.replace(/\s+/g, ' ').slice(0, 120))
+  check('Free account: upgrade sheet opens', /Pro/.test(dlg) && /\$49\.99 a year/.test(dlg) && !/\$7\.99|\$59\.99|Monthly/.test(dlg), dlg.replace(/\s+/g, ' ').slice(0, 120))
   check('Link cleaned from the address', !p.url().includes('upgrade='), p.url())
   await p.reload(); await p.waitForTimeout(2000)
   check('Opens only once', (await p.getByRole('dialog').count()) === 0)
@@ -28,7 +28,7 @@ const results = []; const check = (n, ok, x = '') => results.push((ok ? 'PASS ' 
   check('Pro account: nothing shown', (await p.getByRole('dialog').count()) === 0 && !(await p.evaluate(() => localStorage.getItem('planner_upgrade_intent'))))
   await ctx.close()
   ;({ ctx, p, errs } = await run('free', '/?upgrade=monthly', false))
-  check('Signed out: wish kept for after sign-in', /monthly/.test(await p.evaluate(() => localStorage.getItem('planner_upgrade_intent')) || ''))
+  check('Signed out: wish kept for after sign-in (old monthly link → the yearly plan)', /annual/.test(await p.evaluate(() => localStorage.getItem('planner_upgrade_intent')) || ''))
   await ctx.close()
   ;({ ctx, p, errs } = await run('free', '/', true, JSON.stringify({ plan: 'monthly', at: Date.now() - 5000 })))
   check('After signing in: sheet opens', (await p.getByRole('dialog').count()) === 1)

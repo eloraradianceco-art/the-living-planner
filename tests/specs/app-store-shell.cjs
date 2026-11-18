@@ -84,7 +84,7 @@ async function run() {
   await p.goto(APP + '/'); await p.waitForTimeout(2500)
   const manage = p.getByRole('button', { name: 'Manage' })
   if (await manage.count()) { await manage.first().click(); await p.waitForTimeout(600) }
-  results.upgradeCardNoPlans = !(await html()).includes('buy.stripe.com') && (await p.getByText(/\$59\.99|\$7\.99/).count()) === 0
+  results.upgradeCardNoPlans = !(await html()).includes('buy.stripe.com') && (await p.getByText(/\$49\.99|\$59\.99|\$7\.99/).count()) === 0
   await p.screenshot({ path: path.join(out, 'native-upgrade.png') })
 
   // 9. Signed out: password reset email points at the website
