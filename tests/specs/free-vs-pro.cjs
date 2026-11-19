@@ -33,7 +33,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   const closeUpgrade = async () => { const btn = p.getByRole('button', { name: 'Maybe later' }); if (await btn.count()) await btn.click(); await p.waitForTimeout(200) }
 
   // Home
-  await p.goto(APP + '/'); await p.waitForTimeout(1500)
+  await p.goto(APP + '/'); await p.waitForTimeout(1500); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   const teaser = await p.locator('.pro-teaser').count()
   check('Home shows Life Score teaser (free) / snapshot (pro)', tier === 'free' ? teaser === 1 : teaser === 0)
   await p.screenshot({ path: `${OUT}/${tier}-home.png`, fullPage: true })
@@ -58,7 +58,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   await p.goto(APP + '/habits'); await p.waitForTimeout(1200)
   await p.evaluate(() => {})
   // Quick add -> pills
-  await p.goto(APP + '/'); await p.waitForTimeout(1200)
+  await p.goto(APP + '/'); await p.waitForTimeout(1200); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   await p.getByRole('button', { name: 'Quick add' }).click()
   await p.waitForTimeout(400)
   const pills = await p.locator('.modal-tabs .pill').allInnerTexts()
@@ -112,7 +112,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   }
 
   // Menu PRO tag
-  await p.goto(APP + '/'); await p.waitForTimeout(1000)
+  await p.goto(APP + '/'); await p.waitForTimeout(1000); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   await p.getByRole('button', { name: /Menu/ }).click(); await p.waitForTimeout(500)
   const tag = await p.locator('.menu-tile', { hasText: 'Growth' }).locator('.pro-tag').count()
   check(tier === 'free' ? 'Menu shows PRO on Growth' : 'Menu has no PRO tag', tier === 'free' ? tag === 1 : tag === 0)

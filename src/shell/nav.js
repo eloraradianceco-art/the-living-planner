@@ -56,14 +56,13 @@ const modeOf = (profile) => PLANNER_MODES.find((m) => m.id === profile?.plannerM
 // Free accounts use Balanced; the other modes are Pro (a saved Pro mode comes back when Pro does).
 const effectiveMode = (profile, isPro) => { const m = modeOf(profile); return isPro || FREE_MODES.includes(m.id) ? m : PLANNER_MODES[0] }
 
-// Everything before 'more' shows when Home opens: today first (focus, the clock, the Word, anything overdue),
-// then the numbers and Quick Access. Everything after it sits under "More on Home", closed until tapped
-// (2026-11-18: Home was over four screens long and today's schedule started on the second one).
+// The order of Home's rows for each planner mode (2026-11-19). The date, name, Life Score and Today's Focus always
+// sit open at the top; every other block is a row that opens on tap, in this order.
 const HOME_ORDER = {
-  Balanced:  ['hero', 'focus', 'schedule', 'faith', 'overdue', 'metrics', 'quick', 'score', 'more', 'goals', 'suggestions', 'woty', 'execution', 'tomorrow'],
-  Execution: ['hero', 'overdue', 'schedule', 'focus', 'nextSteps', 'faith', 'metrics', 'quick', 'more', 'execution', 'tomorrow', 'suggestions', 'goals', 'score', 'woty'],
-  Wellness:  ['hero', 'body', 'faith', 'focus', 'schedule', 'metrics', 'quick', 'more', 'score', 'suggestions', 'goals', 'overdue', 'execution', 'tomorrow', 'woty'],
-  Growth:    ['hero', 'woty', 'goals', 'nextSteps', 'review', 'faith', 'focus', 'quick', 'more', 'score', 'metrics', 'schedule', 'overdue', 'suggestions', 'execution', 'tomorrow'],
+  Balanced:  ['schedule', 'faith', 'overdue', 'metrics', 'quick', 'score', 'goals', 'suggestions', 'woty', 'execution', 'tomorrow'],
+  Execution: ['overdue', 'schedule', 'nextSteps', 'faith', 'metrics', 'quick', 'execution', 'tomorrow', 'suggestions', 'goals', 'score', 'woty'],
+  Wellness:  ['body', 'faith', 'schedule', 'metrics', 'quick', 'score', 'suggestions', 'goals', 'overdue', 'execution', 'tomorrow', 'woty'],
+  Growth:    ['woty', 'goals', 'nextSteps', 'review', 'faith', 'quick', 'score', 'metrics', 'schedule', 'overdue', 'suggestions', 'execution', 'tomorrow'],
 }
 const isNavActive = (item, path) => item.to === '/'
   ? path === '/'

@@ -21,13 +21,18 @@ import { DEFAULT_TARGETS, dayProtein } from './wellness/NutritionTab.jsx'
 import { getVerseOfDay } from './faith/verses.js'
 import { useDeviceEvents } from '../lib/deviceCalendar.js'
 import { DeviceEventSheet } from '../components/DeviceEventSheet.jsx'
+import { Fold } from '../components/Fold.jsx'
 
 function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
   // Saved to the account so every device shows the same (were device-only before 2026-11-12)
-  // "More on Home" stays the way it was left on this device.
-  const [moreOpen, setMoreOpen] = React.useState(() => { try { return localStorage.getItem('planner_home_more') === '1' } catch { return false } })
-  const toggleMore = () => setMoreOpen((v) => { try { localStorage.setItem('planner_home_more', v ? '0' : '1') } catch {} return !v })
+  // Home rows remember on this device which ones were left open.
+  const [openRows, setOpenRows] = React.useState(() => { try { return JSON.parse(localStorage.getItem('planner_home_open') || '[]') } catch { return [] } })
+  const setRow = (key, isOpen) => setOpenRows((rows) => {
+    const next = isOpen ? [...rows.filter((k) => k !== key), key] : rows.filter((k) => k !== key)
+    try { localStorage.setItem('planner_home_open', JSON.stringify(next)) } catch {}
+    return next
+  })
   const [woty, saveWoty] = usePageKey('home', 'wordOfYear', '', 'planner_word_of_year')
   const [top3, saveTop3] = usePageKey('home', 'top3', { date: '', items: ['', '', ''], done: [] }, 'planner_tomorrow_top3')
   const TOMORROW = addDays(TODAY, 1)
@@ -682,23 +687,44 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
   }
   // A brand-new planner shows one first step in place of three empty slots.
   if (tasks.length === 0 && habits.length === 0 && goals.length === 0) blocks.focus = B_start
+  // Home (2026-11-19): the date, your name, Life Score and Today's Focus stay open. Every other block is a row that
+  // opens on tap, in the order of the planner mode. A row with nothing to show today is left out.
+  const hour18 = new Date().getHours() >= 18
+  const activeGoals = goals.filter((g) => !g.completed).length
+  const ROWS = {
+    schedule:    { emoji: '🕐', title: "Today's schedule", sub: `${todaySchedule.length} on the clock today`, show: todaySchedule.length > 0 },
+    faith:       { emoji: '📖', title: "Today's Word", sub: 'Verse of the day' },
+    overdue:     { emoji: '⚠️', title: 'Overdue', sub: `${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} past due`, show: overdueTasks.length > 0 },
+    metrics:     { emoji: '📊', title: "Today's numbers", sub: `${insights.openTasks} open · ${insights.completionRate}% of the week done` },
+    quick:       { emoji: '🧭', title: 'Quick Access', sub: 'Every section of your planner' },
+    score:       { emoji: '⚖️', title: 'Life Score by area', sub: isPro ? 'Your 7 areas, last 7 days' : "See what's behind your score" },
+    goals:       { emoji: '🎯', title: 'Goals', sub: `${activeGoals} active`, show: topGoals.length > 0 },
+    suggestions: { emoji: '💡', title: 'Suggestions', sub: `${suggestions.length} for today`, show: suggestions.length > 0 },
+    woty:        { emoji: '✨', title: 'Word of the Year', sub: woty ? String(woty) : 'Choose your word' },
+    execution:   { emoji: '📈', title: 'This week', sub: 'Tasks done each day' },
+    tomorrow:    { emoji: '🌅', title: "Tomorrow's Top 3", sub: 'Set up tomorrow tonight', show: hour18 },
+    nextSteps:   { emoji: '👣', title: 'Next steps', sub: 'Move each project forward' },
+    body:        { emoji: '💪', title: 'Body & Recovery', sub: `${sessionsThisWeek} session${sessionsThisWeek !== 1 ? 's' : ''} this week` },
+    review:      { emoji: '📝', title: 'Weekly Review', sub: 'Look back. Aim forward.' },
+  }
   const order = HOME_ORDER[mode.id] || HOME_ORDER.Balanced
-  const cut = order.indexOf('more')
-  const primary = cut < 0 ? order : order.slice(0, cut)
-  const folded = cut < 0 ? [] : order.slice(cut + 1).filter((key) => blocks[key])
+  const rows = order.filter((key) => ROWS[key] && ROWS[key].show !== false && blocks[key])
 
   return (
     <div className="home-stack" data-mode={mode.id}>
-      {primary.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
+      {blocks.hero}
+      {blocks.focus}
 
-      {folded.length > 0 && (
-        <button type="button" className="home-more-toggle" aria-expanded={moreOpen} onClick={toggleMore}>
-          <span>{moreOpen ? 'Show less' : 'More on Home'}</span>
-          <span className="home-more-hint">{moreOpen ? '' : 'Goals, suggestions, your week and tomorrow'}</span>
-          <span aria-hidden="true" className="home-more-caret">{moreOpen ? '▴' : '▾'}</span>
-        </button>
+      {rows.length > 0 && (
+        <div className="fold-list home-rows">
+          {rows.map((key) => (
+            <Fold key={key} id={'home-' + key} emoji={ROWS[key].emoji} title={ROWS[key].title} sub={ROWS[key].sub}
+              open={openRows.includes(key)} onToggle={(isOpen) => setRow(key, isOpen)}>
+              {blocks[key]}
+            </Fold>
+          ))}
+        </div>
       )}
-      {moreOpen && folded.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
 
       <PageNav />
     </div>

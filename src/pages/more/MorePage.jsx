@@ -10,6 +10,7 @@ import { FREE_LIMITS } from '../../lib/subscription.js'
 import { useAuth } from '../../auth/AuthContext.jsx'
 import { PLANNER_MODES, modeOf } from '../../shell/nav.js'
 import { PageNav } from '../../components/PageNav.jsx'
+import { Fold } from '../../components/Fold.jsx'
 import { A2HSModal } from '../../components/A2HS.jsx'
 import { NotificationSettings } from './NotificationSettings.jsx'
 import { BackupButton } from './Backup.jsx'
@@ -30,19 +31,6 @@ const TIME_ZONES = [
   ['Asia/Tokyo', 'Japan (Tokyo)'], ['Australia/Sydney', 'Sydney'],
 ]
 // One Settings row: an emoji, a name and a line of what is inside; the block opens under it.
-function Fold({ id, emoji, title, sub, children }) {
-  return (
-    <details className="fold-row" id={id}>
-      <summary>
-        <span className="fold-emoji" aria-hidden="true">{emoji}</span>
-        <span className="fold-text"><span className="fold-label">{title}</span>{sub && <span className="fold-sub">{sub}</span>}</span>
-        <span aria-hidden="true" className="fold-caret">▾</span>
-      </summary>
-      <div className="fold-body">{children}</div>
-    </details>
-  )
-}
-
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut, user } = useAuth()
   const [nameDraft, setNameDraft] = React.useState(profile.displayName || '')

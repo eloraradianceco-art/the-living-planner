@@ -2175,10 +2175,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .mm-hint { font-size: .78rem; margin: 10px 2px 0; }
 .mm-starter input { width: 100%; }
 
-/* Home: "More on Home" fold (2026-11-18) */
-.home-more-toggle{box-sizing:border-box;min-width:0;display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:12px 16px;border-radius:16px;border:1px dashed var(--stone3);background:transparent;color:var(--ink);font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;text-align:left}
-.home-more-toggle .home-more-hint{flex:1;min-width:0;font-weight:500;font-size:.78rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.home-more-toggle .home-more-caret{color:var(--brass-text,#7D6230);font-size:.9rem}
+/* Home rows (2026-11-19): a card inside an open row fills the row and drops its own outer gap */
+.home-rows .fold-body{padding:4px 10px 12px}
+.home-rows .fold-body > .card, .home-rows .fold-body > section.card{margin:0;min-width:0;box-sizing:border-box}
 
 /* Folding rows (2026-11-18): grocery aisles and long Settings blocks open on tap */
 details.grocery-cat{border-bottom:1px solid var(--stone2)}

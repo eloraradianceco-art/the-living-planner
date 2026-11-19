@@ -22,7 +22,7 @@ const st = async () => (await fetch(DB + '/__state')).json()
   const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message))
   await p.clock.install({ time: new Date('2026-11-13T12:00:00-06:00') })
   const snap = async () => Object.fromEntries((await p.locator('.score-snap').allInnerTexts()).map((t) => { const [label, val] = t.split('\n').map((x) => x.trim()).filter(Boolean); return [label.replace(/^\S+\s/, ''), val] }))
-  await p.goto(APP + '/'); await p.waitForTimeout(2500)
+  await p.goto(APP + '/'); await p.waitForTimeout(2500); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   r.homeBefore = await snap()
   r.lifePill = (await p.getByText('Life Score').first().locator('..').innerText()).replace(/\s+/g, ' ')
   // Write today's reflection → Faith should move without a reload
@@ -33,7 +33,7 @@ const st = async () => (await fetch(DB + '/__state')).json()
   await p.goto(APP + '/lifestyle?tab=cleaning'); await p.waitForTimeout(1500)
   await p.getByText('Make beds', { exact: true }).click(); await p.waitForTimeout(700)
   r.choreKey = Object.keys(((await st()).pageData.find((x) => x.data_key === 'cleaningLog') || {}).data_value || {})
-  await p.goto(APP + '/'); await p.waitForTimeout(2000)
+  await p.goto(APP + '/'); await p.waitForTimeout(2000); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   r.homeAfter = await snap()
   // Growth breakdown
   await p.goto(APP + '/growth'); await p.waitForTimeout(1500)
@@ -46,7 +46,7 @@ const st = async () => (await fetch(DB + '/__state')).json()
   await p.clock.setFixedTime(new Date('2026-11-14T08:00:00-06:00'))
   await p.goto(APP + '/lifestyle?tab=cleaning'); await p.waitForTimeout(1800)
   r.nextDayDailyDone = (await p.locator('section.card h3').filter({ hasText: /of \d+ done/ }).first().textContent()).trim()
-  await p.goto(APP + '/'); await p.waitForTimeout(1500)
+  await p.goto(APP + '/'); await p.waitForTimeout(1500); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   await p.locator('.score-snap-grid').screenshot({ path: H.OUT + '/score-home.png' })
   r.errors = errs
   H.report(r); await b.close()

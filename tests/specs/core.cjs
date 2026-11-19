@@ -24,7 +24,7 @@ const st = async () => (await fetch(DB + '/__state')).json()
   await ctx.addInitScript((s) => { if (sessionStorage.getItem('i')) return; sessionStorage.setItem('i', '1'); localStorage.setItem('sb-localhost-auth-token', s); localStorage.setItem('planner_a2hs_seen', '1'); localStorage.setItem('planner_onboarded', '1') }, JSON.stringify(session))
   const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message))
   await p.clock.install({ time: new Date('2026-11-13T12:00:00-06:00') })
-  await p.goto(APP + '/'); await p.waitForTimeout(2000)
+  await p.goto(APP + '/'); await p.waitForTimeout(2000); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   r.metrics = (await p.locator('.home-metrics-strip').innerText()).replace(/\s+/g, ' ')
   r.topHabit = (await p.getByText('TOP HABIT', { exact: false }).first().locator('..').innerText()).replace(/\s+/g, ' ')
   await p.goto(APP + '/tasks'); await p.waitForTimeout(1200)
