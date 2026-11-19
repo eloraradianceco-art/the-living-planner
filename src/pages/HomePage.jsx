@@ -183,7 +183,7 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
           const topGoal = goals.find(g => !g.completed)
 
           return (
-            <div style={{display:'grid', gap:6}}>
+            <div style={{display:'grid', gridTemplateColumns:'minmax(0, 1fr)', gap:6}}>
               {/* Focus 1: Top Task */}
               {topTask ? (
                 <div style={{

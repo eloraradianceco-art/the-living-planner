@@ -24,7 +24,7 @@ const PAGES = {
     { id: 't4', title: 'Done task', date: '2026-11-12', category: 'Health', priority: 'Low', completed: true, user_id: UID },
   ])
   await post('events', [{ id: 'e1', title: 'Church', date: '2026-11-15', time: '10:00', end_time: '12:00', recurrence: 'weekly', user_id: UID }])
-  await post('goals', [{ id: 'g1', title: 'Complete App Store submission', category: 'Business', target_date: '2026-12-31', steps: [{ text: 'Get D-U-N-S #', done: false }, { text: 'Apple Developer Program', done: false }], user_id: UID }])
+  await post('goals', [{ id: 'g1', title: 'Complete App Store submission', category: 'Business', target_date: '2026-12-31', steps: [{ text: 'Sign up for Apple Developer Program (Elora Radiance Co. LLC) and wait for the approval email', done: false }, { text: 'Apple Developer Program', done: false }], user_id: UID }])
   await post('projects', [{ id: 'p1', title: 'Living Planner launch', goal_id: 'g1', due_date: '2026-12-15', status: 'active', steps: [{ text: 'Codemagic', done: true, doneAt: '2026-11-12' }, { text: 'Submit', done: false }], user_id: UID }])
   await post('habits', [{ id: 'h1', name: 'Pray daily', category: 'Faith', user_id: UID }, { id: 'h2', name: 'Do cardio 3x per week', category: 'Health', user_id: UID }])
   await post('habit_logs', [{ id: 'l1', habit_id: 'h1', date: '2026-11-12', completed: true, user_id: UID }, { id: 'l2', habit_id: 'h1', date: '2026-11-13', completed: true, user_id: UID }])
