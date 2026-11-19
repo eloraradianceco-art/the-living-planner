@@ -26,6 +26,7 @@ const post = (t, b) => fetch(DB + '/rest/v1/' + t, { method: 'POST', body: JSON.
   const out = { bars: bars.filter((x) => !x.t.includes('nothing')) }
   out.cols = bars.length; out.note = (await card.innerText()).split('\n').slice(-1)[0]
   await p.goto(APP + '/'); await p.waitForTimeout(1500)
+  await p.locator('.home-more-toggle').click(); await p.waitForTimeout(400) // the week chart sits under "More on Home" (2026-11-18)
   await p.locator('section.card').filter({ hasText: 'Execution' }).screenshot({ path: H.OUT + '/execution.png' })
   const hist = (await (await fetch(DB + '/__state')).json()).tables.score_history.filter((h) => h.date === '2026-11-13').map((h) => h.scores._v)
   out.todaySnapshotVersion = hist; out.errors = errs; H.report(out); await b.close()

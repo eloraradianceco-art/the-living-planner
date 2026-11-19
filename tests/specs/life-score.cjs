@@ -36,6 +36,7 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   r.birthdays = (await p.locator('section.card').first().innerText()).split('\n').filter((l) => /Natalie|Mom|Wife|Mother|Today|\dd$/.test(l))
   // Groceries: re-add Apples from master list, order
   await p.goto(APP + '/lifestyle?tab=groceries'); await p.waitForTimeout(1300)
+  await p.locator('details.grocery-cat > summary', { hasText: 'Fruits' }).click(); await p.waitForTimeout(300) // aisles open on tap (2026-11-18)
   await p.getByRole('button', { name: '+ Apples', exact: true }).click(); await p.waitForTimeout(500)
   r.groceries = (await get('groceries')).map((g) => `${g.label}:${g.done ? 'done' : 'open'}`)
   // Trips order

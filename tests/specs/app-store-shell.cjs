@@ -38,6 +38,7 @@ async function run() {
 
   // 2. Pro-locked section: no trial, price or checkout
   await p.goto(APP + '/finance'); await p.waitForTimeout(1500)
+  await p.locator('.section-picker-all').click(); await p.waitForTimeout(400) // locked tabs sit behind "7 more with Pro" (2026-11-18)
   const tabs = p.locator('button', { hasText: /Income|Savings|Debt/ })
   if (await tabs.count()) { await tabs.first().click(); await p.waitForTimeout(600) }
   results.gateText = (await p.getByText('part of Living Planner Pro').count()) > 0
