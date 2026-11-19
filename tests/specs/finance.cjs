@@ -82,7 +82,7 @@ const near = (a, b) => Math.abs(a - b) < 0.02
   await p.screenshot({ path: `${OUT}/${tag}-monthly.png`, fullPage: true })
 
   // ── Home tile follows the period ─────────────────────────────
-  await p.goto(APP + '/'); await p.waitForTimeout(1300)
+  await p.goto(APP + '/'); await p.waitForTimeout(1300); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   const tile = await p.locator('.home-metrics-strip').innerText().catch(() => '')
   check('Home Budget Left = $258 this month', /\$258/.test(tile) && /this month/i.test(tile), tile.replace(/\s+/g, ' '))
 

@@ -20,7 +20,7 @@ const scenarios = {
     await ctx.addInitScript((s) => { if (sessionStorage.getItem('i')) return; sessionStorage.setItem('i', '1'); localStorage.setItem('sb-localhost-auth-token', s); localStorage.setItem('planner_a2hs_seen', '1'); localStorage.setItem('planner_onboarded', '1') }, JSON.stringify(session))
     const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message))
     await p.clock.install({ time: new Date('2026-11-13T13:30:00-06:00') })
-    await p.goto(APP + '/'); await p.waitForTimeout(1800)
+    await p.goto(APP + '/'); await p.waitForTimeout(1800); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
     const focus = p.locator('section.card').filter({ hasText: "Today's Focus" }).first()
     out[name] = { focus: (await focus.innerText()).split('\n').slice(1, 6).join(' | '), timeline: await p.getByText("What's on the clock").count() }
     if (name === 'allDoneToday') await focus.screenshot({ path: H.OUT + '/focus-done.png' })

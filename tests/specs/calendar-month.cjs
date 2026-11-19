@@ -133,7 +133,7 @@ async function seed() {
     await p.keyboard.press('Escape'); await p.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } }).catch(() => {})
 
     // Home timeline shows the place for today's event
-    await p.goto(APP + '/'); await p.waitForTimeout(1800)
+    await p.goto(APP + '/'); await p.waitForTimeout(1800); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
     check(`${label} home timeline shows place`, /Main Street Dental/.test(await p.locator('body').innerText()))
 
     const st = await state()

@@ -152,7 +152,7 @@ const text = async (loc) => (await loc.innerText().catch(() => '')).replace(/\s+
   check('delete: removed from Apple Calendar and from view', dels.length === 1 && dels[0].id === 'e1' && (await p.locator('.time-card.device', { hasText: 'Staff meeting' }).count()) === 0, dels)
 
   // ── 9. Home timeline ──
-  await p.goto(APP + '/'); await p.waitForTimeout(2200)
+  await p.goto(APP + '/'); await p.waitForTimeout(2200); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
   const home = await text(p.locator('section.card', { hasText: 'Today Timeline' }))
   check("Home: today's Apple events with their calendar", /Small group/.test(home) && /Home/.test(home) && /Write sermon notes/.test(home), home)
 
