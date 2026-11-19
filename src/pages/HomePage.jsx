@@ -25,6 +25,9 @@ import { DeviceEventSheet } from '../components/DeviceEventSheet.jsx'
 function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects, expenses, scores, budget, events, habits, habitLogs, settings, profile, onEdit, onQuickCreate, onToggle, onToggleHabit, onSaveSteps }) {
   const navigate = useNavigate()
   // Saved to the account so every device shows the same (were device-only before 2026-11-12)
+  // "More on Home" stays the way it was left on this device.
+  const [moreOpen, setMoreOpen] = React.useState(() => { try { return localStorage.getItem('planner_home_more') === '1' } catch { return false } })
+  const toggleMore = () => setMoreOpen((v) => { try { localStorage.setItem('planner_home_more', v ? '0' : '1') } catch {} return !v })
   const [woty, saveWoty] = usePageKey('home', 'wordOfYear', '', 'planner_word_of_year')
   const [top3, saveTop3] = usePageKey('home', 'top3', { date: '', items: ['', '', ''], done: [] }, 'planner_tomorrow_top3')
   const TOMORROW = addDays(TODAY, 1)
@@ -660,16 +663,42 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
     </section>
   )
 
+  const B_start = (
+    <section className="card home-start" style={{background:'linear-gradient(135deg, #1A2332 0%, #0B1829 100%)', color:'#FAF8F4', border:'none'}}>
+      <p className="eyebrow" style={{color:'rgba(255,255,255,.6)'}}>Start here</p>
+      <h3 style={{margin:'2px 0 6px', color:'white'}}>What is one thing you need to do today?</h3>
+      <p style={{fontSize:'.86rem', lineHeight:1.5, color:'rgba(255,255,255,.75)', margin:'0 0 12px'}}>Add it and it shows up right here. Habits and goals can come later.</p>
+      <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+        <button type="button" className="primary-btn" onClick={() => onQuickCreate && onQuickCreate('task')}>✅ Add my first task</button>
+        <button type="button" className="ghost-btn" style={{color:'white', borderColor:'rgba(255,255,255,.3)'}} onClick={() => onQuickCreate && onQuickCreate('habit')}>🔁 Add a habit</button>
+      </div>
+    </section>
+  )
+
   const blocks = {
     hero: B_hero, woty: B_woty, focus: B_focus, metrics: B_metrics, quick: B_quick, schedule: B_schedule,
     suggestions: B_suggestions, overdue: B_overdue, goals: B_goals, score: B_score, execution: B_execution,
     tomorrow: B_tomorrow, faith: B_faith, nextSteps: B_nextSteps, body: B_body, review: B_review,
   }
+  // A brand-new planner shows one first step in place of three empty slots.
+  if (tasks.length === 0 && habits.length === 0 && goals.length === 0) blocks.focus = B_start
   const order = HOME_ORDER[mode.id] || HOME_ORDER.Balanced
+  const cut = order.indexOf('more')
+  const primary = cut < 0 ? order : order.slice(0, cut)
+  const folded = cut < 0 ? [] : order.slice(cut + 1).filter((key) => blocks[key])
 
   return (
     <div className="home-stack" data-mode={mode.id}>
-      {order.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
+      {primary.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
+
+      {folded.length > 0 && (
+        <button type="button" className="home-more-toggle" aria-expanded={moreOpen} onClick={toggleMore}>
+          <span>{moreOpen ? 'Show less' : 'More on Home'}</span>
+          <span className="home-more-hint">{moreOpen ? '' : 'Goals, suggestions, your week and tomorrow'}</span>
+          <span aria-hidden="true" className="home-more-caret">{moreOpen ? '▴' : '▾'}</span>
+        </button>
+      )}
+      {moreOpen && folded.map((key) => <React.Fragment key={key}>{blocks[key]}</React.Fragment>)}
 
       <PageNav />
     </div>

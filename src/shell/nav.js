@@ -8,15 +8,17 @@ import {
 import { FREE_MODES } from '../lib/subscription.js'
 
 // Phone bottom bar. The last slot opens the Menu sheet with every section.
+// The fourth slot is Habits (2026-11-18): a daily check-off everyone can open. It was Growth, which is a
+// Pro page, so free accounts had a locked tab. Growth is in the Menu and behind Home's Life Score.
 const tabs = [
   { to: '/', label: 'Home', icon: House, emoji: '🏠' },
   { to: '/tasks', label: 'Tasks', icon: SquareCheck, emoji: '✅' },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays, emoji: '📅' },
-  { to: '/growth', label: 'Growth', icon: TrendingUp, emoji: '📈' },
+  { to: '/habits', label: 'Habits', icon: Repeat, emoji: '🔁' },
 ]
 
 // Additional routes not in bottom nav
-const subRoutes = ['/habits', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects', '/faith']
+const subRoutes = ['/growth', '/goals', '/finance', '/wellness', '/productivity', '/lifestyle', '/health', '/projects', '/faith']
 
 // Every section of the planner — drives the iPad/desktop side nav and Home's Quick Access.
 const NAV_GROUPS = [
@@ -54,11 +56,14 @@ const modeOf = (profile) => PLANNER_MODES.find((m) => m.id === profile?.plannerM
 // Free accounts use Balanced; the other modes are Pro (a saved Pro mode comes back when Pro does).
 const effectiveMode = (profile, isPro) => { const m = modeOf(profile); return isPro || FREE_MODES.includes(m.id) ? m : PLANNER_MODES[0] }
 
+// Everything before 'more' shows when Home opens: today first (focus, the clock, the Word, anything overdue),
+// then the numbers and Quick Access. Everything after it sits under "More on Home", closed until tapped
+// (2026-11-18: Home was over four screens long and today's schedule started on the second one).
 const HOME_ORDER = {
-  Balanced:  ['hero', 'focus', 'faith', 'woty', 'metrics', 'quick', 'schedule', 'suggestions', 'overdue', 'goals', 'score', 'execution', 'tomorrow'],
-  Execution: ['hero', 'overdue', 'schedule', 'focus', 'nextSteps', 'faith', 'metrics', 'execution', 'tomorrow', 'suggestions', 'goals', 'quick', 'score', 'woty'],
-  Wellness:  ['hero', 'body', 'faith', 'focus', 'schedule', 'metrics', 'score', 'suggestions', 'goals', 'quick', 'overdue', 'execution', 'tomorrow', 'woty'],
-  Growth:    ['hero', 'woty', 'goals', 'nextSteps', 'review', 'faith', 'focus', 'score', 'metrics', 'schedule', 'overdue', 'quick', 'suggestions', 'execution', 'tomorrow'],
+  Balanced:  ['hero', 'focus', 'schedule', 'faith', 'overdue', 'metrics', 'quick', 'score', 'more', 'goals', 'suggestions', 'woty', 'execution', 'tomorrow'],
+  Execution: ['hero', 'overdue', 'schedule', 'focus', 'nextSteps', 'faith', 'metrics', 'quick', 'more', 'execution', 'tomorrow', 'suggestions', 'goals', 'score', 'woty'],
+  Wellness:  ['hero', 'body', 'faith', 'focus', 'schedule', 'metrics', 'quick', 'more', 'score', 'suggestions', 'goals', 'overdue', 'execution', 'tomorrow', 'woty'],
+  Growth:    ['hero', 'woty', 'goals', 'nextSteps', 'review', 'faith', 'focus', 'quick', 'more', 'score', 'metrics', 'schedule', 'overdue', 'suggestions', 'execution', 'tomorrow'],
 }
 const isNavActive = (item, path) => item.to === '/'
   ? path === '/'

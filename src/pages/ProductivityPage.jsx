@@ -9,7 +9,7 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import { useUrlTab } from '../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../components/Pro.jsx'
 import { EmptyState } from '../components/EmptyState.jsx'
-import { PageHeader, QuickAccessGrid, TabNav } from '../components/PageHeader.jsx'
+import { PageHeader, SectionPicker, TabNav } from '../components/PageHeader.jsx'
 import { useOwnWrites, useRemotePageData } from '../lib/pageData.js'
 
 function NoteComposer({ onSave }) {
@@ -192,7 +192,7 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   return (
     <div className="screen-stack">
       <PageHeader icon={Zap} title="Productivity" subtitle="Do the work that matters" />
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
+      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
 
 
       {tab === 'braindump' && (

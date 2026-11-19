@@ -8,7 +8,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { stripEmoji, emojiOf, PageHeader, QuickAccessGrid, TabNav } from '../../components/PageHeader.jsx'
+import { stripEmoji, emojiOf, PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
 import { useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
 import { CleaningTracker } from './CleaningTracker.jsx'
 import { groceryKey, RecipeBook } from './Recipes.jsx'
@@ -113,7 +113,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   return (
     <div className="screen-stack">
       <PageHeader icon={Compass} title="Lifestyle" subtitle="Home, table, and the people you love" />
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
+      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
 
 
       {tab === 'groceries' && (
@@ -156,7 +156,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
           <section className="card">
             <p className="eyebrow">Master Grocery List</p>
             <h3 style={{ margin: '4px 0 6px' }}>Tap to add to your list</h3>
-            <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>Tap any item to add it to your shopping list above.</p>
+            <p className="muted" style={{fontSize:'.8rem',marginBottom:10}}>Open an aisle, then tap any item to add it to your shopping list above.</p>
             {[
               { cat:'🍎 Fruits', color:'#fde8e8', items:['Apples','Apricots','Avocados','Bananas','Berries','Cherries','Grapefruit','Grapes','Kiwi','Lemons','Limes','Melons','Nectarines','Oranges','Papaya','Peaches','Pears','Plums','Pomegranate','Watermelon'] },
               { cat:'🥦 Vegetables', color:'#d5f5e3', items:['Artichokes','Asparagus','Basil','Beets','Broccoli','Cabbage','Cauliflower','Carrots','Celery','Chiles','Chives','Cilantro','Corn','Cucumbers','Eggplant','Garlic Cloves','Green Onions','Lettuce','Onions','Peppers','Potatoes','Salad Greens','Spinach','Sprouts','Squash','Tomatoes','Zucchini'] },
@@ -180,12 +180,14 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
               { cat:'🐾 Pets', color:'#fff8e1', items:['Cat Food','Cat Sand','Dog Food','Pet Shampoo','Treats','Flea Treatment'] },
               { cat:'⚡ Misc Items', color:'#f5f5f5', items:['Batteries','Charcoal','Greeting Cards','Light Bulbs'] },
             ].map(({ cat, color, items }) => (
-              <div key={cat} style={{marginBottom:16}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 0 10px'}}>
+              <details key={cat} className="grocery-cat">
+                <summary style={{display:'flex',alignItems:'center',gap:10}}>
                   <span style={{fontSize:'.64rem',fontWeight:700,letterSpacing:'.14em',textTransform:'uppercase',color:'var(--brass-fg)'}}><span aria-hidden="true" style={{fontSize:'.95rem',letterSpacing:0,marginRight:6}}>{emojiOf(cat)}</span>{stripEmoji(cat)}</span>
                   <span style={{flex:1,height:1,background:'var(--border2)'}} />
-                </div>
-                <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                  <span className="grocery-cat-count">{items.filter((item) => groceries.some((g) => groceryKey(g.label) === groceryKey(item) && !g.done)).length > 0 ? `${items.filter((item) => groceries.some((g) => groceryKey(g.label) === groceryKey(item) && !g.done)).length} on list · ` : ''}{items.length}</span>
+                  <span aria-hidden="true" className="fold-caret">▾</span>
+                </summary>
+                <div style={{display:'flex',flexWrap:'wrap',gap:6,padding:'10px 0 6px'}}>
                   {items.map(item => {
                     // Checked-off items can be added again (they used to stay locked until "Clear Checked")
                     const alreadyAdded = groceries.some(g => groceryKey(g.label) === groceryKey(item) && !g.done)
@@ -205,7 +207,7 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
                     )
                   })}
                 </div>
-              </div>
+              </details>
             ))}
           </section>
         </div>

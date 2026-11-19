@@ -12,7 +12,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { PageHeader, QuickAccessGrid, TabNav } from '../../components/PageHeader.jsx'
+import { PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
 import { money2, parseMoney, SavingsItem } from './Savings.jsx'
 import { DEBT_TYPES, debtTypeOf, utilTone, ExpenseRow } from './Expenses.jsx'
 import { useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
@@ -258,7 +258,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
     <div className="screen-stack">
       <PageHeader icon={Wallet} title="Finance" subtitle="Steward what you've been given"
         action={<Link to="/calculator" className="ghost-btn calc-link" aria-label="Open the calculator"><Calculator size={15} /> <span>Calculator</span></Link>} />
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
+      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && (

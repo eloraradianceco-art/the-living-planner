@@ -1604,7 +1604,7 @@ html { scroll-behavior: smooth; }
   .menu-sheet, .menu-backdrop { transition: none; }
 }
 /* Phone: leave room under the last item so the floating + never covers it */
-@media (max-width: 760px) { .mobile-frame .content { padding-bottom: 84px; } }
+@media (max-width: 760px) { .mobile-frame .content { padding-bottom: 152px; /* clears the tab bar and the + button, so the last line of a page is never under it */ } }
 
 /* ── Planner modes ───────────────────────────────────────────────────── */
 button.profile-pill { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -2174,3 +2174,17 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px 
 .mm-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .mm-hint { font-size: .78rem; margin: 10px 2px 0; }
 .mm-starter input { width: 100%; }
+
+/* Home: "More on Home" fold (2026-11-18) */
+.home-more-toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:12px 16px;border-radius:16px;border:1px dashed var(--stone3);background:transparent;color:var(--ink);font:inherit;font-weight:700;font-size:.9rem;cursor:pointer;text-align:left}
+.home-more-toggle .home-more-hint{flex:1;min-width:0;font-weight:500;font-size:.78rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.home-more-toggle .home-more-caret{color:var(--brass-text,#7D6230);font-size:.9rem}
+
+/* Folding rows (2026-11-18): grocery aisles and long Settings blocks open on tap */
+details.grocery-cat{border-bottom:1px solid var(--stone2)}
+details.grocery-cat > summary, details.fold-card > summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+details.grocery-cat > summary::-webkit-details-marker, details.fold-card > summary::-webkit-details-marker{display:none}
+.grocery-cat-count{font-size:.72rem;color:var(--ink2);white-space:nowrap}
+.fold-caret{color:var(--brass-text,#7D6230);font-size:.85rem;transition:transform .15s}
+details[open] > summary .fold-caret{transform:rotate(180deg)}
+.fold-title{font-family:var(--font-display,inherit);font-size:1.05rem;color:var(--ink)}

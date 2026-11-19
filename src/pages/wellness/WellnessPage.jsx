@@ -8,7 +8,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { PageHeader, QuickAccessGrid, TabNav } from '../../components/PageHeader.jsx'
+import { PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
 import { mergeLegacyWorkouts, markLegacyWorkoutsMoved, HW_PREFIX, hwRead, useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
 import { readinessOf, readinessBand } from './helpers.js'
 import { sleepSpan, fmtHours } from '../../lib/sleep.js'
@@ -227,12 +227,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
     <div className="screen-stack">
       <PageHeader icon={Leaf} title="Health & Wellness" subtitle="Care for the whole person" />
 
-      {WELLNESS_GROUPS.map((g) => (
-        <div key={g.label} className="tab-group">
-          <p className="tab-group-label">{g.label}</p>
-          <QuickAccessGrid tabs={g.ids.map((id) => TABS.find((t) => t.id === id)).filter(Boolean)} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
-        </div>
-      ))}
+      <SectionPicker tabs={WELLNESS_GROUPS.flatMap((g) => g.ids).map((id) => TABS.find((x) => x.id === id)).filter(Boolean)} groups={WELLNESS_GROUPS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
       {tab === 'training' && (

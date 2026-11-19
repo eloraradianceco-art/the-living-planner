@@ -1,4 +1,5 @@
 // Page header, icons, the quick-access grid and tab navigation.
+import React from 'react'
 import {
   LayoutDashboard, Banknote, CreditCard, PiggyBank, TrendingDown, HeartHandshake, ClipboardList,
   CircleSlash, Smile, Moon, PenLine, Sunrise, BookOpen, Pill, Activity, Wind, CloudLightning,
@@ -119,6 +120,63 @@ function QuickAccessGrid({ tabs, activeTab, onSelect, proTabs = [], isPro = fals
   )
 }
 
+// ── Section picker — one row at the top of an area page (2026-11-18) ─────
+// The page opens on its content: the row shows the tabs a person can use (Free), or the current tab and an
+// "All sections" button (Pro). The full tile grid opens from the row and closes again after a pick.
+// It was a grid of every tab (most of them locked on Free) that filled the top of the page.
+function SectionPicker({ tabs, activeTab, onSelect, proTabs = [], isPro = false, iconOverrides = {}, groups = null }) {
+  const [open, setOpen] = React.useState(false)
+  const locked = (t) => !isPro && proTabs.includes(t.id)
+  const openTabs = tabs.filter((t) => !locked(t))
+  const lockedCount = tabs.length - openTabs.length
+  const active = tabs.find((t) => t.id === activeTab)
+  const pick = (id) => { setOpen(false); onSelect(id) }
+  const chip = (on) => ({
+    display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 44, padding: '8px 14px', borderRadius: 999,
+    border: on ? '1px solid var(--ink)' : '1px solid var(--border)', cursor: 'pointer', font: 'inherit',
+    background: on ? 'linear-gradient(160deg, var(--ink) 0%, #2C2C2E 100%)' : 'var(--warm-white)',
+    color: on ? 'var(--warm-white)' : 'var(--ink2)', fontSize: '.84rem', fontWeight: 600,
+  })
+  const tabChip = (t) => (
+    <button key={t.id} type="button" onClick={() => pick(t.id)} aria-pressed={t.id === activeTab} style={chip(t.id === activeTab)}>
+      <span aria-hidden="true" style={{ fontSize: '1.05rem', lineHeight: 1 }}>{emojiOf(t.label)}</span>
+      <span>{stripEmoji(t.label)}</span>
+      {locked(t) && <Lock size={12} strokeWidth={2} color="var(--brass)" aria-label="Pro" />}
+    </button>
+  )
+  // Free: every tab they can use. Pro: the tab they are on. A locked tab that was tapped shows too.
+  const shown = isPro ? (active ? [active] : []) : [...openTabs, ...(active && locked(active) ? [active] : [])]
+  const more = isPro ? tabs.length > 1 : lockedCount > 0
+  return (
+    <div className="section-picker" style={{ marginBottom: 14 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {shown.map(tabChip)}
+        {more && (
+          <button type="button" className="section-picker-all" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+            style={{ ...chip(false), color: 'var(--brass-text, #7D6230)', background: 'transparent', borderStyle: 'dashed' }}>
+            {isPro
+              ? <span>All {tabs.length} sections</span>
+              : <><Lock size={13} strokeWidth={2} aria-hidden="true" /><span>{lockedCount} more with Pro</span></>}
+            <span aria-hidden="true">{open ? '▴' : '▾'}</span>
+          </button>
+        )}
+      </div>
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          {groups
+            ? groups.map((g) => (
+              <div key={g.label} className="tab-group">
+                <p className="tab-group-label">{g.label}</p>
+                <QuickAccessGrid tabs={g.ids.map((id) => tabs.find((t) => t.id === id)).filter(Boolean)} activeTab={activeTab} onSelect={pick} proTabs={proTabs} isPro={isPro} iconOverrides={iconOverrides} />
+              </div>
+            ))
+            : <QuickAccessGrid tabs={tabs} activeTab={activeTab} onSelect={pick} proTabs={proTabs} isPro={isPro} iconOverrides={iconOverrides} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Tab Navigator — prev/next pills ──────────────────────────────────────
 function TabNav({ tabs, activeTab, onSelect }) {
   const idx = tabs.findIndex(t => t.id === activeTab)
@@ -165,6 +223,6 @@ function TabNav({ tabs, activeTab, onSelect }) {
 }
 
 export {
-  FAITH_ICON_OVERRIDES, stripEmoji, emojiOf, withEmoji, BrandMark, PageHeader, QuickAccessGrid,
+  FAITH_ICON_OVERRIDES, stripEmoji, emojiOf, withEmoji, BrandMark, PageHeader, QuickAccessGrid, SectionPicker,
   TabNav,
 }

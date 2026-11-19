@@ -10,7 +10,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { FAITH_ICON_OVERRIDES, PageHeader, QuickAccessGrid, TabNav } from '../../components/PageHeader.jsx'
+import { FAITH_ICON_OVERRIDES, PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
 import { useOwnWrites } from '../../lib/pageData.js'
 import { getVerseOfDay } from './verses.js'
 
@@ -309,7 +309,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
         ))}
       </div>
 
-      <QuickAccessGrid tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} iconOverrides={FAITH_ICON_OVERRIDES} />
+      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} iconOverrides={FAITH_ICON_OVERRIDES} />
 
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
       {tab === 'devotional' && (

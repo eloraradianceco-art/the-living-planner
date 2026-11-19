@@ -254,10 +254,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       <NotificationSettings settings={settings} updateSettings={updateSettings} />
 
       {/* ── More from Elora Radiance ─────────────────────────────── */}
-      <section className="card">
-        <p className="eyebrow">Explore</p>
-        <h3 style={{margin:'4px 0 6px'}}>More from Elora Radiance Co.</h3>
-        <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,marginBottom:14}}>Scripture-based tools for the whole Christian life.</p>
+      <details className="card fold-card">
+        <summary><span><span className="eyebrow" style={{display:'block'}}>Explore</span><span className="fold-title">More from Elora Radiance Co.</span></span><span aria-hidden="true" className="fold-caret">▾</span></summary>
+        <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,margin:'10px 0 14px'}}>Scripture-based tools for the whole Christian life.</p>
         {[
           { label:'Armed & Anchored', desc:'Spiritual warfare training — 26 weapons', url:'https://armed.eloraradiance.com/', icon:'⚔️' },
           { label:'Anchored Steps · Year 1', desc:'52 weeks of faith in action', url:'https://steps.eloraradiance.com/', icon:'⚓' },
@@ -278,7 +277,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <span style={{color:'var(--brass-fg)',fontSize:'.95rem',flexShrink:0}}>↗</span>
           </a>
         ))}
-      </section>
+      </details>
 
       {/* ── Privacy, account deletion and Scripture credits ──────────── */}
       <section>
