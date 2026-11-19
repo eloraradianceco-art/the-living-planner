@@ -12,11 +12,26 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
+import { PageHeader } from '../../components/PageHeader.jsx'
+import { makeSections, SectionRows, usePrimary } from '../../components/Sections.jsx'
 import { money2, parseMoney, SavingsItem } from './Savings.jsx'
 import { DEBT_TYPES, debtTypeOf, utilTone, ExpenseRow } from './Expenses.jsx'
 import { useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
 import { Fold } from '../../components/Fold.jsx'
+
+// One line under each row's name on this page (components/Sections.jsx)
+const SECTION_SUBS = {
+  rule: 'How your income splits this period',
+  tips: '4 ways to improve your finances',
+  income: 'Paychecks and other income',
+  expenses: 'Bills and tracked spending',
+  savings: 'Funds, goals and challenges',
+  debt: 'Balances and your payoff plan',
+  donations: 'Tithes and offerings',
+  budget: 'Spending budget and cash flow',
+  nospend: 'Color in one per day',
+  overview: 'Your money at a glance',
+}
 
 function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
@@ -75,6 +90,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
   const lsSet = (k, v) => { try { localStorage.setItem('planner.f.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useUrlTab(isPro ? 'overview' : 'budget')
+  // Overview stays open with Pro (Budget Plan without); every other section is a row underneath (components/Sections.jsx)
+  const primary = isPro ? 'overview' : 'budget'
+  const pick = usePrimary(tab, setTab, primary)
+  const S = makeSections()
   // Budget: daily, weekly or monthly. The amount saves when you finish typing (not on every keystroke).
   const bud = normBudget(budget)
   const budInfo = BUDGET_PERIODS[bud.period]
@@ -245,6 +264,12 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
     { id: 'budget', label: '📋 Budget Plan' },
     { id: 'nospend', label: '🌿 No-Spend' },
   ]
+  // Rows under the open section. The 50/30/20 Rule and the tips sit first; they are part of Overview, so Pro only.
+  const ROW_TABS = [
+    TABS[0],
+    ...(isPro ? [{ id: 'rule', label: '⚖️ 50/30/20 Rule' }, { id: 'tips', label: '💡 Tips' }] : []),
+    ...TABS.slice(1),
+  ]
 
   const PeriodPills = () => (
     <div className="pill-row" style={{marginBottom:14,gap:6}}>
@@ -259,10 +284,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
     <div className="screen-stack">
       <PageHeader icon={Wallet} title="Finance" subtitle="Steward what you've been given"
         action={<Link to="/calculator" className="ghost-btn calc-link" aria-label="Open the calculator"><Calculator size={15} /> <span>Calculator</span></Link>} />
-      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.finance} isPro={isPro} />
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
-      {tab === 'overview' && (
+      {S.add('overview', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           {/* Net Worth Tracker */}
@@ -347,8 +371,15 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             </div>
           ))}
 
+        </section>
+        </ProTabGate>
+      ))}
+
+      {/* 50/30/20 Rule and the 4 tips were inside Overview; they are their own rows since 2026-11-19 */}
+      {S.add('rule', () => (
+        <section className="card">
           {/* 50/30/20 */}
-          <div style={{marginTop:18,background:'var(--stone)',borderRadius:12,padding:'16px'}}>
+          <div style={{background:'var(--stone)',borderRadius:12,padding:'16px'}}>
             <p className="eyebrow" style={{marginBottom:6}}>50 / 30 / 20 Rule</p>
             <p className="muted" style={{fontSize:'.78rem',marginBottom:12}}>Based on {period === 'monthly' ? `${monthLabel(CUR_MONTH, { month: 'long' })}'s` : `your ${period}`} income of {fmt(totalIncomeForPeriod)}</p>
             {[
@@ -372,9 +403,12 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               )
             })}
           </div>
-
+        </section>
+      ))}
+      {S.add('tips', () => (
+        <section className="card">
           {/* 4 Tips */}
-          <div style={{marginTop:18}}>
+          <div>
             <p className="eyebrow" style={{marginBottom:12}}>4 Tips to Improve Your Finances</p>
             {[
               ['Know Your Numbers Exactly','Income, expenses, debt, savings. You cannot improve what you refuse to measure.','#e8d5f5'],
@@ -389,11 +423,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ))}
           </div>
         </section>
-        </ProTabGate>
-      )}
+      ))}
 
       {/* ── INCOME ───────────────────────────────────────────────────────── */}
-      {tab === 'donations' && (
+      {S.add('donations', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Giving</p>
@@ -497,9 +530,9 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           )}
         </section>
         </ProTabGate>
-        )}
+        ))}
 
-      {tab === 'income' && (
+      {S.add('income', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Income Tracker</p>
@@ -581,10 +614,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             </>)
           })()}
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── EXPENSES & BILLS ─────────────────────────────────────────────── */}
-      {tab === 'expenses' && (
+      {S.add('expenses', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           {/* Bills section — moved here from Budget */}
@@ -812,10 +845,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             })()}
           </section>
         </div>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── SAVINGS ──────────────────────────────────────────────────────── */}
-      {tab === 'savings' && (
+      {S.add('savings', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
@@ -1037,8 +1070,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             </div>
           </section>
         </div>
-      </ProTabGate>)}
-      {tab === 'debt' && (
+      </ProTabGate>))}
+      {S.add('debt', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card debt-card">
           <p className="eyebrow">Debt Tracker</p>
@@ -1155,10 +1188,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             }}>+ Add {newDebt.type === 'card' ? 'Card' : 'Loan'}</button>
           </div>
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── BUDGET PLAN ──────────────────────────────────────────────────── */}
-      {tab === 'budget' && (
+      {S.add('budget', () => (
         <div>
           {/* Spending budget: daily, weekly or monthly (discretionary cap) */}
           <section className="card budget-card">
@@ -1331,10 +1364,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           </Fold>
           </div>
         </div>
-      )}
+      ))}
 
       {/* ── NO-SPEND ─────────────────────────────────────────────────────── */}
-      {tab === 'nospend' && (
+      {S.add('nospend', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">No-Spend Challenge</p>
@@ -1370,8 +1403,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
             ))}
           </div>
         </section>
-      </ProTabGate>)}
-      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
+      </ProTabGate>))}
+      <SectionRows sections={S} tabs={ROW_TABS} primary={primary} tab={tab} onSelect={pick} subs={SECTION_SUBS} proTabs={PRO_TABS.finance} isPro={isPro} />
     </div>
   )
 }

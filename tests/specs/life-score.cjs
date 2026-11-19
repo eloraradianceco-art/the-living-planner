@@ -33,7 +33,7 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   r.targetValue = await tgt.inputValue()
   // Birthdays
   await p.goto(APP + '/lifestyle?tab=birthdays'); await p.waitForTimeout(1300)
-  r.birthdays = (await p.locator('section.card').first().innerText()).split('\n').filter((l) => /Natalie|Mom|Wife|Mother|Today|\dd$/.test(l))
+  r.birthdays = (await p.locator('#sec-birthdays section.card').first().innerText()).split('\n').filter((l) => /Natalie|Mom|Wife|Mother|Today|\dd$/.test(l))
   // Groceries: re-add Apples from master list, order
   await p.goto(APP + '/lifestyle?tab=groceries'); await p.waitForTimeout(1300)
   await p.locator('details.grocery-cat > summary', { hasText: 'Fruits' }).click(); await p.waitForTimeout(300) // aisles open on tap (2026-11-18)
@@ -41,7 +41,7 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   r.groceries = (await get('groceries')).map((g) => `${g.label}:${g.done ? 'done' : 'open'}`)
   // Trips order
   await p.goto(APP + '/lifestyle?tab=trips'); await p.waitForTimeout(1200)
-  r.trips = (await p.locator('section.card').first().innerText()).split('\n').filter((l) => /trip|Past|in \d+ days/.test(l))
+  r.trips = (await p.locator('#sec-trips section.card').first().innerText()).split('\n').filter((l) => /trip|Past|in \d+ days/.test(l))
   // Meds: Friday → Vitamin D due, Fish oil not
   await p.goto(APP + '/wellness?tab=meds'); await p.waitForTimeout(1300)
   r.meds = (await p.locator('#sec-meds section.card').first() /* sections are rows under the open one since 2026-11-19 */.innerText()).replace(/\s+/g, ' ').slice(0, 220)

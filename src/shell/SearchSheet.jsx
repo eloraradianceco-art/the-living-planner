@@ -26,7 +26,7 @@ const SEARCH_SOURCES = [
   ['faith', 'prayers', 'Prayer', '/faith?tab=prayer'],
   ['faith', 'scriptures', 'Scripture', '/faith?tab=scripture'],
   ['faith', 'gratitude', 'Gratitude', '/faith?tab=gratitude'],
-  ['faith', 'reflections', 'Reflection', '/faith?tab=devotional'],
+  ['faith', 'reflections', 'Reflection', '/faith?tab=past'],
 ]
 const LOCAL_PREFIX = { wellness: 'planner.hw.', lifestyle: 'planner.l.', productivity: 'planner.p.', faith: 'planner.faith.' }
 const TITLE_FIELDS = ['title', 'name', 'who', 'test', 'reference', 'text', 'request', 'label', 'type', 'verse']

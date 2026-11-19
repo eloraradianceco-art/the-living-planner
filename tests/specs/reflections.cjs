@@ -18,7 +18,7 @@ const seed = (k, v) => fetch(DB + '/rest/v1/faith_data', { method: 'POST', body:
     await ctx.addInitScript(([s, loc]) => { if (sessionStorage.getItem('init')) return; sessionStorage.setItem('init', '1'); localStorage.setItem('sb-localhost-auth-token', s); localStorage.setItem('planner_a2hs_seen', '1'); for (const [k, v] of Object.entries(loc)) localStorage.setItem(k, v) }, [JSON.stringify(session), local])
     const p = await ctx.newPage(); p.on('pageerror', (e) => errs.push(e.message))
     await p.clock.install({ time: new Date(iso) })
-    await p.goto(APP + '/faith?tab=devotional'); await p.waitForTimeout(2000)
+    await p.goto(APP + '/faith?tab=past'); await p.waitForTimeout(2000)
     return p
   }
   const box = (p) => p.getByLabel("Today's reflection")
@@ -65,7 +65,7 @@ const seed = (k, v) => fetch(DB + '/rest/v1/faith_data', { method: 'POST', body:
   r.globalSearchText = (await phone.locator('.search-sheet').innerText()).replace(/\s+/g, ' ').slice(0, 200); r.globalSearch = /reflection/i.test(r.globalSearchText) && /northwood/i.test(r.globalSearchText)
   await phone.keyboard.press('Escape')
   // Phone sits in the background overnight; comes back Saturday → reloads, fresh page, Friday's entry in Past
-  await phone.goto(APP + '/faith?tab=devotional'); await phone.waitForTimeout(1500)
+  await phone.goto(APP + '/faith?tab=past'); await phone.waitForTimeout(1500)
   await phone.clock.setFixedTime(new Date('2026-11-14T06:45:00-06:00'))
   await Promise.all([phone.waitForEvent('load', { timeout: 8000 }).catch(() => null), phone.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))])
   await phone.waitForTimeout(2000)

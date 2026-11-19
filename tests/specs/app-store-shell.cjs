@@ -38,11 +38,11 @@ async function run() {
 
   // 2. Pro-locked section: no trial, price or checkout
   await p.goto(APP + '/finance'); await p.waitForTimeout(1500)
-  await p.locator('.section-picker-all').click(); await p.waitForTimeout(400) // locked tabs sit behind "7 more with Pro" (2026-11-18)
+  await p.locator('#sec-pro > summary').click(); await p.waitForTimeout(600) // locked sections sit in the "7 more with Pro" row (2026-11-19)
   const tabs = p.locator('button', { hasText: /Income|Savings|Debt/ })
   if (await tabs.count()) { await tabs.first().click(); await p.waitForTimeout(600) }
   results.gateText = (await p.getByText('part of Living Planner Pro').count()) > 0
-  results.gateHasNoTrial = (await p.getByText(/Free Trial|free trial|\$\d/).count()) === 0
+  results.gateHasNoTrial = (await p.locator('#sec-pro').getByText(/Free Trial|free trial|\$\d/).count()) === 0 // inside the Pro row: Budget Plan above it shows the user's own dollar amounts
   await p.screenshot({ path: path.join(out, 'native-gate.png') })
 
   // 3. More page: no Upgrade button, no install card, no Stripe links

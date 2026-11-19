@@ -18,6 +18,15 @@ function makeSections() {
   return { map, add: (id, render) => { map[id] = render; return null } }
 }
 
+// For a page whose open section depends on the plan (Finance: Overview with Pro, Budget Plan without). If the plan
+// arrives after the page opened and nothing has been tapped yet, move to the right open section.
+function usePrimary(tab, setTab, primary) {
+  const startedOnDefault = React.useRef(tab === primary)
+  const touched = React.useRef(false)
+  React.useEffect(() => { if (startedOnDefault.current && !touched.current && tab !== primary) setTab(primary) }, [primary])
+  return (id) => { touched.current = true; setTab(id) }
+}
+
 function SectionRows({ sections, tabs, primary, tab, onSelect, subs = {}, proTabs = [], isPro = false }) {
   const locked = (t) => !isPro && proTabs.includes(t.id)
   const others = tabs.filter((t) => t.id !== primary)
@@ -63,4 +72,4 @@ function SectionRows({ sections, tabs, primary, tab, onSelect, subs = {}, proTab
   )
 }
 
-export { makeSections, SectionRows }
+export { makeSections, SectionRows, usePrimary }

@@ -8,10 +8,21 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { stripEmoji, emojiOf, PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
+import { stripEmoji, emojiOf, PageHeader } from '../../components/PageHeader.jsx'
+import { makeSections, SectionRows, usePrimary } from '../../components/Sections.jsx'
 import { useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
 import { CleaningTracker } from './CleaningTracker.jsx'
 import { groceryKey, RecipeBook } from './Recipes.jsx'
+
+// One line under each row's name on this page (components/Sections.jsx)
+const SECTION_SUBS = {
+  groceries: 'Your list, aisle by aisle',
+  recipes: 'Saved meals and ingredients',
+  trips: 'Plans and packing',
+  birthdays: 'Dates to remember',
+  gifts: 'Ideas and budgets',
+  cleaning: 'Rooms and routines',
+}
 
 function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   const { user } = useAuth()
@@ -59,7 +70,11 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.l.' + k) ?? localStorage.getItem(k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.l.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useUrlTab('groceries')
+  // Cleaning stays open with Pro (Groceries without, since Cleaning is Pro); the rest are rows (components/Sections.jsx)
+  const primary = isPro ? 'cleaning' : 'groceries'
+  const [tab, setTab] = useUrlTab(primary)
+  const pick = usePrimary(tab, setTab, primary)
+  const S = makeSections()
   const [trips, setTrips] = useState(() => lsGet('trips', []))
   const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', notes: '', packing: '' })
   const [birthdays, setBirthdays] = useState(() => lsGet('birthdays', []))
@@ -113,10 +128,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
   return (
     <div className="screen-stack">
       <PageHeader icon={Compass} title="Lifestyle" subtitle="Home, table, and the people you love" />
-      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
 
 
-      {tab === 'groceries' && (
+      {S.add('groceries', () => (
         <div>
           {/* Custom list */}
           <section className="card">
@@ -211,24 +225,24 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             ))}
           </section>
         </div>
-      )}
+      ))}
 
-      {tab === 'recipes' && (
+      {S.add('recipes', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <RecipeBook recipes={recipes} onSave={saveRecipes} groceries={groceries}
-            onAddToList={addToGroceries} onViewList={() => setTab('groceries')}
+            onAddToList={addToGroceries} onViewList={() => pick('groceries')}
             openId={openRecipeId} onOpened={() => navigate('/lifestyle?tab=recipes', { replace: true })}
             onToast={onToast} />
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'cleaning' && (
+      {S.add('cleaning', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <CleaningTracker />
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'gifts' && (
+      {S.add('gifts', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Gift Tracker</p>
@@ -319,9 +333,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
           )}
         </section>
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'trips' && (
+      {S.add('trips', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
@@ -377,9 +391,9 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             </div>
           </section>
         </div>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'birthdays' && (
+      {S.add('birthdays', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
@@ -435,8 +449,8 @@ function LifestylePage({ isPro = false, onUpgrade = () => {}, onToast }) {
             </div>
           </section>
         </div>
-      </ProTabGate>)}
-      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
+      </ProTabGate>))}
+      <SectionRows sections={S} tabs={TABS} primary={primary} tab={tab} onSelect={pick} subs={SECTION_SUBS} proTabs={PRO_TABS.lifestyle} isPro={isPro} />
     </div>
   )
 }

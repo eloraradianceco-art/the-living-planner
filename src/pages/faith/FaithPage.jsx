@@ -17,6 +17,7 @@ import { getVerseOfDay } from './verses.js'
 
 // One line under each row's name on this page (components/Sections.jsx)
 const SECTION_SUBS = {
+  past: 'Every day you have written, newest first',
   prayer: 'Requests, praises and answers',
   scripture: 'Verses to keep and memorize',
   reading: "Today's reading and your plan",
@@ -388,7 +389,6 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             style={{width:'100%',minHeight:200,padding:'12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
             fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.7,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
           <p className="muted" style={{fontSize:'.75rem',marginTop:6}}>Saved automatically. A fresh page each morning; past days stay below.</p>
-          <PastReflections items={reflections.filter((r) => r.date !== TODAY)} onDelete={deleteReflection} />
         </section>
       ))}
 
@@ -903,7 +903,13 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           </div>
         </section>
       </ProTabGate>))}
-      <SectionRows sections={S} tabs={TABS} primary="devotional" tab={tab} onSelect={setTab} subs={SECTION_SUBS} proTabs={PRO_TABS.faith} isPro={isPro} />
+      {/* Past Reflections sat inside Devotional; it is its own row since 2026-11-19 */}
+      {S.add('past', () => (
+        <section className="card">
+          <PastReflections items={reflections.filter((r) => r.date !== TODAY)} onDelete={deleteReflection} />
+        </section>
+      ))}
+      <SectionRows sections={S} tabs={[TABS[0], { id: 'past', label: '🗂️ Past Reflections' }, ...TABS.slice(1)]} primary="devotional" tab={tab} onSelect={setTab} subs={SECTION_SUBS} proTabs={PRO_TABS.faith} isPro={isPro} />
     </div>
   )
 }
