@@ -29,6 +29,20 @@ const TIME_ZONES = [
   ['Africa/Johannesburg', 'South Africa (Johannesburg)'], ['Asia/Dubai', 'Dubai'], ['Asia/Kolkata', 'India (Kolkata)'], ['Asia/Manila', 'Philippines (Manila)'],
   ['Asia/Tokyo', 'Japan (Tokyo)'], ['Australia/Sydney', 'Sydney'],
 ]
+// One Settings row: an emoji, a name and a line of what is inside; the block opens under it.
+function Fold({ id, emoji, title, sub, children }) {
+  return (
+    <details className="fold-row" id={id}>
+      <summary>
+        <span className="fold-emoji" aria-hidden="true">{emoji}</span>
+        <span className="fold-text"><span className="fold-label">{title}</span>{sub && <span className="fold-sub">{sub}</span>}</span>
+        <span aria-hidden="true" className="fold-caret">▾</span>
+      </summary>
+      <div className="fold-body">{children}</div>
+    </details>
+  )
+}
+
 function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, onDelete, onQuickCreate , triggerUpgrade}) {
   const { signOut, user } = useAuth()
   const [nameDraft, setNameDraft] = React.useState(profile.displayName || '')
@@ -45,6 +59,18 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       .then(({ data }) => { if (alive) setAppleSub(!!data?.active && (!data.expires_at || new Date(data.expires_at) > new Date())) })
     return () => { alive = false }
   }, [user?.id])
+
+  // /more#reminders (or any row's id, or an id inside a row) opens that row and brings it into view.
+  React.useEffect(() => {
+    const id = (window.location.hash || '').slice(1)
+    if (!id) return
+    const t = setTimeout(() => {
+      const el = document.getElementById(id)
+      const row = el && el.closest('details.fold-row')
+      if (row) { row.open = true; row.scrollIntoView({ block: 'start' }) }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [])
 
   return (
     <div className="screen-stack">
@@ -113,7 +139,10 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
         <p style={{fontSize:".62rem",fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",color:'var(--brass-fg)',margin:0}}>Settings</p>
       </div>
 
-      {/* ── Profile ────────────────────────────────────────────────── */}
+      {/* Settings blocks fold into rows (2026-11-18): the page was six screens long. Each row opens in place;
+          /more#<id> opens that row (for example /more#apple-calendar). Tests open every row with openFolds(). */}
+      <div className="fold-list">
+      <Fold id="profile" emoji="👤" title="Profile" sub="Your name and time zone">
       <section className="card">
         <div className="section-title-row" style={{marginBottom:14}}>
           <div><p className="eyebrow">Account</p><h3>Profile</h3></div>
@@ -153,8 +182,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           </label>
         </div>
       </section>
+      </Fold>
 
-      {/* ── Settings ───────────────────────────────────────────────── */}
+      <Fold id="preferences" emoji="⚙️" title="Preferences" sub="Completed tasks and calendar density">
       <section className="card">
         <div className="section-title-row" style={{marginBottom:12}}>
           <div><p className="eyebrow">Preferences</p><h3>Settings</h3></div>
@@ -169,44 +199,17 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           </div>
         ))}
       </section>
+      </Fold>
 
-      {/* ── Add to Home Screen (website only; the App Store app is already installed) ── */}
-      {!isNative && <section className="card">
-        <p className="eyebrow">Quick Access</p>
-        <button onClick={() => setA2hsOpen(true)} style={{
-          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
-          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
-          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
-        }}>
-          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>📱</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Add to Home Screen</div>
-            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Install the planner for full-screen, one-tap access</div>
-          </div>
-          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
-        </button>
-      </section>}
+      <Fold id="reminders" emoji="🔔" title="Reminders" sub="Notifications for tasks, events and habits">
+      <NotificationSettings settings={settings} updateSettings={updateSettings} />
+      </Fold>
 
-      {/* ── Ratings & Reviews ─────── */}
-      <section className="card">
-        <p className="eyebrow">Community</p>
-        <button onClick={() => setShowReviews(true)} style={{
-          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
-          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
-          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
-        }}>
-          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'1.1rem'}}>⭐</div>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Ratings &amp; Reviews</div>
-            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Share your experience or see what others say</div>
-          </div>
-          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
-        </button>
-      </section>
+      {isNative && (<Fold id="apple-calendar-row" emoji="📅" title="Apple Calendar" sub="Show your calendars beside your tasks">
+      <CalendarSettings />
+      </Fold>)}
 
-
-
-      {/* ── Sync / Data ────────────────────────────────────────────── */}
+      <Fold id="data" emoji="☁️" title="Data & Sync" sub="Backup and your devices">
       <section className="card">
         <p className="eyebrow">Data & Sync</p>
         <h3 style={{margin:'4px 0 14px'}}>Cross-Device Sync</h3>
@@ -235,27 +238,46 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           </div>
         )}
       </section>
+      </Fold>
 
-      {/* ── Sign out ───────────────────────────────────────────────── */}
-      <section className="card">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div>
-            <p className="eyebrow">Account</p>
-            <div style={{fontSize:'.85rem', color:'var(--muted)'}}>Signed in as {profile.displayName || 'User'}</div>
+      {!isNative && (<Fold id="install" emoji="📲" title="Add to Home Screen" sub="Open the planner like an app">
+      {!isNative && <section className="card">
+        <p className="eyebrow">Quick Access</p>
+        <button onClick={() => setA2hsOpen(true)} style={{
+          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
+          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
+          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
+        }}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--teal)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0}}>📱</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Add to Home Screen</div>
+            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Install the planner for full-screen, one-tap access</div>
           </div>
-          <button className="danger-btn" style={{fontSize:'.85rem', padding:'8px 16px'}} onClick={signOut}>Sign Out</button>
-        </div>
+          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
+        </button>
+      </section>}
+      </Fold>)}
+
+      <Fold id="reviews" emoji="⭐" title="Ratings & Reviews" sub="Tell us how it is going">
+      <section className="card">
+        <p className="eyebrow">Community</p>
+        <button onClick={() => setShowReviews(true)} style={{
+          width:'100%', display:'flex', alignItems:'center', gap:12, marginTop:8,
+          padding:'12px 14px', borderRadius:'var(--radius-sm)', background:'var(--surface)',
+          border:'1.5px solid var(--border2)', cursor:'pointer', textAlign:'left',
+        }}>
+          <div style={{width:40,height:40,borderRadius:'50%',background:'var(--brass)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'1.1rem'}}>⭐</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:'.9rem',color:'var(--ink)'}}>Ratings &amp; Reviews</div>
+            <div style={{fontSize:'.78rem',color:'var(--muted)',marginTop:2}}>Share your experience or see what others say</div>
+          </div>
+          <span style={{color:'var(--brass-fg)',fontSize:'1rem',flexShrink:0}}>→</span>
+        </button>
       </section>
+      </Fold>
 
-      {/* ── Push Notifications (coming soon) ──────────────────────────── */}
-
-      {/* ── Notifications ─────────────────────────────────────────── */}
-      <CalendarSettings />
-      <NotificationSettings settings={settings} updateSettings={updateSettings} />
-
-      {/* ── More from Elora Radiance ─────────────────────────────── */}
-      <details className="card fold-card">
-        <summary><span><span className="eyebrow" style={{display:'block'}}>Explore</span><span className="fold-title">More from Elora Radiance Co.</span></span><span aria-hidden="true" className="fold-caret">▾</span></summary>
+      <Fold id="explore" emoji="🧭" title="More from Elora Radiance Co." sub="Scripture-based tools for the whole Christian life">
+      <section className="card">
         <p className="muted" style={{fontSize:'.8rem',lineHeight:1.6,margin:'10px 0 14px'}}>Scripture-based tools for the whole Christian life.</p>
         {[
           { label:'Armed & Anchored', desc:'Spiritual warfare training — 26 weapons', url:'https://armed.eloraradiance.com/', icon:'⚔️' },
@@ -277,9 +299,10 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
             <span style={{color:'var(--brass-fg)',fontSize:'.95rem',flexShrink:0}}>↗</span>
           </a>
         ))}
-      </details>
+      </section>
+      </Fold>
 
-      {/* ── Privacy, account deletion and Scripture credits ──────────── */}
+      <Fold id="privacy" emoji="🔒" title="Privacy & Account" sub="Privacy, delete your account, Scripture credits">
       <section>
         <AccountPrivacy
           supabase={supabase}
@@ -291,8 +314,9 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           theme={PLANNER_SETTINGS_THEME}
         />
       </section>
+      </Fold>
 
-      {/* ── Support & Contact ──────────────────────────────────────── */}
+      <Fold id="support" emoji="💬" title="Support" sub="Email us; we answer within 24 hours">
       <section className="card" style={{background:'var(--ink)',border:'none'}}>
         <p className="eyebrow" style={{color:'var(--brass-fg)'}}>Support</p>
         <h3 style={{color:'var(--warm-white)',margin:'4px 0 14px'}}>We're here to help</h3>
@@ -324,6 +348,20 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
                  style={{color:'rgba(255,255,255,.72)',fontSize:'.78rem',textDecoration:'underline',textUnderlineOffset:3}}>{label}</a>
             ))}
           </div>
+        </div>
+      </section>
+      </Fold>
+
+      </div>
+
+      {/* ── Sign out ── */}
+      <section className="card">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <p className="eyebrow">Account</p>
+            <div style={{fontSize:'.85rem', color:'var(--muted)'}}>Signed in as {profile.displayName || 'User'}</div>
+          </div>
+          <button className="danger-btn" style={{fontSize:'.85rem', padding:'8px 16px'}} onClick={signOut}>Sign Out</button>
         </div>
       </section>
 

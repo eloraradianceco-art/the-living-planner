@@ -46,7 +46,7 @@ async function run() {
   await p.screenshot({ path: path.join(out, 'native-gate.png') })
 
   // 3. More page: no Upgrade button, no install card, no Stripe links
-  await p.goto(APP + '/more'); await p.waitForTimeout(2000)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2000); await H.openFolds(p)
   results.moreNoUpgrade = (await p.getByRole('button', { name: 'Upgrade', exact: true }).count()) === 0
   results.moreNoInstallCard = (await p.getByText('Install the planner for full-screen').count()) === 0
   results.noStripeLinksMore = !(await html()).includes('buy.stripe.com')
@@ -116,7 +116,7 @@ async function runWeb() {
   await ctx.addInitScript(([s]) => { try { localStorage.setItem('sb-localhost-auth-token', s); localStorage.setItem('planner_a2hs_seen', '1') } catch {} }, [JSON.stringify(session)])
   const p = await ctx.newPage()
   await fetch(DB + '/__set?tier=free')
-  await p.goto(APP + '/more'); await p.waitForTimeout(2500)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2500); await H.openFolds(p)
   const r = {}
   r.webUpgradeButton = (await p.getByRole('button', { name: 'Upgrade', exact: true }).count()) > 0
   r.webInstallCard = (await p.getByText('Install the planner for full-screen').count()) > 0

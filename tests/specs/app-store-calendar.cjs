@@ -157,7 +157,7 @@ const text = async (loc) => (await loc.innerText().catch(() => '')).replace(/\s+
   check("Home: today's Apple events with their calendar", /Small group/.test(home) && /Home/.test(home) && /Write sermon notes/.test(home), home)
 
   // ── 10. Settings: calendars by account, hide one, turn it off ──
-  await p.goto(APP + '/more'); await p.waitForTimeout(1800)
+  await p.goto(APP + '/more'); await p.waitForTimeout(1800); await H.openFolds(p)
   const card = p.locator('#apple-calendar')
   const cardText = await text(card)
   check('settings: connected, calendars grouped by account', /Showing on your Calendar and Home/.test(cardText) && /iCloud Home/i.test(cardText) && /Gmail Work/i.test(cardText) && /Subscribed US Holidays View only/i.test(cardText), cardText)
@@ -167,7 +167,7 @@ const text = async (loc) => (await loc.innerText().catch(() => '')).replace(/\s+
   await p.getByRole('button', { name: '+ Event' }).click(); await p.waitForTimeout(400)
   check('hidden calendar is not offered for new events', JSON.stringify(await saveTo.locator('option').allInnerTexts()) === JSON.stringify(['The Living Planner', 'Work (Gmail)']))
   await p.keyboard.press('Escape'); await p.locator('.modal-backdrop').click({ position: { x: 4, y: 4 } }).catch(() => {})
-  await p.goto(APP + '/more'); await p.waitForTimeout(1800)
+  await p.goto(APP + '/more'); await p.waitForTimeout(1800); await H.openFolds(p)
   await card.getByRole('button', { name: 'Stop showing Apple Calendar' }).click(); await p.waitForTimeout(400)
   check('turned off: Connect button is back', (await card.getByRole('button', { name: 'Connect Apple Calendar' }).count()) === 1)
   await p.goto(APP + '/calendar'); await p.waitForTimeout(2000)
@@ -180,14 +180,14 @@ const text = async (loc) => (await loc.innerText().catch(() => '')).replace(/\s+
   await ctx.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('planner_device_cal', JSON.stringify({ on: true, hidden: [], saveTo: '' })); sessionStorage.setItem('seeded', '1') } })
   await p.goto(APP + '/calendar'); await p.waitForTimeout(2500)
   check('already connected: events show on open, without asking again', (await p.locator('.time-card.device').count()) >= 2 && (await calls(p, 'requestFullCalendarAccess')).length === 0)
-  await p.goto(APP + '/more'); await p.waitForTimeout(1500)
+  await p.goto(APP + '/more'); await p.waitForTimeout(1500); await H.openFolds(p)
   await p.getByRole('button', { name: 'Sign Out' }).click(); await p.waitForTimeout(1500)
   check('sign-out clears the calendar choice on this device', (await p.evaluate(() => localStorage.getItem('planner_device_cal'))) === null)
   await ctx.close()
 
   // ── 12. Access denied in iOS ──
   ;({ ctx, p, errs } = await open(browser, { calendar: { permission: 'prompt', answer: 'denied', calendars: CALENDARS, events: EVENTS } }))
-  await p.goto(APP + '/more'); await p.waitForTimeout(2200)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2200); await H.openFolds(p)
   await p.locator('#apple-calendar').getByRole('button', { name: 'Connect Apple Calendar' }).click(); await p.waitForTimeout(600)
   check('denied: explains where to turn it on', /Calendar access is off/.test(await text(p.locator('#apple-calendar'))) && /Settings app/.test(await text(p.locator('#apple-calendar'))))
   await p.goto(APP + '/calendar'); await p.waitForTimeout(2000)
@@ -197,7 +197,7 @@ const text = async (loc) => (await loc.innerText().catch(() => '')).replace(/\s+
 
   // ── 13. Website: none of this appears ──
   ;({ ctx, p, errs } = await open(browser, { native: false }))
-  await p.goto(APP + '/more'); await p.waitForTimeout(2200)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2200); await H.openFolds(p)
   check('website: no Apple Calendar card in Settings', (await p.locator('#apple-calendar').count()) === 0)
   await p.goto(APP + '/calendar'); await p.waitForTimeout(2000)
   check('website: no offer on the Calendar', !/Apple Calendar/.test(await text(p.locator('body'))))

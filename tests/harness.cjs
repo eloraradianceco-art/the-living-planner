@@ -127,4 +127,7 @@ const DEVICES = {
   ipadPortrait: devices['iPad Pro 11'],
 }
 
-module.exports = { chromium, devices, DEVICES, APP, DB, UID, OUT, session, SESSION_KEY, db, report, ymd, addDays, fakeIphone }
+// Settings blocks are rows that open on tap (2026-11-18). A spec that works inside one opens them all first.
+const openFolds = (page) => page.evaluate(() => document.querySelectorAll('details.fold-row').forEach((d) => { d.open = true }))
+
+module.exports = { chromium, devices, DEVICES, APP, DB, UID, OUT, session, SESSION_KEY, db, report, ymd, addDays, fakeIphone, openFolds }

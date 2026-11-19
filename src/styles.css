@@ -2188,3 +2188,16 @@ details.grocery-cat > summary::-webkit-details-marker, details.fold-card > summa
 .fold-caret{color:var(--brass-text,#7D6230);font-size:.85rem;transition:transform .15s}
 details[open] > summary .fold-caret{transform:rotate(180deg)}
 .fold-title{font-family:var(--font-display,inherit);font-size:1.05rem;color:var(--ink)}
+
+/* Settings rows (2026-11-18) */
+.fold-list{background:var(--warm-white);border:1px solid var(--stone2);border-radius:18px;overflow:hidden}
+details.fold-row{border-top:1px solid var(--stone2)}
+details.fold-row:first-child{border-top:0}
+details.fold-row > summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 16px}
+details.fold-row > summary::-webkit-details-marker{display:none}
+.fold-emoji{flex:none;width:36px;height:36px;border-radius:10px;background:var(--stone);display:grid;place-items:center;font-size:1.15rem}
+.fold-text{flex:1;min-width:0;display:flex;flex-direction:column}
+.fold-label{font-weight:700;font-size:.95rem;color:var(--ink)}
+.fold-sub{font-size:.76rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fold-body{padding:0 10px 12px;display:grid;gap:12px;min-width:0}
+details.fold-row[open] > summary{background:var(--stone)}

@@ -25,7 +25,7 @@ const st = async () => (await fetch(DB + '/__state')).json()
   await p.getByRole('button', { name: '+ Habit' }).click(); await p.waitForTimeout(500)
   r.limitShown = (await p.locator('body').innerText()).match(/Free includes 5 habits[^\n]*/)?.[0] || 'none'
   // Profile: name saves once on blur, timezone select
-  await p.goto(APP + '/more'); await p.waitForTimeout(1500)
+  await p.goto(APP + '/more'); await p.waitForTimeout(1500); await H.openFolds(p)
   const writes0 = (await st()).profileWrites.length
   const name = p.getByLabel('Display Name'); await name.fill(''); await name.type('Anthony'); await p.waitForTimeout(300)
   const writesTyping = (await st()).profileWrites.length - writes0

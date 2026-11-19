@@ -119,7 +119,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
   await p.screenshot({ path: `${OUT}/${tier}-menu.png` })
 
   // Settings copy
-  await p.goto(APP + '/more'); await p.waitForTimeout(1000)
+  await p.goto(APP + '/more'); await p.waitForTimeout(1000); await H.openFolds(p)
   const more = await p.locator('main').innerText()
   check('Settings subscription copy', tier === 'free' ? /Free plan · 3 habits, 2 goals, 2 projects/.test(more) : /All features unlocked/.test(more))
   check('No page errors', errs.length === 0, errs.join(' | '))

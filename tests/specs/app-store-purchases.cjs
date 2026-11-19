@@ -122,7 +122,7 @@ const check = (name, ok, extra = '') => results.push((ok ? 'PASS ' : 'FAIL ') + 
   await p.screenshot({ path: path.join(out, 'iap-welcome.png') })
 
   // ── Settings: Apple subscriber → Manage opens Apple's subscriptions ──
-  await p.goto(APP + '/more'); await p.waitForTimeout(2000)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2000); await H.openFolds(p)
   check('Settings says it\'s an App Store subscription', /through the App Store/.test(await p.locator('main').innerText()))
   await p.getByRole('button', { name: 'Manage', exact: true }).click(); await p.waitForTimeout(300)
   check('Manage opens Apple\'s subscriptions', (await fake('opened')).includes('https://apps.apple.com/account/subscriptions'))
@@ -131,7 +131,7 @@ const check = (name, ok, extra = '') => results.push((ok ? 'PASS ' : 'FAIL ') + 
   // ── Restore on a fresh free account state ──
   await fetch(DB + '/__set?tier=free'); await fetch(DB + '/__apple?pro=0&ent=0')
   await p.evaluate(() => { window.__fake.owned = false; localStorage.setItem('planner_tier', 'free') })
-  await p.goto(APP + '/more'); await p.waitForTimeout(2000)
+  await p.goto(APP + '/more'); await p.waitForTimeout(2000); await H.openFolds(p)
   await p.getByRole('button', { name: 'Restore purchases' }).click(); await p.waitForTimeout(500)
   check('Restore with nothing to restore says so', /No Living Planner Pro subscription was found/.test(await p.locator('main').innerText()))
   await p.evaluate(() => { window.__fake.owned = true }); await fetch(DB + '/__apple?pro=1')
