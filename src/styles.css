@@ -2200,3 +2200,9 @@ details.fold-row > summary::-webkit-details-marker{display:none}
 .fold-sub{font-size:.76rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fold-body{padding:0 10px 12px;display:grid;gap:12px;min-width:0}
 details.fold-row[open] > summary{background:var(--stone)}
+
+/* Section rows (2026-11-19): Wellness, Faith and Productivity list their sections under the open one */
+.section-rows details.fold-row{scroll-margin-top:84px}
+.section-rows .fold-body > *{min-width:0;max-width:100%;box-sizing:border-box}
+.section-locked-list{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 0}
+.section-locked-chip{font-size:.78rem;color:var(--ink2);background:var(--stone);border-radius:999px;padding:5px 10px}

@@ -9,8 +9,18 @@ import { useAuth } from '../auth/AuthContext.jsx'
 import { useUrlTab } from '../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../components/Pro.jsx'
 import { EmptyState } from '../components/EmptyState.jsx'
-import { PageHeader, SectionPicker, TabNav } from '../components/PageHeader.jsx'
+import { PageHeader } from '../components/PageHeader.jsx'
+import { makeSections, SectionRows } from '../components/Sections.jsx'
 import { useOwnWrites, useRemotePageData } from '../lib/pageData.js'
+
+// One line under each row's name on this page (components/Sections.jsx)
+const SECTION_SUBS = {
+  braindump: 'Get it out of your head',
+  mindmap: 'Map an idea',
+  checklists: 'Reusable lists',
+  focus: 'Work in timed blocks',
+  tips: '20 tips for better focus',
+}
 
 function NoteComposer({ onSave }) {
   const [title, setTitle] = React.useState('')
@@ -107,7 +117,8 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   const lsGet = (k, d) => { try { const v = localStorage.getItem('planner.p.' + k); return v ? JSON.parse(v) : d } catch { return d } }
   const lsSet = (k, v) => { try { localStorage.setItem('planner.p.' + k, JSON.stringify(v)) } catch {} }
 
-  const [tab, setTab] = useUrlTab('braindump')
+  const [tab, setTab] = useUrlTab('notes')
+  const S = makeSections() // each section below registers here; SectionRows lays them out (components/Sections.jsx)
   const [noteQuery, setNoteQuery] = useState('')
   const notes = propNotes || []
   // notes now come from Supabase via props - use saveItem
@@ -192,10 +203,9 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
   return (
     <div className="screen-stack">
       <PageHeader icon={Zap} title="Productivity" subtitle="Do the work that matters" />
-      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.productivity} isPro={isPro} />
 
 
-      {tab === 'braindump' && (
+      {S.add('braindump', () => (
         <section className="card">
           <p className="eyebrow">Brain Dump</p>
           <h3 style={{ margin: '4px 0 8px' }}>Clear Your Head</h3>
@@ -208,9 +218,9 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             <button onClick={()=>{ if (String(brainDump || '').trim() && window.confirm('Clear your whole brain dump? This can\'t be undone.')) saveBrainDump('', true) }} style={{background:'none',border:'1px solid var(--border)',borderRadius:6,padding:'4px 10px',fontSize:'.75rem',color:'var(--muted)',cursor:'pointer'}}>Clear</button>
           </div>
         </section>
-      )}
+      ))}
 
-      {tab === 'focus' && (
+      {S.add('focus', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Focus Timer</p>
@@ -273,18 +283,18 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             ))}
           </div>
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
 
-      {tab === 'mindmap' && (
+      {S.add('mindmap', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade} title="Mind Map is part of Pro"
           text="Put one idea in the center and branch out. Plan a goal, take sermon notes, think through a decision."
           points={['Templates for goals, sermons, decisions, business ideas and projects', 'Turn any branch into a task', 'Map or outline view, copy as text']}>
           <MindMapTab maps={mindMaps} onSave={saveMindMaps} tasks={tasks} onMakeTask={mindMapTask} />
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'checklists' && (
+      {S.add('checklists', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <>
           {checklists.map((cl, ci) => (
@@ -330,11 +340,11 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               onClick={() => { if (!newChecklist) return; saveChecklists([...checklists, { id: Date.now(), title: newChecklist, items: [] }]); setNewChecklist('') }}>Create</button>
           </div>
         </>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
 
 
-            {tab === 'notes' && (
+            {S.add('notes', () => (
         <section className="card">
           <p className="eyebrow">Notes</p>
           <h3 style={{margin:'4px 0 14px'}}>My Notes</h3>
@@ -376,9 +386,9 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
               ))
           }
         </section>
-      )}
+      ))}
 
-      {tab === 'tips' && (
+      {S.add('tips', () => (
         <section className="card">
           <p className="eyebrow">Time Management</p>
           <h3 style={{margin:'4px 0 14px'}}>20 Tips for Better Focus</h3>
@@ -421,9 +431,9 @@ function ProductivityPage({ tasks, notes: propNotes, onQuickCreate, onToggle, on
             "The key is not to prioritize what's on your schedule, but to schedule your priorities." — Stephen Covey
           </div>
         </section>
-      )}
+      ))}
 
-      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
+      <SectionRows sections={S} tabs={TABS} primary="notes" tab={tab} onSelect={setTab} subs={SECTION_SUBS} proTabs={PRO_TABS.productivity} isPro={isPro} />
     </div>
   )
 }

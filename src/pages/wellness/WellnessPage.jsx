@@ -8,13 +8,30 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
+import { PageHeader } from '../../components/PageHeader.jsx'
+import { makeSections, SectionRows } from '../../components/Sections.jsx'
 import { mergeLegacyWorkouts, markLegacyWorkoutsMoved, HW_PREFIX, hwRead, useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
 import { readinessOf, readinessBand } from './helpers.js'
 import { sleepSpan, fmtHours } from '../../lib/sleep.js'
 import { TrainingTab, RecoveryTab } from './TrainingRecovery.jsx'
 import { DEFAULT_TARGETS, NutritionTab } from './NutritionTab.jsx'
 import { CareTab } from './CareTab.jsx'
+
+// One line under each row's name on this page (components/Sections.jsx)
+const SECTION_SUBS = {
+  training: 'Workouts and your training log',
+  recovery: 'Daily readiness check-in',
+  nutrition: 'Water, meals and targets',
+  sleep: 'Hours and quality',
+  metrics: 'Weight, blood pressure and measurements',
+  journal: 'Write it out',
+  routine: 'Your morning and evening rhythm',
+  anxiety: 'Daily check-in and triggers',
+  coping: 'Your toolkit for hard moments',
+  care: 'Vitals, appointments and labs',
+  meds: 'Medications and supplements',
+  migraines: 'Log an episode',
+}
 
 const WELLNESS_GROUPS = [
   { label: 'Body', ids: ['training', 'recovery', 'nutrition', 'sleep', 'metrics'] },
@@ -144,6 +161,7 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
 
   // ── Health state ────────────────────────────────────────────────────────
   const [tab, setTab] = useUrlTab('mood')
+  const S = makeSections() // each section below registers here; SectionRows lays them out (components/Sections.jsx)
   
   
 
@@ -227,16 +245,15 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
     <div className="screen-stack">
       <PageHeader icon={Leaf} title="Health & Wellness" subtitle="Care for the whole person" />
 
-      <SectionPicker tabs={WELLNESS_GROUPS.flatMap((g) => g.ids).map((id) => TABS.find((x) => x.id === id)).filter(Boolean)} groups={WELLNESS_GROUPS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.wellness} isPro={isPro} />
 
       {/* ── Mood ─────────────────────────────────────────────────── */}
-      {tab === 'training' && (
+      {S.add('training', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <TrainingTab workouts={workouts} onSave={saveWorkouts} />
         </ProTabGate>
-      )}
-      {tab === 'recovery' && <ProTabGate isPro={isPro} onUpgrade={onUpgrade}><RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} /></ProTabGate>}
-      {tab === 'nutrition' && (
+      ))}
+      {S.add('recovery', () => (<ProTabGate isPro={isPro} onUpgrade={onUpgrade}><RecoveryTab checkins={recovery} onSave={saveRecovery} sleep={sleep} /></ProTabGate>))}
+      {S.add('nutrition', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <section className="card" style={{marginBottom:14}}>
           {/* Water Intake */}
@@ -267,14 +284,14 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
           </section>
           <NutritionTab meals={meals} onSaveMeals={saveMeals} targets={nutritionTargets} onSaveTargets={saveTargets} water={waterLog[TODAY]} />
         </ProTabGate>
-      )}
-      {tab === 'care' && (
+      ))}
+      {S.add('care', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
           <CareTab vitals={vitals} onSaveVitals={saveVitals} appts={appts} onSaveAppts={saveAppts} labs={labs} onSaveLabs={saveLabs} onAddEvent={onAddEvent} />
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'mood' && (
+      {S.add('mood', () => (
         <div>
           <section className="card">
 
@@ -334,11 +351,11 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             </div>
           </section>
         </div>
-      )}
+      ))}
 
       {/* ── Sleep ────────────────────────────────────────────────── */}
       {/* ── Journal ──────────────────────────────────────────────── */}
-      {tab === 'journal' && (
+      {S.add('journal', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
@@ -376,10 +393,10 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             <button className="secondary-btn" style={{width:'100%'}} onClick={() => setJournalShown((n) => n + 10)}>Show older entries ({journalEntries.length - journalShown} more)</button>
           )}
         </div>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── Routine ──────────────────────────────────────────────── */}
-      {tab === 'routine' && (
+      {S.add('routine', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Daily Routine Builder</p>
@@ -429,11 +446,11 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             }}>Add to Routine</button>
           </div>
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── Reading ──────────────────────────────────────────────── */}
 
-      {tab === 'meds' && (
+      {S.add('meds', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <>
           <section className="card">
@@ -521,9 +538,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             )}
           </section>
         </>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'sleep' && (
+      {S.add('sleep', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Sleep Tracker</p>
@@ -616,9 +633,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             )
           })}
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'anxiety' && (
+      {S.add('anxiety', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Anxiety Tracker</p>
@@ -656,9 +673,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             ))}
           </div>
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'migraines' && (
+      {S.add('migraines', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Migraine & Headache Tracker</p>
@@ -712,9 +729,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             </div>
           ))}
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'coping' && (
+      {S.add('coping', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Coping Skills</p>
@@ -767,9 +784,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             </div>
           )}
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      {tab === 'metrics' && (
+      {S.add('metrics', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <div>
           <section className="card">
@@ -886,9 +903,9 @@ function HealthWellnessPage({ isPro = false, onUpgrade = () => {}, onAddEvent })
             </section>
           )}
         </div>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
-      <TabNav tabs={WELLNESS_GROUPS.flatMap((g) => g.ids).map((id) => TABS.find((t) => t.id === id)).filter(Boolean)} activeTab={tab} onSelect={setTab} />
+      <SectionRows sections={S} tabs={WELLNESS_GROUPS.flatMap((g) => g.ids).map((id) => TABS.find((t) => t.id === id)).filter(Boolean)} primary="mood" tab={tab} onSelect={setTab} subs={SECTION_SUBS} proTabs={PRO_TABS.wellness} isPro={isPro} />
     </div>
   )
 }

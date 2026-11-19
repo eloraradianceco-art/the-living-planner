@@ -44,10 +44,10 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   r.trips = (await p.locator('section.card').first().innerText()).split('\n').filter((l) => /trip|Past|in \d+ days/.test(l))
   // Meds: Friday → Vitamin D due, Fish oil not
   await p.goto(APP + '/wellness?tab=meds'); await p.waitForTimeout(1300)
-  r.meds = (await p.locator('section.card').first().innerText()).replace(/\s+/g, ' ').slice(0, 220)
+  r.meds = (await p.locator('#sec-meds section.card').first() /* sections are rows under the open one since 2026-11-19 */.innerText()).replace(/\s+/g, ' ').slice(0, 220)
   // Prayers
   await p.goto(APP + '/faith?tab=prayer'); await p.waitForTimeout(1500)
-  r.praise = (await p.locator('section.card').first().innerText()).split('\n').filter((l) => /✓|Answered/.test(l))
+  r.praise = (await p.locator('#sec-prayer section.card').first().innerText()).split('\n').filter((l) => /✓|Answered/.test(l))
   // Focus timer: break preset then work stays 25
   await p.goto(APP + '/productivity?tab=focus'); await p.waitForTimeout(1000)
   await p.getByRole('button', { name: /Short Break/ }).click()

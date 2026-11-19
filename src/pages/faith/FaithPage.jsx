@@ -10,9 +10,21 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { useUrlTab } from '../../shell/nav.js'
 import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
-import { FAITH_ICON_OVERRIDES, PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.jsx'
+import { FAITH_ICON_OVERRIDES, PageHeader } from '../../components/PageHeader.jsx'
+import { makeSections, SectionRows } from '../../components/Sections.jsx'
 import { useOwnWrites } from '../../lib/pageData.js'
 import { getVerseOfDay } from './verses.js'
+
+// One line under each row's name on this page (components/Sections.jsx)
+const SECTION_SUBS = {
+  prayer: 'Requests, praises and answers',
+  scripture: 'Verses to keep and memorize',
+  reading: "Today's reading and your plan",
+  gratitude: 'Count your blessings',
+  fasting: 'Discipline and consecration',
+  sermons: 'Capture what God says',
+  goals: 'Growing in the Spirit',
+}
 
 const FAITH_AREAS = ['Spiritual Growth', 'Prayer Life', 'Scripture Study', 'Community/Church', 'Service', 'Fasting', 'Evangelism', 'Discipleship']
 
@@ -213,6 +225,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
   const lsSet = (k, v) => { try { localStorage.setItem('planner.faith.' + k, JSON.stringify(v)) } catch {} }
 
   const [tab, setTab] = useUrlTab('devotional')
+  const S = makeSections() // each section below registers here; SectionRows lays them out (components/Sections.jsx)
 
   // Prayer journal state
   const [prayers, setPrayers] = useState(() => lsGet('prayers', []))
@@ -309,10 +322,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
         ))}
       </div>
 
-      <SectionPicker tabs={TABS} activeTab={tab} onSelect={setTab} proTabs={PRO_TABS.faith} isPro={isPro} iconOverrides={FAITH_ICON_OVERRIDES} />
 
       {/* ── DEVOTIONAL ─────────────────────────────────────────────────────── */}
-      {tab === 'devotional' && (
+      {S.add('devotional', () => (
         <section className="card">
           {/* Verse of the Day */}
           {(() => {
@@ -378,10 +390,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           <p className="muted" style={{fontSize:'.75rem',marginTop:6}}>Saved automatically. A fresh page each morning; past days stay below.</p>
           <PastReflections items={reflections.filter((r) => r.date !== TODAY)} onDelete={deleteReflection} />
         </section>
-      )}
+      ))}
 
       {/* ── PRAYER ─────────────────────────────────────────────────────────── */}
-      {tab === 'prayer' && (
+      {S.add('prayer', () => (
         <section className="card">
           <p className="eyebrow">Prayer Journal</p>
           <h3 style={{ margin: '4px 0 14px' }}>Your Prayer Life</h3>
@@ -466,10 +478,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             }}>+ Add Prayer</button>
           </div>
         </section>
-      )}
+      ))}
 
       {/* ── SCRIPTURE ──────────────────────────────────────────────────────── */}
-      {tab === 'scripture' && (
+      {S.add('scripture', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           {/* Memory Verse Practice */}
@@ -566,9 +578,9 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           </div>
         </section>
         </ProTabGate>
-      )}
+      ))}
 
-      {tab === 'reading' && (
+      {S.add('reading', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Bible Reading</p>
@@ -671,10 +683,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           </div>
         </section>
         </ProTabGate>
-      )}
+      ))}
 
       {/* ── GRATITUDE ──────────────────────────────────────────────────────── */}
-      {tab === 'gratitude' && (
+      {S.add('gratitude', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Gratitude Journal</p>
@@ -752,10 +764,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           ))}
         </section>
         </ProTabGate>
-      )}
+      ))}
 
       {/* ── FASTING ────────────────────────────────────────────────────────── */}
-      {tab === 'fasting' && (
+      {S.add('fasting', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Fasting Tracker</p>
@@ -805,10 +817,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             </div>
           )}
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── SERMONS ────────────────────────────────────────────────────────── */}
-      {tab === 'sermons' && (
+      {S.add('sermons', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <p className="eyebrow">Sermon Notes</p>
@@ -850,10 +862,10 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             }}>+ Save Notes</button>
           </div>
         </section>
-      </ProTabGate>)}
+      </ProTabGate>))}
 
       {/* ── FAITH GOALS (shared with Goals) ───────────────────────────────── */}
-      {tab === 'goals' && (
+      {S.add('goals', () => (
         <ProTabGate isPro={isPro} onUpgrade={onUpgrade}>
         <section className="card">
           <div className="section-title-row" style={{ marginBottom: 6 }}>
@@ -890,8 +902,8 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
             <small className="muted">Tap a goal to add steps, a target date or your why.</small>
           </div>
         </section>
-      </ProTabGate>)}
-      <TabNav tabs={TABS} activeTab={tab} onSelect={setTab} />
+      </ProTabGate>))}
+      <SectionRows sections={S} tabs={TABS} primary="devotional" tab={tab} onSelect={setTab} subs={SECTION_SUBS} proTabs={PRO_TABS.faith} isPro={isPro} />
     </div>
   )
 }

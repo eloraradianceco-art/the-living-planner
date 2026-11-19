@@ -267,7 +267,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </section>
 
       <div className="fold-list home-rows">
-      <Fold id="growth-week" emoji="🗣️" title="What the week is saying" sub="Insights from your last 7 days">
+      <Fold id="growth-week" emoji="🗣️" title="Weekly Pulse" sub="What the week is saying">
       <section className="card premium-card">
         <div className="section-title-row">
           <div>
@@ -285,7 +285,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </Fold>
 
       {/* ── Quick Status ────────────────────────────────────────────────── */}
-      <Fold id="growth-status" emoji="📍" title="Where you stand" sub="Habits, goals and tasks right now">
+      <Fold id="growth-status" emoji="📍" title="Today at a Glance" sub="Where you stand right now">
       <section className="card">
         <p className="eyebrow">Today at a Glance</p>
         <h3 style={{margin:'4px 0 14px'}}>Where you stand right now</h3>
@@ -307,7 +307,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </Fold>
 
       {/* ── Weekly Intention ────────────────────────────────────────────── */}
-      <Fold id="growth-intention" emoji="🎯" title="This week's intention" sub="What matters most this week?">
+      <Fold id="growth-intention" emoji="🎯" title="Weekly Intention" sub="What matters most this week?">
       <section className="card">
         <p className="eyebrow">Weekly Intention</p>
         <h3 style={{margin:'4px 0 8px'}}>What matters most this week?</h3>
@@ -320,7 +320,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </Fold>
 
       {/* ── Weekly Reflection ───────────────────────────────────────────── */}
-      <Fold id="growth-review" emoji="📝" title="End of Week Review" sub="Look back. Aim forward.">
+      <Fold id="growth-review" emoji="📝" title="Weekly Reflection" sub="End of week review">
       <section className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
           <div>
@@ -376,7 +376,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </Fold>
 
       {/* ── Personal Development ────────────────────────────────────────── */}
-      <Fold id="growth-principles" emoji="🌱" title="Principles for Growth" sub="Short reminders to grow by">
+      <Fold id="growth-principles" emoji="🌱" title="Personal Development" sub="Principles for growth">
       <section className="card">
         <p className="eyebrow">Personal Development</p>
         <h3 style={{margin:'4px 0 14px'}}>Principles for Growth</h3>
@@ -399,7 +399,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
       </Fold>
 
       {/* ── Reading (moved from Wellness) ─────────────────────────────────── */}
-      <Fold id="growth-reading" emoji="📚" title="Reading list" sub="Your library">
+      <Fold id="growth-reading" emoji="📚" title="Reading" sub="Your library">
       <ReadingList />
       </Fold>
       </div>
