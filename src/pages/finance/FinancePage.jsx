@@ -16,6 +16,7 @@ import { PageHeader, SectionPicker, TabNav } from '../../components/PageHeader.j
 import { money2, parseMoney, SavingsItem } from './Savings.jsx'
 import { DEBT_TYPES, debtTypeOf, utilTone, ExpenseRow } from './Expenses.jsx'
 import { useOwnWrites, useRemotePageData } from '../../lib/pageData.js'
+import { Fold } from '../../components/Fold.jsx'
 
 function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals, isPro = false, onUpgrade = () => {} }) {
   const { user } = useAuth()
@@ -1259,6 +1260,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           </section>
 
           {/* 50/30/20 allocation */}
+          <div className="fold-list home-rows">
+          <Fold id="budget-allocation" emoji="🧮" title="Spending allocation" sub="Where should your money go? (50/30/20)">
           <section className="card">
             <p className="eyebrow">Spending Allocation</p>
             <h3 style={{ margin: '4px 0 12px' }}>Where Should Your Money Go?</h3>
@@ -1286,8 +1289,10 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               )
             })}
           </section>
+          </Fold>
 
           {/* Savings rate */}
+          <Fold id="budget-savings-rate" emoji="💰" title="Your savings rate" sub="How much are you keeping?">
           <section className="card">
             <p className="eyebrow">Your Savings Rate</p>
             <h3 style={{ margin: '4px 0 14px' }}>How Much Are You Keeping?</h3>
@@ -1323,6 +1328,8 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
               )
             })()}
           </section>
+          </Fold>
+          </div>
         </div>
       )}
 

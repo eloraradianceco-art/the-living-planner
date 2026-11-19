@@ -12,12 +12,12 @@ const pd = async () => (await (await fetch(DB + '/__state')).json()).pageData ||
   // Old build left the intention under 'planner.gr.intention' (raw string) — it should still show
   await ctx.addInitScript((s) => { localStorage.setItem('sb-localhost-auth-token', s); localStorage.setItem('planner_a2hs_seen', '1'); if (!sessionStorage.getItem('seeded')) { localStorage.setItem('planner.gr.intention', 'Be patient'); sessionStorage.setItem('seeded', '1') } }, JSON.stringify(session))
   const p = await ctx.newPage(); const errs = []; p.on('pageerror', (e) => errs.push(e.message))
-  await p.goto('http://localhost:4830/growth'); await p.waitForTimeout(2000)
+  await p.goto('http://localhost:4830/growth'); await p.waitForTimeout(2000); await H.openFolds(p) /* Growth blocks are rows since 2026-11-19 */
   const ta = p.getByPlaceholder('This week I am committed to...')
   r.oldIntentionShown = await ta.inputValue()
   await ta.fill('Lead my home with patience'); await p.waitForTimeout(1200)
   r.intentionSynced = (await pd()).find((x) => x.page === 'growth' && x.data_key === 'intentionText')?.data_value
-  await p.reload(); await p.waitForTimeout(2000)
+  await p.reload(); await p.waitForTimeout(2000); await H.openFolds(p) /* Growth blocks are rows since 2026-11-19 */
   r.afterReload = await p.getByPlaceholder('This week I am committed to...').inputValue()
   r.cache = await p.evaluate(() => localStorage.getItem('planner.gr.intentionText'))
   r.errors = errs

@@ -3,6 +3,7 @@ import { Repeat } from 'lucide-react'
 import { TODAY, addDays, startOfWeek, endOfWeek, getWeekDays, isToday } from '../lib/dates.js'
 import { habitTimesPerWeek } from '../lib/score.js'
 import { PageNav } from '../components/PageNav.jsx'
+import { Fold } from '../components/Fold.jsx'
 import { EmptyState } from '../components/EmptyState.jsx'
 import { PageHeader } from '../components/PageHeader.jsx'
 
@@ -175,6 +176,8 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
       )}
 
       {/* Suggestions */}
+      <div className="fold-list home-rows">
+      <Fold id="habits-library" emoji="💡" title="50 Powerful Habits" sub="Tap any to add it">
       <section className="card">
         <p className="eyebrow">Habit Library</p>
         <h3 style={{margin:'4px 0 6px'}}>50 Powerful Habits</h3>
@@ -189,6 +192,8 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
           ))}
         </div>
       </section>
+      </Fold>
+      </div>
       <PageNav />
     </div>
   )
