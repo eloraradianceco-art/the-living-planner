@@ -7,6 +7,7 @@ import { TODAY, startOfWeek, endOfWeek, formatDateLabel } from '../lib/dates.js'
 import { SCORE_DOMAINS, DOMAIN_META, lifeScoreOf } from '../lib/score.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { PageNav } from '../components/PageNav.jsx'
+import { Fold } from '../components/Fold.jsx'
 import { EmptyState } from '../components/EmptyState.jsx'
 import { PageHeader } from '../components/PageHeader.jsx'
 import { useOwnWrites, useRemotePageData, usePageKey } from '../lib/pageData.js'
@@ -265,6 +266,8 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
         })()}
       </section>
 
+      <div className="fold-list home-rows">
+      <Fold id="growth-week" emoji="🗣️" title="What the week is saying" sub="Insights from your last 7 days">
       <section className="card premium-card">
         <div className="section-title-row">
           <div>
@@ -279,8 +282,10 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
           <div className="review-card"><strong>Finances</strong><p>{weeklyReview.money}</p></div>
         </div>
       </section>
+      </Fold>
 
       {/* ── Quick Status ────────────────────────────────────────────────── */}
+      <Fold id="growth-status" emoji="📍" title="Where you stand" sub="Habits, goals and tasks right now">
       <section className="card">
         <p className="eyebrow">Today at a Glance</p>
         <h3 style={{margin:'4px 0 14px'}}>Where you stand right now</h3>
@@ -299,8 +304,10 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
           ))}
         </div>
       </section>
+      </Fold>
 
       {/* ── Weekly Intention ────────────────────────────────────────────── */}
+      <Fold id="growth-intention" emoji="🎯" title="This week's intention" sub="What matters most this week?">
       <section className="card">
         <p className="eyebrow">Weekly Intention</p>
         <h3 style={{margin:'4px 0 8px'}}>What matters most this week?</h3>
@@ -310,8 +317,10 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
           style={{width:'100%',minHeight:80,padding:'10px 12px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',
           fontSize:'.9rem',fontFamily:'var(--serif)',lineHeight:1.6,resize:'vertical',background:'var(--warm-white)',color:'var(--ink)',boxSizing:'border-box'}} />
       </section>
+      </Fold>
 
       {/* ── Weekly Reflection ───────────────────────────────────────────── */}
+      <Fold id="growth-review" emoji="📝" title="End of Week Review" sub="Look back. Aim forward.">
       <section className="card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
           <div>
@@ -364,8 +373,10 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
             syncPageData('reviewAnswers',{})
           }}>Save This Week's Review</button>
       </section>
+      </Fold>
 
       {/* ── Personal Development ────────────────────────────────────────── */}
+      <Fold id="growth-principles" emoji="🌱" title="Principles for Growth" sub="Short reminders to grow by">
       <section className="card">
         <p className="eyebrow">Personal Development</p>
         <h3 style={{margin:'4px 0 14px'}}>Principles for Growth</h3>
@@ -385,9 +396,13 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
           </div>
         ))}
       </section>
+      </Fold>
 
       {/* ── Reading (moved from Wellness) ─────────────────────────────────── */}
+      <Fold id="growth-reading" emoji="📚" title="Reading list" sub="Your library">
       <ReadingList />
+      </Fold>
+      </div>
 
       <section className="card" style={{ padding: '12px 16px' }}>
         <Link to="/finance" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textDecoration: 'none', color: 'var(--ink2)', fontSize: '.85rem', fontWeight: 600 }}>
