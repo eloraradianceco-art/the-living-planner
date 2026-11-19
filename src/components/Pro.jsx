@@ -1,7 +1,7 @@
 // Pro: welcome banner, locked-tab gates, the upgrade sheet and App Store plans.
 import React, { useState } from 'react'
 import { isNative, purchasesInApp, storePlans, storeBuy, storeRestore } from '../native.js'
-import { STRIPE_CONFIG, PRO_PRICE_LINE, PRO_FEATURES, plannerCheckoutUrl } from '../lib/subscription.js'
+import { STRIPE_CONFIG, PRO_PRICE_LINE, PRO_GROUPS, plannerCheckoutUrl } from '../lib/subscription.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { PageNav } from './PageNav.jsx'
 import { PageHeader } from './PageHeader.jsx'
@@ -107,6 +107,27 @@ function ProSectionGate({ isPro, onUpgrade, icon, title, subtitle, gateTitle, te
 }
 
 
+// What Pro adds: three short groups of three, so the card reads in a few seconds.
+function ProGroups() {
+  return (
+    <div style={{ display: 'grid', gap: 8, margin: '0 0 16px', textAlign: 'left' }}>
+      {PRO_GROUPS.map(([title, items]) => (
+        <div key={title} style={{ background: 'var(--stone, #F5F2EC)', borderRadius: 14, padding: '11px 14px 9px' }}>
+          <div style={{ fontSize: '.66rem', fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--brass-text, #7D6230)', marginBottom: 6 }}>{title}</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 5 }}>
+            {items.map((t) => (
+              <li key={t} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
+                <span aria-hidden="true" style={{ flexShrink: 0, width: 17, height: 17, borderRadius: '50%', background: 'var(--teal)', color: 'white', fontSize: '.62rem', fontWeight: 700, display: 'grid', placeItems: 'center', marginTop: 2 }}>✓</span>
+                <span>{t}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── App Store purchase (Apple in-app purchase through RevenueCat) ──────────
 // Prices come from Apple for the person's own country. Pro attaches to the signed-in planner account.
 // Apple requires: the price and period, how renewal works, Restore Purchases, and links to the terms and privacy policy.
@@ -147,14 +168,7 @@ function NativeProPlans({ onDone }) {
   const btn = { display: 'block', width: '100%', padding: '14px', borderRadius: 14, fontWeight: 700, cursor: 'pointer', font: 'inherit', textAlign: 'center' }
   return (
     <div className="native-plans">
-      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', textAlign: 'left', display: 'grid', gap: 9 }}>
-        {PRO_FEATURES.map(([emoji, name, detail]) => (
-          <li key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
-            <span aria-hidden="true" style={{ fontSize: '1.05rem', lineHeight: 1.2 }}>{emoji}</span>
-            <span><strong>{name}</strong> <span style={{ color: 'var(--ink2)' }}>· {detail}</span></span>
-          </li>
-        ))}
-      </ul>
+      <ProGroups />
       {plans === undefined && <p className="muted" style={{ fontSize: '.85rem', margin: '0 0 16px' }}>Loading plans from the App Store…</p>}
       {plans === null && <p style={{ fontSize: '.85rem', color: 'var(--ink2)', lineHeight: 1.55, margin: '0 0 16px', background: 'var(--stone)', borderRadius: 12, padding: '12px 14px' }}>The App Store isn't reachable right now. Check your connection and try again.</p>}
       {plans && (
@@ -215,23 +229,19 @@ function UpgradeCard({ title, message, onClose }) {
         ) : isNative ? (
           <NativeProPlans onDone={onClose} />
         ) : (<>
-        <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px', textAlign: 'left', display: 'grid', gap: 9 }}>
-          {PRO_FEATURES.map(([emoji, name, detail]) => (
-            <li key={name} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: '.86rem', lineHeight: 1.4, color: 'var(--ink)' }}>
-              <span aria-hidden="true" style={{ fontSize: '1.05rem', lineHeight: 1.2 }}>{emoji}</span>
-              <span><strong>{name}</strong> <span style={{ color: 'var(--ink2)' }}>· {detail}</span></span>
-            </li>
-          ))}
-        </ul>
+        <ProGroups />
 
-        <div style={{ display: 'grid', gap: 10, marginBottom: 20 }}>
+        <div style={{ margin: '4px 0 14px' }}>
+          <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--ink)', lineHeight: 1.2 }}>$49.99 a year</div>
+          <div style={{ fontSize: '.82rem', color: 'var(--ink2)', marginTop: 2 }}>About $4.17 a month · Cancel anytime</div>
+        </div>
+        <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
           <a href={plannerCheckoutUrl(STRIPE_CONFIG.annualLink, user)} target="_blank" rel="noopener noreferrer" style={{
             display: 'block', padding: '16px', borderRadius: 14,
             background: 'var(--teal)', color: 'white', textDecoration: 'none',
             fontWeight: 700,
           }}>
-            <div style={{ fontSize: '.95rem' }}>Get Pro — $49.99 a year</div>
-            <div style={{ fontSize: '.78rem', opacity: .92, marginTop: 2 }}>About $4.17 a month · Cancel anytime</div>
+            <div style={{ fontSize: '1rem' }}>Get Pro</div>
           </a>
         </div>
         </>)}

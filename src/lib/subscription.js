@@ -53,13 +53,11 @@ const activeCount = (type, items = []) =>
   type === 'goal' ? items.filter((g) => !g.completed).length
     : type === 'project' ? items.filter((p) => p.status !== 'Completed').length
     : items.length
-const PRO_FEATURES = [
-  ['💰', 'Full Finance', 'income, bills, savings, debt payoff & credit cards, giving, net worth'],
-  ['❤️', 'Full Health & Wellness', 'training, nutrition, sleep, recovery, meds, body metrics'],
-  ['🙏', 'All of Faith', 'scripture, Bible reading plan, gratitude, fasting, sermons, faith goals'],
-  ['📈', 'Growth & Life Score', 'the 7 areas behind your score, 30-day trends, weekly review'],
-  ['♾️', 'No limits', 'unlimited habits, goals and projects, and every Home mode'],
-  ['🏡', 'Lifestyle & Focus', 'recipes, trips, birthdays, gifts, cleaning, mind maps, checklists, focus timer'],
+// What Pro adds, in three short groups (the upgrade card and the App Store purchase screen).
+const PRO_GROUPS = [
+  ['Plan without limits', ['Unlimited habits, goals and projects', 'Mind maps, checklists and focus timer', 'Every Home mode']],
+  ['Steward your money and health', ['Income, bills, savings, debt and giving', 'Training, nutrition, sleep and recovery', 'Recipes that fill your grocery list']],
+  ['Grow in faith', ['Scripture, reading plan and sermon notes', 'Gratitude, fasting and faith goals', 'Life Score trends and weekly review']],
 ]
 
 // ── Subscription Hook ─────────────────────────────────────────────────────
@@ -185,5 +183,5 @@ function useSubscription(user) {
 
 export {
   takeUpgradeIntent, STRIPE_CONFIG, PRO_PRICE_LINE, FREE_LIMITS, FREE_MODES, PRO_ROUTES,
-  activeCount, PRO_FEATURES, plannerCheckoutUrl, useSubscription,
+  activeCount, PRO_GROUPS, plannerCheckoutUrl, useSubscription,
 }

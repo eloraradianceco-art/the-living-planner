@@ -42,7 +42,7 @@ const check = (name, ok, extra = '') => { results.push((ok ? 'PASS ' : 'FAIL ') 
     check('Teaser opens upgrade card', await upgradeOpen())
     const txt = await p.locator('[role="dialog"][aria-modal="true"]').filter({ hasText: 'Get Pro' }).innerText()
     check('Upgrade card has no trial wording', !/trial/i.test(txt), txt.match(/.*trial.*/i)?.[0] || '')
-    check('Upgrade card lists Pro features', /Full Finance/.test(txt) && /No limits/.test(txt))
+    check('Upgrade card lists Pro in three groups', /Plan without limits/i.test(txt) && /Steward your money and health/i.test(txt) && /Grow in faith/i.test(txt) && /Unlimited habits, goals and projects/.test(txt))
     await p.screenshot({ path: `${OUT}/${tier}-upgrade.png` })
     await closeUpgrade()
   }
