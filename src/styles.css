@@ -1670,7 +1670,8 @@ button.profile-pill:active { transform: scale(.97); }
   width: 100%; box-sizing: border-box; padding: 9px 10px; font: inherit; font-size: 16px;
   border: 1.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--warm-white); color: var(--text);
 }
-.wl-grid3 { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; }
+.wl-grid3 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.wl-grid3 > * { min-width: 0; }
 .wl-ex-head { display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px; }
 .wl-ex-head span { font-size: .62rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brass-fg); }
 .wl-ex-head small { font-size: .7rem; color: var(--muted); }
@@ -2206,3 +2207,4 @@ details.fold-row[open] > summary{background:var(--stone)}
 .section-rows .fold-body > *{min-width:0;max-width:100%;box-sizing:border-box}
 .section-locked-list{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 0}
 .section-locked-chip{font-size:.78rem;color:var(--ink2);background:var(--stone);border-radius:999px;padding:5px 10px}
+.section-rows .fold-body input, .section-rows .fold-body select, .section-rows .fold-body textarea{min-width:0;max-width:100%;box-sizing:border-box}
