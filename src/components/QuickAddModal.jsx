@@ -1,7 +1,7 @@
 // The add / edit sheet for tasks, events, goals, projects, habits, notes and expenses.
 import { useEffect, useMemo, useState } from 'react'
 import { MapPin } from 'lucide-react'
-import { TODAY, addDays, EVENT_REPEATS, shiftEnd, endBeforeStart } from '../lib/dates.js'
+import { TODAY, addDays, EVENT_REPEATS, shiftEnd, endBeforeStart, goalTargetDate } from '../lib/dates.js'
 import { habitTimesPerWeek } from '../lib/score.js'
 import { mapsUrl, cleanPlace } from './Place.jsx'
 import { categories } from '../lib/plannerService.js'
@@ -13,7 +13,7 @@ const baseForms = {
   event: { title: '', date: TODAY, startTime: '09:00', endTime: '10:00', category: 'Business', location: '', recurrence: 'none', recurrenceUntil: '' },
   expense: { amount: '', category: 'Bills', date: TODAY, note: '' },
   note: { title: '', content: '', linkedType: '', linkedId: '' },
-  goal: { title: '', category: 'Health', targetDate: addDays(TODAY, 30), why: '', timeframe: '1yr', steps: [] },
+  goal: { title: '', category: 'Health', targetDate: goalTargetDate('1yr'), why: '', timeframe: '1yr', steps: [] }, // the date matches the time limit
   project: { title: '', goalId: '', dueDate: addDays(TODAY, 45), status: 'Active', description: '', steps: [] },
   habit: { title: '', category: 'Health' },
 }
@@ -168,7 +168,7 @@ function QuickAddModal({ isOpen, type = 'task', mode = 'create', item, onClose, 
           </>)}
 
           {selectedType === 'goal' && (<>
-            <label className="full-span">Timeframe<select value={form.timeframe||'1yr'} onChange={(e) => setForm({...form,timeframe:e.target.value})} style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}}><option value='1wk'>1 Week</option><option value='1mo'>1 Month</option><option value='6mo'>6 Months</option><option value='1yr'>1 Year</option><option value='3yr'>3 Years</option><option value='5yr'>5 Years</option></select></label>
+            <label className="full-span">Timeframe<select value={form.timeframe||'1yr'} onChange={(e) => setForm({...form,timeframe:e.target.value,targetDate:goalTargetDate(e.target.value)||form.targetDate})} /* choosing a time limit moves the target date to match; the date can still be changed after */ style={{padding:'9px 10px',border:'1.5px solid var(--border2)',borderRadius:'var(--radius-sm)',fontSize:'.9rem',background:'var(--stone)',color:'var(--text)'}}><option value='1wk'>1 Week</option><option value='1mo'>1 Month</option><option value='6mo'>6 Months</option><option value='1yr'>1 Year</option><option value='3yr'>3 Years</option><option value='5yr'>5 Years</option></select></label>
             <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{categories.map((category) => <option key={category}>{category}</option>)}</select></label>
             <label>Target Date<input type="date" value={form.targetDate} onChange={(e) => setForm({ ...form, targetDate: e.target.value })} /></label>
             <label className="full-span">Why<textarea rows="4" value={form.why || ''} onChange={(e) => setForm({ ...form, why: e.target.value })} /></label>

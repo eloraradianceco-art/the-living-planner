@@ -18,5 +18,43 @@
  "achieveLinkAfterNotYet": 1,
  "notYetRemembered": true,
  "taskFollowedProject": true,
+ "newGoalDefault": [
+  "1yr",
+  "2027-11-16"
+ ],
+ "dateFollowsTimeLimit": {
+  "1wk": "2026-11-23",
+  "1mo": "2026-12-16",
+  "6mo": "2027-05-16",
+  "1yr": "2027-11-16",
+  "3yr": "2029-11-16",
+  "5yr": "2031-11-16"
+ },
+ "dateCanStillBeChanged": [
+  "6mo",
+  "2027-06-30"
+ ],
+ "goalCategories": [
+  "Health",
+  "Lifestyle",
+  "Productivity",
+  "Wellness",
+  "Finances",
+  "Faith",
+  "Business",
+  "Personal"
+ ],
+ "savedPersonalGoal": [
+  "Personal",
+  "6mo",
+  "2027-05-16"
+ ],
+ "taskCategoriesIncludePersonal": true,
+ "endOfMonth": [
+  "2027-02-28",
+  "2027-02-28",
+  "2029-02-28",
+  null
+ ],
  "errors": []
 }

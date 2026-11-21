@@ -126,7 +126,7 @@ function GrowthPage({ scores, scoreDetails = {}, scoreHistory = [], scoreSeries 
     Faith: 'Daily reflection, Bible reading, prayer & gratitude, plus Faith habits and tasks.',
     Health: 'Workouts, sleep (quality + hours), water, recovery energy, meals logged, plus Health habits and tasks.',
     Wellness: 'Mood check-ins, calm (anxiety log), journal, daily routine, plus Wellness habits and tasks.',
-    Lifestyle: 'Daily and weekly chores in the cleaning tracker, plus Lifestyle habits and tasks.',
+    Lifestyle: 'Daily and weekly chores in the cleaning tracker, plus Lifestyle and Personal habits and tasks.',
     Productivity: 'Work and business tasks done when due, nothing piling up overdue, goal and project steps checked off, plus Productivity habits.',
     Finances: 'Spending vs your budget, counted by the week (when you log spending), adding to savings, plus Finance habits and tasks.',
   }

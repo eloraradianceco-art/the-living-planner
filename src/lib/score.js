@@ -152,7 +152,7 @@ function scoreDetailsAsOf({ tasks = [], expenses = [], habits = [], habitLogs = 
   const TODAY = SCORE_ASOF   // everything below measures the 7 days ending on this day
   const days = scoreWindow()
   const W = src.wellness || {}, F = src.faith || {}, P = src.productivity || {}, M = src.finance || {}
-  const otherAreas = new Set(['Health', 'Lifestyle', 'Wellness', 'Finances', 'Faith'])
+  const otherAreas = new Set(['Health', 'Lifestyle', 'Wellness', 'Finances', 'Faith', 'Personal']) // Personal counts toward Lifestyle, not work
   const parts = {}
 
   // Faith: reflection, Bible reading, prayer & gratitude, Faith habits/tasks
@@ -218,7 +218,8 @@ function scoreDetailsAsOf({ tasks = [], expenses = [], habits = [], habitLogs = 
     daysPart('Daily chores', choreDays, days, 7),
     usedWeekly ? { label: 'Weekly chores', detail: `${weeklyDone} done this week`, value: clamp01(weeklyDone / 5) } : null,
     habitsPart('Lifestyle', habits, habitLogs, days),
-    tasksPart('Lifestyle tasks', tasks, days, (t) => t.category === 'Lifestyle'),
+    habitsPart('Personal', habits, habitLogs, days),
+    tasksPart('Lifestyle and Personal tasks', tasks, days, (t) => t.category === 'Lifestyle' || t.category === 'Personal'),
   ]
 
   // Productivity: work tasks due this week, overdue load, goal/project steps, Productivity habits

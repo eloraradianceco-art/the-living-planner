@@ -47,7 +47,7 @@ function HabitsPage({ habits, habitLogs, onToggleHabit, onEdit, onDelete, onQuic
     ['Express gratitude to someone','Lifestyle'],['Rest without guilt','Wellness'],
   ]
 
-  const CAT_COLOR = {Health:'#B83A3A',Wellness:'#1F7A43',Productivity:'var(--teal)',Lifestyle:'var(--brass-fg)',Finances:'#4F46E5',Faith:'#8B3FD1'} // text-safe on light cards
+  const CAT_COLOR = {Health:'#B83A3A',Wellness:'#1F7A43',Productivity:'var(--teal)',Lifestyle:'var(--brass-fg)',Finances:'#4F46E5',Faith:'#8B3FD1',Personal:'#B4531A'} // text-safe on light cards
 
   return (
     <div className="screen-stack">

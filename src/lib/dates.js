@@ -64,6 +64,19 @@ function addMonthsKeepDay(dateString, n, day) {
   if (day > last) return null // e.g. the 31st in a 30-day month: skip that month
   return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
+// The target date that goes with a goal's time limit, counted from today: '6mo' → the same day six months on
+// (the 31st lands on the last day of a shorter month). Unknown limits leave the date alone.
+const GOAL_FRAME_MONTHS = { '1mo': 1, '6mo': 6, '1yr': 12, '3yr': 36, '5yr': 60 }
+function goalTargetDate(timeframe, from = TODAY) {
+  if (timeframe === '1wk') return addDays(from, 7)
+  const n = GOAL_FRAME_MONTHS[timeframe]
+  if (!n) return null
+  const [y, m, d] = from.split('-').map(Number)
+  const first = new Date(Date.UTC(y, m - 1 + n, 1))
+  const last = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
+  return `${first.getUTCFullYear()}-${String(first.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`
+}
+
 function expandEvents(events, from, to) {
   const out = []
   for (const ev of events || []) {
@@ -160,6 +173,7 @@ const hourLabel = (hh) => { const h = Number(String(hh).slice(0, 2)); return `${
 const shortTime = (t) => { const m = toMin(t); if (m == null) return ''; const h = Math.floor(m / 60), mi = m % 60; return `${h % 12 || 12}${mi ? ':' + String(mi).padStart(2, '0') : ''}${h < 12 ? 'a' : 'p'}` }
 
 export {
+  goalTargetDate,
   DEVICE_TIME_ZONE, dateOfStamp, getTodayString, TODAY, addDays, startOfWeek, endOfWeek,
   getWeekDays, EVENT_REPEATS, repeatLabel, expandEvents, getMonthDays, formatDateLabel, isToday,
   isOverdue, isThisWeek, shortDate, fmt12, fmtRange, toMin, shiftEnd, endBeforeStart, hourLabel,

@@ -20,6 +20,7 @@ const categories = [
   'Finances',
   'Faith',
   'Business',
+  'Personal', // 2026-11-21: personal items. In the Life Score they count toward Lifestyle (lib/score.js).
 ]
 
 const defaultData = {

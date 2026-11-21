@@ -96,6 +96,28 @@ const state = async () => (await fetch(DB + '/__state')).json()
   const t2 = (await state()).tables.tasks.find((t) => t.title === 'Upload build')
   r.taskFollowedProject = t2.goal_id === g2.id
 
+  // ── Time limit sets the target date; Personal category (2026-11-21). The fixed day is 2026-11-16. ──
+  await openAdd('Goal')
+  const tf = field('Timeframe').locator('select'), date = field('Target Date').locator('input')
+  r.newGoalDefault = [await tf.inputValue(), await date.inputValue()]
+  const dates = {}
+  for (const v of ['1wk', '1mo', '6mo', '1yr', '3yr', '5yr']) { await tf.selectOption(v); await p.waitForTimeout(100); dates[v] = await date.inputValue() }
+  r.dateFollowsTimeLimit = dates
+  await tf.selectOption('6mo'); await date.fill('2027-06-30'); await p.waitForTimeout(100)
+  r.dateCanStillBeChanged = [await tf.inputValue(), await date.inputValue()]
+  r.goalCategories = await field('Category').locator('option').allInnerTexts()
+  await modal().locator('input').first().fill('Read through the Psalms')
+  await field('Category').locator('select').selectOption('Personal')
+  await tf.selectOption('6mo'); await p.waitForTimeout(100)
+  await modal().locator('button[type="submit"], button:has-text("Save")').last().click(); await p.waitForTimeout(1200)
+  const pg = (await state()).tables.goals.find((g) => g.title === 'Read through the Psalms')
+  r.savedPersonalGoal = pg ? [pg.category, pg.timeframe, pg.target_date] : null
+  await openAdd('Task')
+  r.taskCategoriesIncludePersonal = (await field('Category').locator('option').allInnerTexts()).includes('Personal')
+  // a 6-month limit chosen on the 31st lands on the last day of a shorter month
+  const D = await import(require('url').pathToFileURL(require('path').join(__dirname, '../../src/lib/dates.js')).href)
+  r.endOfMonth = [D.goalTargetDate('6mo', '2026-08-31'), D.goalTargetDate('1mo', '2027-01-31'), D.goalTargetDate('1yr', '2028-02-29'), D.goalTargetDate('all', '2026-08-31')]
+
   r.errors = errors
   H.report(r)
   await browser.close(); process.exit(0)
