@@ -1026,6 +1026,11 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
 
 /* ── Side-nav layout: iPad (portrait + landscape) and desktop ───────── */
 @media (min-width: 761px) {
+  /* The top bar and the side menu stay put while the page scrolls. They are sticky, but `overflow-x: hidden` on both
+     html and body turns body into its own scroll box and cancels it; on these widths only body keeps it.
+     Phones are left as they were: the top bar scrolls away and the bottom tab bar stays. */
+  html { overflow-x: visible; }
+  details.fold-row { scroll-margin-top: calc(var(--topbar-h, 64px) + 12px); }
   .app-shell { max-width: 100%; padding: 0; border-left: none; border-right: none; }
   .app-frame.with-side-nav { display: flex; align-items: flex-start; min-height: calc(100vh - var(--topbar-h, 64px)); }
   .app-frame.with-side-nav .content {
