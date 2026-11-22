@@ -49,6 +49,15 @@
   "6mo",
   "2027-05-16"
  ],
+ "boxFloats": {
+  "clearOfEdges": true,
+  "corners": [
+   "28px",
+   "28px"
+  ],
+  "handleHidden": true,
+  "pageDoesNotScrollSideways": true
+ },
  "taskCategoriesIncludePersonal": true,
  "endOfMonth": [
   "2027-02-28",

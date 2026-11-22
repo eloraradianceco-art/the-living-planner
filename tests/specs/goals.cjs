@@ -113,6 +113,9 @@ const state = async () => (await fetch(DB + '/__state')).json()
   const pg = (await state()).tables.goals.find((g) => g.title === 'Read through the Psalms')
   r.savedPersonalGoal = pg ? [pg.category, pg.timeframe, pg.target_date] : null
   await openAdd('Task')
+  // The add box floats (2026-11-22): clear of all four edges, rounded all the way round, scrolls inside when tall
+  r.boxFloats = await p.evaluate(() => { const el = document.querySelector('.modal-sheet'); const b = el.getBoundingClientRect(); const cs = getComputedStyle(el)
+    return { clearOfEdges: b.top >= 12 && b.left >= 12 && window.innerHeight - b.bottom >= 12 && window.innerWidth - b.right >= 12, corners: [cs.borderTopLeftRadius, cs.borderBottomRightRadius], handleHidden: getComputedStyle(document.querySelector('.modal-handle')).display === 'none', pageDoesNotScrollSideways: document.documentElement.scrollWidth <= window.innerWidth } })
   r.taskCategoriesIncludePersonal = (await field('Category').locator('option').allInnerTexts()).includes('Personal')
   // a 6-month limit chosen on the 31st lands on the last day of a shorter month
   const D = await import(require('url').pathToFileURL(require('path').join(__dirname, '../../src/lib/dates.js')).href)
