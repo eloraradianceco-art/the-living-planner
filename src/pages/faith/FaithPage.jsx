@@ -12,6 +12,7 @@ import { PRO_TABS, ProTabGate } from '../../components/Pro.jsx'
 import { EmptyState } from '../../components/EmptyState.jsx'
 import { FAITH_ICON_OVERRIDES, PageHeader } from '../../components/PageHeader.jsx'
 import { makeSections, SectionRows } from '../../components/Sections.jsx'
+import { Fold } from '../../components/Fold.jsx'
 import { useOwnWrites } from '../../lib/pageData.js'
 import { getVerseOfDay } from './verses.js'
 
@@ -741,27 +742,52 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
               setNewGratitude('')
             }}>+ Add</button>
           </div>
-          {[...gratitude].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (Number(b.id) || 0) - (Number(a.id) || 0)).slice(0, 30).reduce((groups, item) => {
-            const g = groups.find(g => g.date === item.date)
-            if (g) g.items.push(item)
-            else groups.push({ date: item.date, items: [item] })
-            return groups
-          }, [])
-
-.map(group => (
-            <div key={group.date} style={{marginBottom:14}}>
-              <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6}}>
-                {group.date === TODAY ? 'Today' : group.date === addDays(TODAY, -1) ? 'Yesterday' : formatDateLabel(group.date, { weekday: 'short', month: 'short', day: 'numeric' })}
-              </p>
-              {group.items.map(item => (
-                <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
-                  <span style={{fontSize:'.88rem',color:'var(--ink)'}}>{item.text}</span>
-                  <button onClick={() => saveGratitude(gratitude.filter(g => g.id !== item.id))}
-                    style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',marginLeft:8}}>✕</button>
-                </div>
-              ))}
-            </div>
-          ))}
+          {/* Today's entries stay open; earlier days fold into one row (2026-11-21) */}
+          {(() => {
+            const sorted = [...gratitude].sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (Number(b.id) || 0) - (Number(a.id) || 0))
+            const group = (items) => items.reduce((groups, item) => {
+              const g = groups.find(g => g.date === item.date)
+              if (g) g.items.push(item)
+              else groups.push({ date: item.date, items: [item] })
+              return groups
+            }, [])
+            const row = (item) => (
+              <div key={item.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontSize:'.88rem',color:'var(--ink)',minWidth:0,overflowWrap:'anywhere'}}>{item.text}</span>
+                <button aria-label={`Remove ${item.text}`} onClick={() => saveGratitude(gratitude.filter(g => g.id !== item.id))}
+                  style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',marginLeft:8}}>✕</button>
+              </div>
+            )
+            const today = sorted.filter((g) => g.date === TODAY)
+            const earlier = sorted.filter((g) => g.date !== TODAY)
+            const shown = earlier.slice(0, 60) // the most recent 60 earlier entries
+            const days = group(shown)
+            return (
+              <>
+                {today.length > 0 && (
+                  <div style={{marginBottom:14}}>
+                    <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6}}>Today</p>
+                    {today.map(row)}
+                  </div>
+                )}
+                {earlier.length > 0 && (
+                  <div className="fold-list">
+                    <Fold id="gratitude-earlier" emoji="🗂️" title="Earlier entries" sub={`${earlier.length} blessing${earlier.length === 1 ? '' : 's'} over ${new Set(earlier.map((g) => g.date)).size} day${new Set(earlier.map((g) => g.date)).size === 1 ? '' : 's'}`}>
+                      {days.map((g) => (
+                        <div key={g.date} style={{marginBottom:14}}>
+                          <p style={{fontSize:'.78rem',fontWeight:700,color:'var(--brass-fg)',marginBottom:6}}>
+                            {g.date === addDays(TODAY, -1) ? 'Yesterday' : formatDateLabel(g.date, { weekday: 'short', month: 'short', day: 'numeric' })}
+                          </p>
+                          {g.items.map(row)}
+                        </div>
+                      ))}
+                      {earlier.length > shown.length && <p className="muted" style={{fontSize:'.78rem',margin:0}}>Showing the most recent {shown.length} of {earlier.length}.</p>}
+                    </Fold>
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </section>
         </ProTabGate>
       ))}

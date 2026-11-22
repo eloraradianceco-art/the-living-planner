@@ -15,6 +15,7 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   await pd('lifestyle', 'trips', [{ destination: 'Old trip', startDate: '2026-03-01', endDate: '2026-03-05' }, { destination: 'Next trip', startDate: '2026-12-20', endDate: '2026-12-27' }])
   await pd('wellness', 'meds', [{ name: 'Vitamin D', dose: '1000IU', time: 'AM', days: ['Mon', 'Wed', 'Fri'] }, { name: 'Fish oil', dose: '', time: '', days: ['Tue'] }])
   await fetch(DB + '/rest/v1/faith_data', { method: 'POST', body: JSON.stringify({ user_id: UID, data_key: 'prayers', data_value: [{ id: 1, text: 'Provision for the business', type: 'Request', date: '2026-11-01', answered: true, answeredDate: '2026-11-10' }, { id: 2, text: 'Health for Mom', type: 'Request', date: '2026-11-05' }] }) })
+  await fetch(DB + '/rest/v1/faith_data', { method: 'POST', body: JSON.stringify({ user_id: UID, data_key: 'gratitude', data_value: [{ id: 5, text: 'Morning coffee', date: '2026-11-13' }, { id: 4, text: 'Family', date: '2026-11-13' }, { id: 3, text: 'A good session with a client', date: '2026-11-12' }, { id: 2, text: 'Rain', date: '2026-11-10' }, { id: 1, text: 'Church', date: '2026-11-10' }] }) })
   const b = await chromium.launch(); const r = {}; const errs = []
   const ctx = await b.newContext({ ...devices['iPhone 14'], deviceScaleFactor: 1, timezoneId: 'America/Chicago' })
   await ctx.route(/fonts\./, (x) => x.fulfill({ body: '' }))
@@ -53,6 +54,18 @@ const get = async (k) => ((await st()).pageData.find((x) => x.data_key === k) ||
   await p.getByRole('button', { name: /Short Break/ }).click()
   await p.getByRole('button', { name: /Start/ }).click(); await p.clock.runFor(5 * 60 * 1000 + 2000); await p.waitForTimeout(300)
   r.afterBreak = (await p.locator('text=/\\d\\d:\\d\\d/').first().innerText())
+  // Gratitude (2026-11-21): today's entries stay open, earlier days fold into one row
+  await p.goto(APP + '/faith?tab=gratitude'); await p.waitForTimeout(1500)
+  const gr = p.locator('#sec-gratitude')
+  const vis = async (t) => await gr.getByText(t, { exact: true }).first().isVisible().catch(() => false)
+  r.gratitude = { todayOpen: await vis('Morning coffee') && await vis('Family'), earlierHidden: !(await vis('Rain')), row: (await gr.locator('#gratitude-earlier summary').innerText()).replace(/\s+/g, ' ').trim() }
+  if (process.env.SHOT) await p.screenshot({ path: process.env.SHOT + '/gratitude.png' })
+  await gr.locator('#gratitude-earlier > summary').click(); await p.waitForTimeout(300)
+  r.gratitude.earlierAfterTap = [await vis('Yesterday'), await vis('A good session with a client'), await vis('Rain'), await vis('Church')]
+  await gr.getByRole('button', { name: 'Remove Rain' }).click(); await p.waitForTimeout(400)
+  r.gratitude.afterRemove = (await gr.locator('#gratitude-earlier summary').innerText()).replace(/\s+/g, ' ').trim()
+  r.gratitude.wide = await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+
   r.errors = errs
   H.report(r); await b.close()
 })().catch((e) => { console.error(e); process.exit(1) })

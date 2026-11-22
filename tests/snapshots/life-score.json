@@ -29,5 +29,18 @@
   "✓ Answered"
  ],
  "afterBreak": "25:00",
+ "gratitude": {
+  "todayOpen": true,
+  "earlierHidden": true,
+  "row": "🗂️ Earlier entries 3 blessings over 2 days ▾",
+  "earlierAfterTap": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "afterRemove": "🗂️ Earlier entries 2 blessings over 2 days ▾",
+  "wide": 0
+ },
  "errors": []
 }
