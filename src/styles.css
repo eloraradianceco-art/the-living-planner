@@ -650,6 +650,8 @@ label { display: block; font-size: .8rem; font-weight: 600; color: var(--text2);
   .month-cell-num { align-self: flex-start; width: 24px; height: 24px; font-size: .78rem; }
   .month-dots { display: none; }
   .month-chips { display: grid; gap: 3px; }
+  .month-cell .month-holiday { justify-content: flex-start; padding: 0 4px; width: 100%; box-sizing: border-box; } /* wide screens: the holiday's name shows beside its emoji */
+  .month-cell .month-holiday-name { display: block; }
 }
 @container (min-width: 620px) {
   .month-cell { min-height: 108px; }
@@ -2208,3 +2210,11 @@ details.fold-row[open] > summary{background:var(--stone)}
 .section-locked-list{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 0}
 .section-locked-chip{font-size:.78rem;color:var(--ink2);background:var(--stone);border-radius:999px;padding:5px 10px}
 .section-rows .fold-body input, .section-rows .fold-body select, .section-rows .fold-body textarea{min-width:0;max-width:100%;box-sizing:border-box}
+
+/* Holidays on the calendar (2026-11-21): markers, not items */
+.cal-holiday{display:flex;align-items:center;gap:6px;margin:0 0 8px;padding:7px 10px;border-radius:10px;background:var(--stone);color:var(--ink);font-size:.82rem;font-weight:600;min-width:0}
+.week-card .cal-holiday{margin:6px 0;padding:5px 8px;font-size:.74rem}
+.month-holiday{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0;max-width:100%;line-height:1}
+.month-holiday-emoji{font-size:.72rem}
+.month-holiday-name{display:none;font-size:.64rem;font-weight:700;color:var(--brass-fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.month-cell.other-month .month-holiday{opacity:.5}

@@ -9,6 +9,7 @@ import { cleanPlace, PlaceLink, PlaceText } from '../components/Place.jsx'
 import { useResponsive } from '../lib/responsive.js'
 import { PageNav } from '../components/PageNav.jsx'
 import { deviceCal, useDeviceCalendar, useDeviceEvents } from '../lib/deviceCalendar.js'
+import { holidaysBetween, useHolidayPrefs } from '../lib/holidays.js'
 import { DeviceEventSheet } from '../components/DeviceEventSheet.jsx'
 
 // What each calendar item is called, and (for Apple Calendar events) its calendar's colour
@@ -33,6 +34,12 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
   const deviceCalendar = useDeviceCalendar()
   const deviceItems = useDeviceEvents(from, to)
   const [deviceItem, setDeviceItem] = useState(null)
+  // Holidays: worked out for the dates on screen, shown as markers (never items you can move or delete)
+  const [holidayPrefs] = useHolidayPrefs()
+  const holidays = useMemo(() => holidaysBetween(from, to, holidayPrefs), [from, to, holidayPrefs])
+  const holidayLine = (date) => (holidays[date] || []).map((h) => (
+    <div key={h.name} className="cal-holiday"><span aria-hidden="true">{h.emoji}</span> {h.name}</div>
+  ))
   const [tipHidden, setTipHidden] = useState(() => { try { return localStorage.getItem(TIP_KEY) === '1' } catch { return false } })
   const showTip = deviceCalendar.supported && !deviceCalendar.on && deviceCalendar.status !== 'denied' && deviceCalendar.status !== 'unknown' && !tipHidden
   const hideTip = () => { setTipHidden(true); try { localStorage.setItem(TIP_KEY, '1') } catch {} }
@@ -191,6 +198,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               {dayScheduled.length ? `${dayScheduled.length} scheduled` : 'Open day'}
             </span>
           </div>
+          {holidayLine(selectedDate)}
           {dayAllDay.length > 0 && (
             <div className="cal-allday">
               <div className="cal-allday-label">All day</div>
@@ -296,6 +304,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   <button className="day-chip" onClick={() => { setSelectedDate(date); setView('day') }}>
                     {formatDateLabel(date, { weekday: 'short', month: 'short', day: 'numeric' })}
                   </button>
+                  {holidayLine(date)}
                   {items.length === 0 ? <p className="muted" style={{fontSize:'.75rem'}}>Open</p> : items.map((item) => (
                     <button key={`${item.itemType}-${item.id}`} className={'week-item ' + item.itemType} style={tint(item)} onClick={() => openItem(item)}
                       draggable={canDrag(item)} onDragStart={(e) => e.dataTransfer.setData('application/json', JSON.stringify({ type: item.itemType, id: item.id, repeat: !!item.isRepeat }))}>
@@ -325,7 +334,9 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
               const inMonth = date.slice(0, 7) === monthKey
               const isSel = date === selectedDate
               const shown = items.length > 3 ? items.slice(0, 2) : items
+              const hol = holidays[date] || []
               const label = formatDateLabel(date, { weekday: 'long', month: 'long', day: 'numeric' })
+                + (hol.length ? `, ${hol.map((h) => h.name).join(' and ')}` : '')
                 + (items.length ? `, ${items.length} ${items.length === 1 ? 'item' : 'items'}` : '')
                 + (isSel ? '. Tap again to open the day' : '')
               return (
@@ -333,6 +344,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
                   aria-current={date === TODAY ? 'date' : undefined}
                   className={'month-cell' + (inMonth ? '' : ' other-month') + (date === TODAY ? ' today' : '') + (isSel ? ' selected' : '') + (i % 7 === 0 || i % 7 === 6 ? ' weekend' : '')}>
                   <span className="month-cell-num" aria-hidden="true">{Number(date.slice(8))}</span>
+                  {hol.length > 0 && <span className="month-holiday" aria-hidden="true"><span className="month-holiday-emoji">{hol[0].emoji}</span><span className="month-holiday-name">{hol[0].name}</span></span>}
                   {items.length > 0 && (<>
                     <span className="month-dots" aria-hidden="true">
                       {items.slice(0, 3).map((item) => <span key={`${item.itemType}-${item.id}`} className={`month-dot ${item.itemType}${item.itemType === 'task' && item.completed ? ' done' : ''}`} style={tint(item)} />)}
@@ -362,6 +374,7 @@ function CalendarPage({ tasks, events, settings, onEdit, onDelete, onQuickCreate
             </div>
             <button type="button" className="ghost-btn" onClick={() => setView('day')}>Open day →</button>
           </div>
+          {holidayLine(selectedDate)}
           {dayScheduled.length === 0 ? (
             <div className="month-agenda-empty">
               <span className="muted">Nothing planned.</span>

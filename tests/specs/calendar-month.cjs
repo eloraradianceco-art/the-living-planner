@@ -136,6 +136,35 @@ async function seed() {
     await p.goto(APP + '/'); await p.waitForTimeout(1800); await H.openFolds(p); await p.waitForTimeout(300) /* Home blocks are rows since 2026-11-19 */
     check(`${label} home timeline shows place`, /Main Street Dental/.test(await p.locator('body').innerText()))
 
+    // ── Holidays (2026-11-21). The fixed month is November 2026: Veterans Day the 11th, Thanksgiving the 26th. ──
+    await p.goto(APP + '/calendar'); await p.waitForTimeout(1500)
+    await p.getByRole('button', { name: 'month', exact: true }).click(); await p.waitForTimeout(500)
+    const cell = (d) => p.locator(`.month-cell[aria-label*="November ${d}"]`).first()
+    check(`${label} holidays: Thanksgiving marked on the 26th`, /Thanksgiving/.test(await cell(26).getAttribute('aria-label')) && (await cell(26).locator('.month-holiday').count()) === 1, await cell(26).getAttribute('aria-label'))
+    check(`${label} holidays: Veterans Day marked on the 11th`, /Veterans Day/.test(await cell(11).getAttribute('aria-label')))
+    check(`${label} holidays: an ordinary day has no marker`, (await cell(17).locator('.month-holiday').count()) === 0)
+    check(`${label} holidays: two this month`, (await p.locator('.month-cell:not(.other-month) .month-holiday').count()) === 2, await p.locator('.month-cell:not(.other-month) .month-holiday').count())
+    if (process.env.SHOT) await p.screenshot({ path: `${process.env.SHOT}/month-${label.replace(/\W+/g, '')}.png` })
+    await cell(26).click(); await p.waitForTimeout(400)
+    check(`${label} holidays: the day's list names it`, /Thanksgiving/.test(await p.locator('.month-agenda').innerText()))
+    check(`${label} holidays: it is not an item (nothing to open, drag or delete)`, (await p.locator('.month-agenda .agenda-row').count()) === 0 && /Nothing planned/.test(await p.locator('.month-agenda').innerText()))
+    await cell(26).click(); await p.waitForTimeout(600) // second tap opens the day
+    check(`${label} holidays: the day view shows it`, /Thanksgiving/.test(await p.locator('.cal-holiday').first().innerText().catch(() => '')))
+    check(`${label} holidays: nothing runs off the side`, (await p.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0)
+    // Settings: one group off, then all off
+    await p.goto(APP + '/more#preferences'); await p.waitForTimeout(1500)
+    await p.getByLabel('US federal holidays').uncheck(); await p.waitForTimeout(200)
+    await p.goto(APP + '/calendar'); await p.waitForTimeout(1500); await p.getByRole('button', { name: 'month', exact: true }).click(); await p.waitForTimeout(500)
+    check(`${label} holidays: federal off removes Thanksgiving and Veterans Day`, (await p.locator('.month-cell:not(.other-month) .month-holiday').count()) === 0)
+    await p.getByRole('button', { name: 'Next', exact: true }).click(); await p.waitForTimeout(600)
+    const dec = await p.locator('.month-cell:not(.other-month)[aria-label*="December"]').evaluateAll((els) => els.filter((e) => e.querySelector('.month-holiday')).map((e) => e.getAttribute('aria-label').replace(/\. Tap.*$/, '')))
+    check(`${label} holidays: Christmas stays under Christian, with Christmas Eve and New Year's Eve`, dec.length === 3 && /December 24, Christmas Eve/.test(dec[0]) && /December 25, Christmas Day/.test(dec[1]) && /December 31, New Year's Eve/.test(dec[2]), dec)
+    await p.goto(APP + '/more#preferences'); await p.waitForTimeout(1500)
+    await p.getByLabel('Show holidays on the calendar').uncheck(); await p.waitForTimeout(200)
+    check(`${label} holidays: turning them off hides the three groups`, (await p.getByLabel('US federal holidays').count()) === 0)
+    await p.goto(APP + '/calendar'); await p.waitForTimeout(1500); await p.getByRole('button', { name: 'month', exact: true }).click(); await p.waitForTimeout(500)
+    check(`${label} holidays: off means none`, (await p.locator('.month-holiday, .cal-holiday').count()) === 0)
+
     const st = await state()
     check(`${label} no schema errors`, !(st.schemaErrors || []).length, (st.schemaErrors || []).slice(0, 2))
     check(`${label} no page errors`, errors.length === 0, errors.slice(0, 3))

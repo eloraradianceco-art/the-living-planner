@@ -11,6 +11,7 @@ import { useAuth } from '../../auth/AuthContext.jsx'
 import { PLANNER_MODES, modeOf } from '../../shell/nav.js'
 import { PageNav } from '../../components/PageNav.jsx'
 import { Fold } from '../../components/Fold.jsx'
+import { GROUPS as HOLIDAY_GROUPS, useHolidayPrefs } from '../../lib/holidays.js'
 import { A2HSModal } from '../../components/A2HS.jsx'
 import { NotificationSettings } from './NotificationSettings.jsx'
 import { BackupButton } from './Backup.jsx'
@@ -37,6 +38,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
   React.useEffect(() => { setNameDraft(profile.displayName || '') }, [profile.displayName])
   const [a2hsOpen, setA2hsOpen] = React.useState(false)
   const [showReviews, setShowReviews] = React.useState(false)
+  const [holidayPrefs, setHolidayPrefs] = useHolidayPrefs()
   // App Store app: is this account's Pro an Apple subscription? (then Manage opens Apple's subscriptions)
   const [appleSub, setAppleSub] = React.useState(false)
   const [restoreMsg, setRestoreMsg] = React.useState('')
@@ -172,7 +174,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
       </section>
       </Fold>
 
-      <Fold id="preferences" emoji="⚙️" title="Preferences" sub="Completed tasks and calendar density">
+      <Fold id="preferences" emoji="⚙️" title="Preferences" sub="Completed tasks, calendar density and holidays">
       <section className="card">
         <div className="section-title-row" style={{marginBottom:12}}>
           <div><p className="eyebrow">Preferences</p><h3>Settings</h3></div>
@@ -184,6 +186,17 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           <div key={key} className="setting-row">
             <span style={{fontSize:'.9rem', color:'var(--text2)'}}>{label}</span>
             <input type="checkbox" checked={settings[key]} onChange={(e) => updateSettings({ ...settings, [key]: e.target.checked })} />
+          </div>
+        ))}
+        {/* Holidays on the calendar (lib/holidays.js): kept on this device */}
+        <div className="setting-row">
+          <span style={{fontSize:'.9rem', color:'var(--text2)'}}>Show holidays on the calendar</span>
+          <input type="checkbox" aria-label="Show holidays on the calendar" checked={holidayPrefs.on} onChange={(e) => setHolidayPrefs({ on: e.target.checked })} />
+        </div>
+        {holidayPrefs.on && HOLIDAY_GROUPS.map((g) => (
+          <div key={g.id} className="setting-row" style={{paddingLeft:16}}>
+            <span style={{fontSize:'.84rem', color:'var(--ink2)'}}>{g.label}</span>
+            <input type="checkbox" aria-label={g.label} checked={holidayPrefs[g.id]} onChange={(e) => setHolidayPrefs({ [g.id]: e.target.checked })} />
           </div>
         ))}
       </section>
