@@ -457,9 +457,9 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
         <span className="pro-tag">PRO</span>
       </div>
       <p className="muted" style={{fontSize:'.86rem',lineHeight:1.55,margin: purchasesInApp ? '0 0 12px' : 0}}>
-        Pro breaks your Life Score into its 7 areas, tracks it over 30 days, and walks you through a weekly review.{!purchasesInApp && ' If you have Pro, sign in with that account to see it.'}
+        Pro breaks your Life Score into its 6 areas, tracks it over 30 days, and walks you through a weekly review.{!purchasesInApp && ' If you have Pro, sign in with that account to see it.'}
       </p>
-      {purchasesInApp && <button type="button" className="primary-btn" onClick={() => onUpgrade('See your full Life Score', 'Your score in 7 areas, 30-day trends and a weekly review, plus everything else in Pro.')}>Unlock Pro →</button>}
+      {purchasesInApp && <button type="button" className="primary-btn" onClick={() => onUpgrade('See your full Life Score', 'Your score in 6 areas, 30-day trends and a weekly review, plus everything else in Pro.')}>Unlock Pro →</button>}
     </section>
   ) : (
     <>
@@ -697,7 +697,7 @@ function HomePage({ isPro = false, onUpgrade = () => {}, tasks, goals, projects,
     overdue:     { emoji: '⚠️', title: 'Overdue', sub: `${overdueTasks.length} task${overdueTasks.length === 1 ? '' : 's'} past due`, show: overdueTasks.length > 0 },
     metrics:     { emoji: '📊', title: "Today's numbers", sub: `${insights.openTasks} open · ${insights.completionRate}% of the week done` },
     quick:       { emoji: '🧭', title: 'Quick Access', sub: 'Every section of your planner' },
-    score:       { emoji: '⚖️', title: 'Life Score by area', sub: isPro ? 'Your 7 areas, last 7 days' : "See what's behind your score" },
+    score:       { emoji: '⚖️', title: 'Life Score by area', sub: isPro ? 'Your 6 areas, last 7 days' : "See what's behind your score" },
     goals:       { emoji: '🎯', title: 'Goals', sub: `${activeGoals} active`, show: topGoals.length > 0 },
     suggestions: { emoji: '💡', title: 'Suggestions', sub: `${suggestions.length} for today`, show: suggestions.length > 0 },
     woty:        { emoji: '✨', title: 'Word of the Year', sub: woty ? String(woty) : 'Choose your word' },

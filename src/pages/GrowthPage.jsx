@@ -1,4 +1,4 @@
-// Growth: Life Score in 7 areas, trend, weekly review, reading list.
+// Growth: Life Score in 6 areas, trend, weekly review, reading list.
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TrendingUp } from 'lucide-react'
