@@ -49,4 +49,8 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        # The build is uploaded and is available to internal testers (the people on the App Store Connect team)
+        # as soon as Apple finishes processing it. Set this to true only once outside testers are wanted AND
+        # TestFlight → Test Information (description, feedback email, contact, review notes) is filled in:
+        # with it on and that page empty, the upload still succeeds but this step ends red.
+        submit_to_testflight: false
