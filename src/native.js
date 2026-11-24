@@ -20,7 +20,7 @@ export const WEB_ORIGIN = 'https://planner.eloraradiance.com'
 // It turns on by itself once REVENUECAT_IOS_KEY holds the app's public RevenueCat key (starts with "appl_";
 // it is meant to ship inside the app). Until then the app shows no prices or buy buttons, and people who
 // already have Pro sign in and have it. Setup steps: claude/in-app-purchases.md in the project.
-export const REVENUECAT_IOS_KEY = '' || import.meta.env.VITE_REVENUECAT_IOS_KEY || ''  // key goes in the first quotes
+export const REVENUECAT_IOS_KEY = import.meta.env.VITE_REVENUECAT_IOS_KEY ?? 'appl_SbDdDUDuQWFLokHdecbgNhVYWIt'  // public key (safe to ship); the tests override it
 export const NATIVE_PURCHASES = isNative && nativePlatform === 'ios' && /^appl_/.test(REVENUECAT_IOS_KEY)
 export const purchasesInApp = !isNative || NATIVE_PURCHASES
 

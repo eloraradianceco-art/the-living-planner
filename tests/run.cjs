@@ -27,7 +27,7 @@ process.env.TZ = 'America/Chicago' // specs and the browser run in one fixed tim
 
 // Build variants. "iap" carries a test App Store key so the in-app purchase screens can be exercised.
 const VARIANTS = {
-  web: { VITE_SUPABASE_URL: 'http://localhost:4831', VITE_SUPABASE_ANON_KEY: 'test-anon-key' },
+  web: { VITE_SUPABASE_URL: 'http://localhost:4831', VITE_SUPABASE_ANON_KEY: 'test-anon-key', VITE_REVENUECAT_IOS_KEY: '' }, // purchases off: the app's fallback when no key is set
   iap: { VITE_SUPABASE_URL: 'http://localhost:4831', VITE_SUPABASE_ANON_KEY: 'test-anon-key', VITE_REVENUECAT_IOS_KEY: 'appl_testkey' },
 }
 
