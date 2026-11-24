@@ -46,7 +46,8 @@ async function syncUser(userId: string, apiKey: string) {
   const { data: who } = await sb.auth.admin.getUserById(userId)
   if (!who?.user) return { userId, skipped: 'no such account' }
   const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(userId)}`, {
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'X-Platform': 'ios' },
+    // No X-Platform header: RevenueCat treats a secret key sent with it as a key leaked into an app and answers 403 (code 7243).
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
   })
   if (!res.ok) throw new Error(`RevenueCat ${res.status}`)
   const row = entitlementRow(userId, (await res.json()).subscriber || {})
