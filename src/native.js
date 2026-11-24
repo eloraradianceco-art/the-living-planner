@@ -35,9 +35,11 @@ let storeUser = null
 export async function storeSignIn(userId) {
   if (!NATIVE_PURCHASES || !userId) return false
   try {
-    if (!storeReady) storeReady = Purchases.configure({ apiKey: REVENUECAT_IOS_KEY, appUserID: userId }).then(() => true)
+    if (!storeReady) storeReady = Purchases.configure({ apiKey: REVENUECAT_IOS_KEY, appUserID: userId }).then(() => { storeUser = userId; return true })
     await storeReady
-    if (storeUser && storeUser !== userId) await Purchases.logIn({ appUserID: userId })
+    // Also after a sign-out (storeUser is null then): without this the next person to sign in stayed anonymous in the
+    // store, so Apple took their purchase but it was never tied to their account.
+    if (storeUser !== userId) await Purchases.logIn({ appUserID: userId })
     storeUser = userId
     return true
   } catch { storeReady = null; return false }
