@@ -14,6 +14,8 @@ export const NOTICES = {
   NIV_ALL: 'All Scripture quotations, unless otherwise indicated, are taken from the Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.® Used by permission of Zondervan. All rights reserved worldwide. www.zondervan.com The “NIV” and “New International Version” are trademarks registered in the United States Patent and Trademark Office by Biblica, Inc.®',
   NKJV: 'Scripture quotations marked (NKJV) are taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. Used by permission. All rights reserved.',
   NLT: 'Scripture quotations marked (NLT) are taken from the Holy Bible, New Living Translation, copyright ©1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Carol Stream, Illinois 60188. All rights reserved.',
+  BSB: 'Scripture quotations are from the Holy Bible, Berean Standard Bible (BSB), which has been dedicated to the public domain. berean.bible',
+  BSB_MARKED: 'Scripture quotations marked (BSB) are from the Holy Bible, Berean Standard Bible, which has been dedicated to the public domain. berean.bible',
   KJV: 'Scripture quotations marked (KJV) are from the King James Version, which is in the public domain in the United States.',
 }
 

@@ -32,13 +32,13 @@ const FAITH_AREAS = ['Spiritual Growth', 'Prayer Life', 'Scripture Study', 'Comm
 
 // Today's Anchor verse, by day of the week (also labels each past reflection)
 const FAITH_ANCHORS = [
-  '"Trust in the Lord with all your heart and lean not on your own understanding." — Proverbs 3:5',
-  '"I can do all things through Christ who strengthens me." — Philippians 4:13 NKJV',
+  '"Trust in the LORD with all your heart, and lean not on your own understanding." — Proverbs 3:5',
+  '"I can do all things through Christ who gives me strength." — Philippians 4:13',
   '"Be still and know that I am God." — Psalm 46:10',
-  '"For I know the plans I have for you, declares the Lord, plans to prosper you." — Jeremiah 29:11',
-  '"The Lord is my shepherd; I shall not want." — Psalm 23:1 KJV',
-  '"Let your light shine before others, that they may see your good deeds." — Matthew 5:16',
-  '"And we know that in all things God works for the good of those who love him." — Romans 8:28',
+  '"For I know the plans I have for you, declares the LORD, plans to prosper you and not to harm you, to give you a future and a hope." — Jeremiah 29:11',
+  '"The LORD is my shepherd; I shall not want." — Psalm 23:1',
+  '"Let your light shine before men, that they may see your good deeds and glorify your Father in heaven." — Matthew 5:16',
+  '"And we know that God works all things together for the good of those who love Him, who are called according to His purpose." — Romans 8:28',
 ]
 const anchorFor = (ymd) => FAITH_ANCHORS[new Date(ymd + 'T12:00:00').getDay() % 7]
 // Reflections: one entry per day, newest first ([{ date, text }]). Older builds kept only today's ({ text, date }).
@@ -417,7 +417,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
                   <strong style={{fontSize:'.78rem',color:'var(--success)'}}>{answered.length} answered</strong>
                 </div>
                 <p style={{fontSize:'.78rem',color:'var(--ink2)',marginBottom:10,fontStyle:'italic'}}>
-                  "Give thanks to the Lord, for he is good; his love endures forever." — Psalm 107:1
+                  "Give thanks to the LORD, for He is good; His loving devotion endures forever." — Psalm 107:1
                 </p>
                 {/* One list of answered prayers (the box showed blanks — it read p.title, prayers store p.text — and a second list repeated them) */}
                 <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:260,overflow:'auto'}}>
@@ -587,7 +587,7 @@ function FaithPage({ isPro = false, onUpgrade = () => {}, goals = [], tasks = []
           <p className="eyebrow">Bible Reading</p>
           <h3 style={{margin:'4px 0 8px'}}>Daily Reading</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
-            "Man shall not live by bread alone, but by every word that comes from the mouth of God." — Matthew 4:4 ESV
+            "Man shall not live on bread alone, but on every word that comes from the mouth of God." — Matthew 4:4
           </p>
 
           {/* Plan selector */}

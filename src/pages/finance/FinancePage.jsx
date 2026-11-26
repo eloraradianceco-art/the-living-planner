@@ -432,7 +432,7 @@ function FinancePage({ expenses, budget, setBudget, saveItem, deleteItem, goals,
           <p className="eyebrow">Giving</p>
           <h3 style={{ margin: '4px 0 8px' }}>Tithes & Offerings</h3>
           <p className="muted" style={{fontSize:'.8rem',marginBottom:14}}>
-            "Bring the whole tithe into the storehouse" — Malachi 3:10
+            "Bring the full tithe into the storehouse" — Malachi 3:10
           </p>
 
           {/* Summary stats */}

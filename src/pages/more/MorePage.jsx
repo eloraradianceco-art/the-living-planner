@@ -311,7 +311,7 @@ function MorePage({ profile, settings, updateProfile, updateSettings, onEdit, on
           deletes="This permanently deletes your Living Planner account and everything in it: tasks, events, goals, habits, notes, journal, finances, faith and wellness entries, and settings. It can't be undone. Your account in the other Elora Radiance apps is separate and isn't affected."
         />
         <ScriptureCredits
-          notices={['NIV_ALL', 'ESV', 'NKJV', 'KJV']}
+          notices={['BSB']}
           theme={PLANNER_SETTINGS_THEME}
         />
       </section>

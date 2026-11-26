@@ -15,8 +15,7 @@ function ModeSheet({ open, current, onPick, onClose, isPro = true }) {
   return (
     <div className={'menu-sheet-root' + (open ? ' open' : '')} aria-hidden={!open}>
       <div className="menu-backdrop" onClick={onClose} />
-      <div className="menu-sheet" role="dialog" aria-modal="true" aria-label="Planner mode">
-        <div className="menu-grabber" />
+      <div className="menu-sheet mode-sheet" role="dialog" aria-modal="true" aria-label="Planner mode">
         <div className="menu-head">
           <span>Planner mode</span>
           <button className="menu-close" onClick={onClose} aria-label="Close"><X size={18} /></button>
